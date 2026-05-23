@@ -97,35 +97,49 @@ struct SongSortButton: View {
 
     private var sortOptions: some View {
         VStack(alignment: .leading, spacing: 4) {
-            sortOptionButton(settings.text(.title), field: .title, order: .forward)
-            sortOptionButton(settings.text(.titleDescending), field: .title, order: .reverse)
+            sortFieldButton(settings.text(.title), field: .title)
+            sortFieldButton(settings.text(.artist), field: .artist)
+            sortFieldButton(settings.text(.album), field: .album)
+            sortFieldButton(settings.text(.duration), field: .duration)
+            sortFieldButton(settings.text(.playCount), field: .playCount)
+            sortFieldButton(settings.text(.dateAdded), field: .dateAdded)
             Divider()
-            sortOptionButton(settings.text(.artist), field: .artist, order: .forward)
-            sortOptionButton(settings.text(.artistDescending), field: .artist, order: .reverse)
-            Divider()
-            sortOptionButton(settings.text(.album), field: .album, order: .forward)
-            sortOptionButton(settings.text(.albumDescending), field: .album, order: .reverse)
-            Divider()
-            sortOptionButton(settings.text(.duration), field: .duration, order: .forward)
-            sortOptionButton(settings.text(.durationDescending), field: .duration, order: .reverse)
-            Divider()
-            sortOptionButton(settings.text(.playCount), field: .playCount, order: .reverse)
-            sortOptionButton(settings.text(.playCountAscending), field: .playCount, order: .forward)
-            Divider()
-            sortOptionButton(settings.text(.dateAdded), field: .dateAdded, order: .reverse)
-            sortOptionButton(settings.text(.dateAddedAscending), field: .dateAdded, order: .forward)
+            sortOrderButton(settings.text(.ascending), order: .forward)
+            sortOrderButton(settings.text(.descending), order: .reverse)
         }
     }
 
-    private func sortOptionButton(_ title: String, field: SongSortField, order: Foundation.SortOrder) -> some View {
+    private func sortFieldButton(_ title: String, field: SongSortField) -> some View {
         Button {
-            setSort(field, order: order)
-            isPopoverPresented = false
+            setSort(field, order: activeSortOrder)
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "checkmark")
                     .font(.system(size: 13, weight: .semibold))
-                    .opacity(activeSortField == field && activeSortOrder == order ? 1 : 0)
+                    .opacity(activeSortField == field ? 1 : 0)
+                    .frame(width: 16)
+
+                Text(title)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(MintRowButtonStyle())
+    }
+
+    private func sortOrderButton(_ title: String, order: Foundation.SortOrder) -> some View {
+        Button {
+            setSort(activeSortField, order: order)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .opacity(activeSortOrder == order ? 1 : 0)
                     .frame(width: 16)
 
                 Text(title)

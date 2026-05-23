@@ -2,12 +2,12 @@ import Foundation
 
 enum AppConfiguration {
 #if DEBUG
-    static let displayName = "MintPlayer Debug"
+    static let displayName = "Mint Player Debug"
     static let buildFlavor = "Debug"
     static let supportDirectoryName = "MintPlayer-Debug"
     static let userDefaultsPrefix = "mintPlayer.debug"
 #else
-    static let displayName = "MintPlayer"
+    static let displayName = "Mint Player"
     static let buildFlavor = "Release"
     static let supportDirectoryName = "MintPlayer"
     static let userDefaultsPrefix = "mintPlayer"

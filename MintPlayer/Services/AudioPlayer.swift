@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 import Combine
 
-class AudioPlayer: ObservableObject {
+class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published var currentSong: Song?
     @Published var volume: Float = 0.7
     @Published var isPlaying: Bool = false
@@ -27,9 +27,10 @@ class AudioPlayer: ObservableObject {
 
     var onSongStarted: ((Song) -> Void)?
 
-    init() {
+    override init() {
         let storedVolume = UserDefaults.standard.object(forKey: volumeDefaultsKey) as? Float
         volume = min(max(storedVolume ?? 0.7, 0), 1)
+        super.init()
 
         // 配置音频会话
         setupAudioSession()
@@ -172,6 +173,7 @@ class AudioPlayer: ObservableObject {
         let url = URL(fileURLWithPath: song.path)
         do {
             audioPlayer = try AVAudioPlayer(contentsOf: url)
+            audioPlayer?.delegate = self
             audioPlayer?.volume = volume
             audioPlayer?.prepareToPlay()
 
@@ -337,10 +339,28 @@ class AudioPlayer: ObservableObject {
                 self.lastSessionElapsedUpdate = self.currentTime
             }
 
-            // 检查是否播放完毕
-            if self.duration > 0, self.currentTime >= self.duration {
-                self.next()
+        }
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.audioPlayer === player else { return }
+            self.currentTime = self.duration
+
+            guard flag else {
+                self.finishPlayback()
+                return
             }
+
+            self.next()
+        }
+    }
+
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.audioPlayer === player else { return }
+            self.playbackError = error.map { "播放失败：\($0.localizedDescription)" } ?? "播放失败"
+            self.finishPlayback()
         }
     }
 

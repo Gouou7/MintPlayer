@@ -158,6 +158,8 @@ enum L10n {
         case history
         case upNextLower
         case sortSongs
+        case ascending
+        case descending
         case title
         case titleDescending
         case artist
@@ -295,6 +297,8 @@ enum L10n {
         .history: "history",
         .upNextLower: "up next",
         .sortSongs: "Sort Songs",
+        .ascending: "Ascending",
+        .descending: "Descending",
         .title: "Title",
         .titleDescending: "Title Descending",
         .artist: "Artist",
@@ -427,6 +431,8 @@ enum L10n {
         .history: "历史",
         .upNextLower: "即将播放",
         .sortSongs: "歌曲排序",
+        .ascending: "升序",
+        .descending: "降序",
         .title: "标题",
         .titleDescending: "标题降序",
         .artist: "艺人",

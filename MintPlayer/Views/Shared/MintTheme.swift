@@ -63,12 +63,14 @@ extension View {
 struct MintPlainIconButtonStyle: ButtonStyle {
     var isActive = false
     var shape: AnyShape = AnyShape(Circle())
+    var hoverSize: CGSize = CGSize(width: 38, height: 38)
 
     func makeBody(configuration: Configuration) -> some View {
         HoverButtonBody(
             configuration: configuration,
             isActive: isActive,
-            shape: shape
+            shape: shape,
+            hoverSize: hoverSize
         )
     }
 
@@ -76,6 +78,7 @@ struct MintPlainIconButtonStyle: ButtonStyle {
         let configuration: Configuration
         let isActive: Bool
         let shape: AnyShape
+        let hoverSize: CGSize
         @State private var isHovered = false
 
         var body: some View {
@@ -84,8 +87,10 @@ struct MintPlainIconButtonStyle: ButtonStyle {
                 .background {
                     if configuration.isPressed {
                         shape.fill(MintTheme.pressedFill)
+                            .frame(width: hoverSize.width, height: hoverSize.height)
                     } else if isHovered {
                         shape.fill(MintTheme.hoverFill)
+                            .frame(width: hoverSize.width, height: hoverSize.height)
                     }
                 }
                 .opacity(configuration.isPressed ? 0.78 : 1)
@@ -145,17 +150,20 @@ struct MintRowButtonStyle: ButtonStyle {
 
 struct MintContentButtonStyle: ButtonStyle {
     var cornerRadius: CGFloat = 12
+    var hoverOutset: CGFloat = 6
 
     func makeBody(configuration: Configuration) -> some View {
         HoverContentBody(
             configuration: configuration,
-            cornerRadius: cornerRadius
+            cornerRadius: cornerRadius,
+            hoverOutset: hoverOutset
         )
     }
 
     private struct HoverContentBody: View {
         let configuration: Configuration
         let cornerRadius: CGFloat
+        let hoverOutset: CGFloat
         @State private var isHovered = false
 
         private var shape: RoundedRectangle {
@@ -164,6 +172,7 @@ struct MintContentButtonStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
+                .padding(hoverOutset)
                 .background {
                     if configuration.isPressed {
                         shape.fill(MintTheme.pressedFill)
@@ -179,6 +188,7 @@ struct MintContentButtonStyle: ButtonStyle {
                 .opacity(configuration.isPressed ? 0.84 : 1)
                 .contentShape(shape)
                 .onHover { isHovered = $0 }
+                .padding(-hoverOutset)
         }
     }
 }

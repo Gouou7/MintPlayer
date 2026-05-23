@@ -24,6 +24,7 @@ struct CollapsibleSidebarHeader: View {
                         .frame(width: 18, height: 18)
                 }
                 .buttonStyle(MintPlainIconButtonStyle())
+                .foregroundStyle(.secondary)
                 .help(addHelp ?? "")
                 .opacity(isHovering ? 1 : 0)
             }

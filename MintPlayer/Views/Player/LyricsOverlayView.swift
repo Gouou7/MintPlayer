@@ -152,7 +152,7 @@ struct LyricsOverlayView: View {
                     .font(.system(size: 27, weight: .semibold))
                     .frame(width: 34, height: 34)
             }
-            .buttonStyle(MintPlainIconButtonStyle())
+            .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 46, height: 46)))
             .help(settings.text(.previous))
 
             Spacer(minLength: 24)
@@ -162,7 +162,7 @@ struct LyricsOverlayView: View {
                     .font(.system(size: 34, weight: .bold))
                     .frame(width: 43, height: 43)
             }
-            .buttonStyle(MintPlainIconButtonStyle())
+            .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 58, height: 58)))
             .help(audioPlayer.isPlaying ? settings.text(.pause) : settings.text(.play))
 
             Spacer(minLength: 24)
@@ -174,7 +174,7 @@ struct LyricsOverlayView: View {
                     .font(.system(size: 27, weight: .semibold))
                     .frame(width: 34, height: 34)
             }
-            .buttonStyle(MintPlainIconButtonStyle())
+            .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 46, height: 46)))
             .help(settings.text(.next))
 
             Spacer(minLength: 24)
@@ -532,18 +532,35 @@ private struct FullscreenProgressSlider: View {
 
 private struct PlaybackToggleButtonStyle: ButtonStyle {
     let isActive: Bool
+    private let hoverSize: CGFloat = 38
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(isActive ? MintTheme.accent : Color.secondary)
-            .opacity(configuration.isPressed ? 0.78 : 1)
-            .contentShape(Circle())
-            .background {
-                if configuration.isPressed {
-                    Circle()
-                        .fill(MintTheme.pressedFill)
+        ButtonBody(configuration: configuration, isActive: isActive, hoverSize: hoverSize)
+    }
+
+    private struct ButtonBody: View {
+        let configuration: Configuration
+        let isActive: Bool
+        let hoverSize: CGFloat
+        @State private var isHovered = false
+
+        var body: some View {
+            configuration.label
+                .foregroundStyle(isActive ? MintTheme.accent : Color.secondary)
+                .frame(width: hoverSize, height: hoverSize)
+                .opacity(configuration.isPressed ? 0.78 : 1)
+                .contentShape(Circle())
+                .background {
+                    if configuration.isPressed {
+                        Circle()
+                            .fill(MintTheme.pressedFill)
+                    } else if isHovered {
+                        Circle()
+                            .fill(MintTheme.hoverFill)
+                    }
                 }
-            }
+                .onHover { isHovered = $0 }
+        }
     }
 }
 

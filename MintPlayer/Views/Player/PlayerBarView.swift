@@ -209,7 +209,7 @@ struct PlayerBarView: View {
                 .frame(width: artworkSize, height: artworkSize)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .buttonStyle(MintContentButtonStyle(cornerRadius: 8))
+        .buttonStyle(MintContentButtonStyle(cornerRadius: 8, hoverOutset: 0))
         .help(settings.text(.showLyrics))
     }
 
@@ -272,12 +272,14 @@ private struct PlayerIconButton: View {
 private struct PlayerBarIconButtonStyle: ButtonStyle {
     let isActive: Bool
     let inactiveColor: Color
+    private let hoverSize: CGFloat = 36
 
     func makeBody(configuration: Configuration) -> some View {
         ButtonBody(
             configuration: configuration,
             isActive: isActive,
-            inactiveColor: inactiveColor
+            inactiveColor: inactiveColor,
+            hoverSize: hoverSize
         )
     }
 
@@ -285,6 +287,7 @@ private struct PlayerBarIconButtonStyle: ButtonStyle {
         let configuration: Configuration
         let isActive: Bool
         let inactiveColor: Color
+        let hoverSize: CGFloat
         @State private var isHovered = false
 
         var body: some View {
@@ -293,8 +296,10 @@ private struct PlayerBarIconButtonStyle: ButtonStyle {
                 .background {
                     if configuration.isPressed {
                         Circle().fill(MintTheme.pressedFill)
+                            .frame(width: hoverSize, height: hoverSize)
                     } else if isHovered {
                         Circle().fill(MintTheme.hoverFill)
+                            .frame(width: hoverSize, height: hoverSize)
                     }
                 }
                 .opacity(configuration.isPressed ? 0.78 : 1)

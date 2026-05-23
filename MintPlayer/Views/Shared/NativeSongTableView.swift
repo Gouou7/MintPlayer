@@ -89,6 +89,7 @@ struct NativeSongTableView: NSViewRepresentable {
         context.coordinator.resizeColumnsToFit()
         context.coordinator.lastSongIDs = songs.map(\.id)
         context.coordinator.lastSongs = songs
+        context.coordinator.syncSortDescriptorsToTable()
         context.coordinator.syncSelectionToTable()
         return scrollView
     }
@@ -113,6 +114,7 @@ struct NativeSongTableView: NSViewRepresentable {
         }
 
         context.coordinator.resizeColumnsToFit()
+        context.coordinator.syncSortDescriptorsToTable()
         context.coordinator.syncSelectionToTable()
     }
 
@@ -275,6 +277,7 @@ extension NativeSongTableView {
         var lastSongs: [Song] = []
         private var isSyncingSelection = false
         private var isApplyingColumnWidths = false
+        private var isApplyingSortDescriptors = false
         private var menuSongs: [Song] = []
         private var clipViewObservers: [NSObjectProtocol] = []
 
@@ -492,6 +495,7 @@ extension NativeSongTableView {
         }
 
         func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+            guard !isApplyingSortDescriptors else { return }
             guard let descriptor = tableView.sortDescriptors.first else { return }
             let order: SortOrder = descriptor.ascending ? .forward : .reverse
 
@@ -515,6 +519,18 @@ extension NativeSongTableView {
             default:
                 break
             }
+        }
+
+        func syncSortDescriptorsToTable() {
+            guard parent.style.showsHeader,
+                  let tableView,
+                  let descriptor = sortDescriptor(for: parent.sortOrder)
+            else { return }
+
+            guard tableView.sortDescriptors.first != descriptor else { return }
+            isApplyingSortDescriptors = true
+            tableView.sortDescriptors = [descriptor]
+            isApplyingSortDescriptors = false
         }
 
         func tableViewColumnDidResize(_ notification: Notification) {
@@ -906,6 +922,42 @@ extension NativeSongTableView {
             case .favorite:
                 return nil
             case .index:
+                return nil
+            }
+        }
+
+        private func sortDescriptor(for sortOrder: [KeyPathComparator<Song>]) -> NSSortDescriptor? {
+            guard let comparator = sortOrder.first,
+                  let key = sortKey(for: comparator.keyPath)
+            else { return nil }
+
+            let isStringSort = ["title", "artist", "album", "genre", "type"].contains(key)
+            return NSSortDescriptor(
+                key: key,
+                ascending: comparator.order == .forward,
+                selector: isStringSort ? #selector(NSString.localizedCaseInsensitiveCompare(_:)) : nil
+            )
+        }
+
+        private func sortKey(for keyPath: PartialKeyPath<Song>) -> String? {
+            switch keyPath {
+            case \Song.title:
+                return "title"
+            case \Song.artist:
+                return "artist"
+            case \Song.album:
+                return "album"
+            case \Song.displayGenre:
+                return "genre"
+            case \Song.fileType:
+                return "type"
+            case \Song.duration:
+                return "duration"
+            case \Song.playCount:
+                return "playCount"
+            case \Song.dateAdded:
+                return "dateAdded"
+            default:
                 return nil
             }
         }
