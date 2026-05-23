@@ -1,5 +1,16 @@
 import SwiftUI
 
+private struct PlayerOverlayPresentationKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var isPlayerOverlayPresented: Bool {
+        get { self[PlayerOverlayPresentationKey.self] }
+        set { self[PlayerOverlayPresentationKey.self] = newValue }
+    }
+}
+
 private enum FloatingSearchMetrics {
     static let height: CGFloat = 34
     static let searchWidth: CGFloat = 245
@@ -10,7 +21,7 @@ struct LibrarySearchControls<LeadingControls: View>: View {
     @Binding var searchText: String
     let searchPrompt: String
     private let leadingControls: LeadingControls
-    
+
     init(
         searchText: Binding<String>,
         searchPrompt: String,
@@ -20,7 +31,7 @@ struct LibrarySearchControls<LeadingControls: View>: View {
         self.searchPrompt = searchPrompt
         self.leadingControls = leadingControls()
     }
-    
+
     var body: some View {
         HStack(spacing: FloatingSearchMetrics.spacing) {
             leadingControls
@@ -41,27 +52,28 @@ extension LibrarySearchControls where LeadingControls == EmptyView {
 struct FloatingSearchField: View {
     @Binding var text: String
     let prompt: String
-    
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
-            
+
             TextField(prompt, text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: 15, weight: .semibold))
         }
         .padding(.horizontal, 13)
         .frame(width: FloatingSearchMetrics.searchWidth, height: FloatingSearchMetrics.height)
-        .modifier(FloatingSearchSurface())
+        .modifier(CapsuleGlassControlSurface(height: FloatingSearchMetrics.height))
     }
 }
 
 struct SongSortButton: View {
+    @EnvironmentObject private var settings: SettingsManager
     @Binding var sortOrder: [KeyPathComparator<Song>]
     @State private var isPopoverPresented = false
-    
+
     var body: some View {
         Button {
             isPopoverPresented.toggle()
@@ -75,30 +87,36 @@ struct SongSortButton: View {
         .modifier(CircleGlassButtonSurface())
         .labelStyle(.iconOnly)
         .fixedSize()
-        .help("Sort Songs")
+        .help(settings.text(.sortSongs))
         .popover(isPresented: $isPopoverPresented, arrowEdge: .top) {
             sortOptions
                 .frame(width: 220)
                 .padding(10)
         }
     }
-    
+
     private var sortOptions: some View {
         VStack(alignment: .leading, spacing: 4) {
-            sortOptionButton("Title", field: .title, order: .forward)
-            sortOptionButton("Title Descending", field: .title, order: .reverse)
+            sortOptionButton(settings.text(.title), field: .title, order: .forward)
+            sortOptionButton(settings.text(.titleDescending), field: .title, order: .reverse)
             Divider()
-            sortOptionButton("Artist", field: .artist, order: .forward)
-            sortOptionButton("Artist Descending", field: .artist, order: .reverse)
+            sortOptionButton(settings.text(.artist), field: .artist, order: .forward)
+            sortOptionButton(settings.text(.artistDescending), field: .artist, order: .reverse)
             Divider()
-            sortOptionButton("Album", field: .album, order: .forward)
-            sortOptionButton("Album Descending", field: .album, order: .reverse)
+            sortOptionButton(settings.text(.album), field: .album, order: .forward)
+            sortOptionButton(settings.text(.albumDescending), field: .album, order: .reverse)
             Divider()
-            sortOptionButton("Duration", field: .duration, order: .forward)
-            sortOptionButton("Duration Descending", field: .duration, order: .reverse)
+            sortOptionButton(settings.text(.duration), field: .duration, order: .forward)
+            sortOptionButton(settings.text(.durationDescending), field: .duration, order: .reverse)
+            Divider()
+            sortOptionButton(settings.text(.playCount), field: .playCount, order: .reverse)
+            sortOptionButton(settings.text(.playCountAscending), field: .playCount, order: .forward)
+            Divider()
+            sortOptionButton(settings.text(.dateAdded), field: .dateAdded, order: .reverse)
+            sortOptionButton(settings.text(.dateAddedAscending), field: .dateAdded, order: .forward)
         }
     }
-    
+
     private func sortOptionButton(_ title: String, field: SongSortField, order: Foundation.SortOrder) -> some View {
         Button {
             setSort(field, order: order)
@@ -109,10 +127,10 @@ struct SongSortButton: View {
                     .font(.system(size: 13, weight: .semibold))
                     .opacity(activeSortField == field && activeSortOrder == order ? 1 : 0)
                     .frame(width: 16)
-                
+
                 Text(title)
                     .lineLimit(1)
-                
+
                 Spacer(minLength: 0)
             }
             .foregroundStyle(.primary)
@@ -122,10 +140,10 @@ struct SongSortButton: View {
         }
         .buttonStyle(MintRowButtonStyle())
     }
-    
+
     private var activeSortField: SongSortField {
         guard let keyPath = sortOrder.first?.keyPath else { return .title }
-        
+
         switch keyPath {
         case \Song.title:
             return .title
@@ -139,15 +157,19 @@ struct SongSortButton: View {
             return .type
         case \Song.duration:
             return .duration
+        case \Song.playCount:
+            return .playCount
+        case \Song.dateAdded:
+            return .dateAdded
         default:
             return .title
         }
     }
-    
+
     private var activeSortOrder: Foundation.SortOrder {
         sortOrder.first?.order ?? .forward
     }
-    
+
     private func setSort(_ field: SongSortField, order: Foundation.SortOrder) {
         switch field {
         case .title:
@@ -162,13 +184,21 @@ struct SongSortButton: View {
             sortOrder = [KeyPathComparator(\Song.fileType, order: order)]
         case .duration:
             sortOrder = [KeyPathComparator(\Song.duration, order: order)]
+        case .playCount:
+            sortOrder = [KeyPathComparator(\Song.playCount, order: order)]
+        case .dateAdded:
+            sortOrder = [KeyPathComparator(\Song.dateAdded, order: order)]
         }
     }
 }
 
-private struct FloatingSearchSurface: ViewModifier {
-    private let shape = RoundedRectangle(cornerRadius: FloatingSearchMetrics.height / 2, style: .continuous)
-    
+struct CapsuleGlassControlSurface: ViewModifier {
+    let height: CGFloat
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+    }
+
     func body(content: Content) -> some View {
         content
             .glassEffect(.regular.interactive(), in: shape)

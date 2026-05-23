@@ -4,46 +4,43 @@ import AppKit
 struct SidebarView: View {
     @Binding var selection: LibrarySelection
     @EnvironmentObject private var musicLibrary: MusicLibrary
-    
-    @AppStorage("sidebar.library.isExpanded") private var isLibraryExpanded = true
-    @AppStorage("sidebar.playlists.isExpanded") private var isPlaylistsExpanded = true
-    @AppStorage("sidebar.folders.isExpanded") private var isFoldersExpanded = true
-    @AppStorage("sidebar.library.order") private var libraryOrderStorage = LibrarySidebarItem.allCases.map(\.rawValue).joined(separator: ",")
+    @EnvironmentObject private var settings: SettingsManager
+
+    @AppStorage(AppConfiguration.userDefaultsKey("sidebar.playlists.isExpanded")) private var isPlaylistsExpanded = true
+    @AppStorage(AppConfiguration.userDefaultsKey("sidebar.folders.isExpanded")) private var isFoldersExpanded = true
+    @AppStorage(AppConfiguration.userDefaultsKey("sidebar.library.order")) private var libraryOrderStorage = LibrarySidebarItem.allCases.map(\.rawValue).joined(separator: ",")
     @State private var playlistEditorDraft: PlaylistEditorDraft?
     @State private var playlistPendingDeletion: Playlist?
     @State private var folderPendingDeletion: MusicLibrarySource?
-    
+    @State private var dropTargetedPlaylistID: Playlist.ID?
+
     var body: some View {
         VStack(spacing: 0) {
-            header
-            
             List {
                 Section {
-                    if isLibraryExpanded {
-                        ForEach(orderedLibraryItems, id: \.self) { item in
-                            Button {
-                                selection = item.selection
-                            } label: {
-                                SidebarRow(
-                                    title: item.title,
-                                    systemImage: item.systemImage,
-                                    isSelected: selection == item.selection
-                                )
-                            }
-                            .buttonStyle(MintRowButtonStyle(isSelected: selection == item.selection))
+                    ForEach(orderedLibraryItems, id: \.self) { item in
+                        Button {
+                            selection = item.selection
+                        } label: {
+                            SidebarRow(
+                                title: item.title(language: settings.effectiveLanguage),
+                                systemImage: item.systemImage,
+                                isSelected: selection == item.selection
+                            )
                         }
-                        .onMove(perform: moveLibraryItems)
+                        .buttonStyle(MintRowButtonStyle(isSelected: selection == item.selection))
                     }
-                } header: {
-                    CollapsibleSidebarHeader(title: "Library", isExpanded: $isLibraryExpanded)
+                    .onMove(perform: moveLibraryItems)
                 }
-                
+
                 Section {
                     if isPlaylistsExpanded {
                         if musicLibrary.playlists.isEmpty {
-                            emptyRow("No playlists")
+                            emptyRow(settings.text(.noPlaylists))
                         } else {
                             ForEach(musicLibrary.playlists, id: \.id) { playlist in
+                                let isDropTargeted = dropTargetedPlaylistID == playlist.id
+
                                 Button {
                                     selection = .playlist(playlist.id)
                                 } label: {
@@ -53,18 +50,18 @@ struct SidebarView: View {
                                         isSelected: selection == .playlist(playlist.id)
                                     )
                                 }
-                                .buttonStyle(MintRowButtonStyle(isSelected: selection == .playlist(playlist.id)))
+                                .buttonStyle(MintRowButtonStyle(isSelected: selection == .playlist(playlist.id), isHighlighted: isDropTargeted))
                                 .contextMenu {
                                     Button {
                                         editPlaylist(playlist)
                                     } label: {
-                                        Label("Edit Playlist", systemImage: "pencil")
+                                        Label(settings.text(.editPlaylistAction), systemImage: "pencil")
                                     }
-                                    
+
                                     Button {
                                         playlistPendingDeletion = playlist
                                     } label: {
-                                        Label("Delete Playlist", systemImage: "trash")
+                                        Label(settings.text(.deletePlaylist), systemImage: "trash")
                                             .foregroundStyle(.red)
                                     }
                                 }
@@ -74,7 +71,7 @@ struct SidebarView: View {
                                         musicLibrary: musicLibrary
                                     )
                                 }
-                                .onDrop(of: SongDragPayload.acceptedContentTypes, isTargeted: nil) { providers in
+                                .onDrop(of: SongDragPayload.acceptedContentTypes, isTargeted: dropTargetBinding(for: playlist.id)) { providers in
                                     SongDragPayload.loadSongs(from: providers, musicLibrary: musicLibrary) { songs in
                                         musicLibrary.addSongsToPlaylist(songs, playlistId: playlist.id)
                                     }
@@ -87,18 +84,18 @@ struct SidebarView: View {
                     }
                 } header: {
                     CollapsibleSidebarHeader(
-                        title: "Playlists",
+                        title: settings.text(.playlists),
                         isExpanded: $isPlaylistsExpanded,
                         addSystemImage: "plus",
                         addHelp: "New playlist",
                         addAction: createPlaylist
                     )
                 }
-                
+
                 Section {
                     if isFoldersExpanded {
                         if musicLibrary.librarySources.isEmpty {
-                            emptyRow("No folders")
+                            emptyRow(settings.text(.noFolders))
                         } else {
                             ForEach(musicLibrary.librarySources, id: \.id) { source in
                                 Button {
@@ -115,7 +112,7 @@ struct SidebarView: View {
                                     Button {
                                         folderPendingDeletion = source
                                     } label: {
-                                        Label("Delete Folder", systemImage: "trash")
+                                        Label(settings.text(.deleteFolder), systemImage: "trash")
                                             .foregroundStyle(.red)
                                     }
                                 }
@@ -124,7 +121,7 @@ struct SidebarView: View {
                     }
                 } header: {
                     CollapsibleSidebarHeader(
-                        title: "Folders",
+                        title: settings.text(.foldersSection),
                         isExpanded: $isFoldersExpanded,
                         addSystemImage: "plus",
                         addHelp: "Add folder",
@@ -135,7 +132,7 @@ struct SidebarView: View {
             .listStyle(.sidebar)
             .tint(MintTheme.accent)
             .accentColor(MintTheme.accent)
-            
+
             footer
         }
         .frame(minWidth: 204)
@@ -149,58 +146,44 @@ struct SidebarView: View {
             )
         }
         .confirmationDialog(
-            "Delete Playlist?",
+            settings.text(.deletePlaylistQuestion),
             isPresented: playlistDeletionConfirmationBinding,
             titleVisibility: .visible,
             presenting: playlistPendingDeletion
         ) { playlist in
-            Button("Delete Playlist", role: .destructive) {
+            Button(settings.text(.deletePlaylist), role: .destructive) {
                 deletePlaylist(playlist)
                 playlistPendingDeletion = nil
             }
-            Button("Cancel", role: .cancel) {
+            Button(settings.text(.cancel), role: .cancel) {
                 playlistPendingDeletion = nil
             }
         } message: { playlist in
-            Text("This will remove \"\(playlist.name)\" from Mint Player. Songs will stay in your library.")
+            Text(String(format: settings.text(.deletePlaylistMessage), playlist.name))
         }
         .confirmationDialog(
-            "Delete Folder?",
+            settings.text(.deleteFolderQuestion),
             isPresented: folderDeletionConfirmationBinding,
             titleVisibility: .visible,
             presenting: folderPendingDeletion
         ) { source in
-            Button("Delete Folder", role: .destructive) {
+            Button(settings.text(.deleteFolder), role: .destructive) {
                 deleteFolder(source)
                 folderPendingDeletion = nil
             }
-            Button("Cancel", role: .cancel) {
+            Button(settings.text(.cancel), role: .cancel) {
                 folderPendingDeletion = nil
             }
         } message: { source in
-            Text("This will remove \"\(source.name)\" and its songs from Mint Player. Files on disk will not be deleted.")
+            Text(String(format: settings.text(.deleteFolderMessage), source.name))
         }
     }
-    
-    private var header: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "music.note.house.fill")
-                .font(.system(size: 28, weight: .semibold))
-                .foregroundColor(MintTheme.accent)
-            Text("Mint Player")
-                .font(.headline)
-                .bold()
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-    }
-    
+
     private var footer: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
                 settingsButton
-                
+
                 Spacer()
             }
             .font(.system(size: 18, weight: .semibold))
@@ -210,26 +193,27 @@ struct SidebarView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
-    
+
     @ViewBuilder
     private var settingsButton: some View {
         SettingsLink {
-            Label("Settings", systemImage: "gearshape.fill")
+            Label(settings.text(.settings), systemImage: "gearshape.fill")
                 .labelStyle(.iconOnly)
         }
         .controlSize(.large)
         .foregroundStyle(.secondary)
-        .help("Settings")
+        .help(settings.text(.settings))
     }
-    
+
     private var orderedLibraryItems: [LibrarySidebarItem] {
         let storedItems = libraryOrderStorage
             .split(separator: ",")
             .compactMap { LibrarySidebarItem(rawValue: String($0)) }
         let missingItems = LibrarySidebarItem.allCases.filter { !storedItems.contains($0) }
-        return storedItems + missingItems
+        let movableItems = (storedItems + missingItems).filter { $0 != .favorites }
+        return [.favorites] + movableItems
     }
-    
+
     private var playlistDeletionConfirmationBinding: Binding<Bool> {
         Binding(
             get: { playlistPendingDeletion != nil },
@@ -240,7 +224,7 @@ struct SidebarView: View {
             }
         )
     }
-    
+
     private var folderDeletionConfirmationBinding: Binding<Bool> {
         Binding(
             get: { folderPendingDeletion != nil },
@@ -251,7 +235,7 @@ struct SidebarView: View {
             }
         )
     }
-    
+
     private func emptyRow(_ title: String) -> some View {
         Text(title)
             .font(.headline.weight(.semibold))
@@ -259,42 +243,60 @@ struct SidebarView: View {
             .padding(.leading, 36)
             .padding(.vertical, 7)
     }
-    
+
+    private func dropTargetBinding(for playlistId: Playlist.ID) -> Binding<Bool> {
+        Binding(
+            get: { dropTargetedPlaylistID == playlistId },
+            set: { isTargeted in
+                if isTargeted {
+                    dropTargetedPlaylistID = playlistId
+                } else if dropTargetedPlaylistID == playlistId {
+                    dropTargetedPlaylistID = nil
+                }
+            }
+        )
+    }
+
     private func importFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        
+
         guard panel.runModal() == .OK, let url = panel.url else { return }
         musicLibrary.addLibrarySource(name: url.lastPathComponent, path: url.path)
         selection = .folder(musicLibrary.librarySources.last?.id ?? UUID())
     }
-    
+
     private func createPlaylist() {
         playlistEditorDraft = .create()
     }
-    
+
     private func moveLibraryItems(from source: IndexSet, to destination: Int) {
+        let favoritesIndex = 0
+        let filteredSource = IndexSet(source.filter { $0 != favoritesIndex })
+        guard !filteredSource.isEmpty else { return }
+
         var items = orderedLibraryItems
-        items.move(fromOffsets: source, toOffset: destination)
-        libraryOrderStorage = items.map(\.rawValue).joined(separator: ",")
+        items.move(fromOffsets: filteredSource, toOffset: max(destination, 1))
+        items.removeAll { $0 == .favorites }
+        libraryOrderStorage = ([.favorites] + items).map(\.rawValue).joined(separator: ",")
     }
-    
+
     private func deletePlaylist(_ playlist: Playlist) {
         musicLibrary.deletePlaylist(id: playlist.id)
         if selection == .playlist(playlist.id) {
             selection = .songs
         }
     }
-    
+
     private func editPlaylist(_ playlist: Playlist) {
         playlistEditorDraft = .edit(playlist)
     }
-    
+
     private func savePlaylist(draft: PlaylistEditorDraft, name: String, description: String) {
         guard !name.isEmpty else { return }
-        
+
         if let playlistId = draft.playlistId {
             musicLibrary.updatePlaylist(
                 id: playlistId,
@@ -307,10 +309,10 @@ struct SidebarView: View {
                 selection = .playlist(playlist.id)
             }
         }
-        
+
         playlistEditorDraft = nil
     }
-    
+
     private func deleteFolder(_ source: MusicLibrarySource) {
         musicLibrary.removeLibrarySource(id: source.id)
         if selection == .folder(source.id) {

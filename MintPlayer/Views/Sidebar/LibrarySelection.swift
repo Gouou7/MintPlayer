@@ -4,7 +4,7 @@ enum LibrarySelection: Hashable {
     case songs
     case albums
     case artists
-    case recent
+    case favorites
     case playlist(UUID)
     case folder(UUID)
 }

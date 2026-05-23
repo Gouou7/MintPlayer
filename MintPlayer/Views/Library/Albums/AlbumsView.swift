@@ -2,21 +2,23 @@ import SwiftUI
 
 struct AlbumsView: View {
     @EnvironmentObject private var musicLibrary: MusicLibrary
+    @EnvironmentObject private var settings: SettingsManager
+    @Environment(\.isPlayerOverlayPresented) private var isPlayerOverlayPresented
     @State private var searchText = ""
     @State private var selectedAlbum: AlbumSummary?
-    
+
     private var filteredAlbums: [AlbumSummary] {
         guard !searchText.isEmpty else {
             return musicLibrary.albumSummaries
         }
-        
+
         return musicLibrary.albumSummaries
             .filter { album in
                 album.title.localizedCaseInsensitiveContains(searchText) ||
                     album.artist.localizedCaseInsensitiveContains(searchText)
             }
     }
-    
+
     var body: some View {
         ZStack(alignment: .top) {
             if let selectedAlbum {
@@ -26,20 +28,22 @@ struct AlbumsView: View {
             } else {
                 albumGrid
             }
-            
+
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                LibrarySearchControls(
-                    searchText: $searchText,
-                    searchPrompt: selectedAlbum == nil ? "Search Albums" : "Search in Album"
-                )
+            if !isPlayerOverlayPresented {
+                ToolbarItem(placement: .primaryAction) {
+                    LibrarySearchControls(
+                        searchText: $searchText,
+                        searchPrompt: selectedAlbum == nil ? settings.text(.searchAlbums) : settings.text(.searchInAlbum)
+                    )
+                }
+                .sharedBackgroundVisibility(.hidden)
             }
-            .sharedBackgroundVisibility(.hidden)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
+
     private var albumGrid: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -62,14 +66,15 @@ struct AlbumsView: View {
 }
 
 private struct AlbumTile: View {
+    @EnvironmentObject private var settings: SettingsManager
     let album: AlbumSummary
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ArtworkImage(path: album.coverPath, cornerRadius: 10)
                 .frame(width: 150, height: 150)
                 .shadow(color: .black.opacity(0.22), radius: 14, x: 0, y: 8)
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(album.title)
                     .font(.headline)
@@ -79,28 +84,33 @@ private struct AlbumTile: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Text(album.year > 0 ? "\(album.year) · \(album.songCount) songs" : "\(album.songCount) songs")
+                Text(album.year > 0 ? "\(album.year) · \(songCountText(album.songCount))" : songCountText(album.songCount))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .frame(width: 150, alignment: .leading)
         }
     }
+
+    private func songCountText(_ count: Int) -> String {
+        "\(count) \(settings.text(.songs).lowercased())"
+    }
 }
 
 struct AlbumDetailView: View {
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var musicLibrary: MusicLibrary
-    
+    @EnvironmentObject private var settings: SettingsManager
+
     let album: AlbumSummary
     @Binding var searchText: String
     let onBack: () -> Void
-    
+
     @State private var albumSongs: [Song] = []
     @State private var visibleSongs: [Song] = []
     @State private var selectedSongIDs = Set<Song.ID>()
     @State private var songSortOrder = [KeyPathComparator(\Song.title)]
-    
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 34) {
@@ -116,9 +126,9 @@ struct AlbumDetailView: View {
                 }
                 .buttonStyle(MintPlainIconButtonStyle())
                 .modifier(CircleGlassButtonSurface())
-                
+
                 albumHeader
-                
+
                 NativeSongTableView(
                     songs: visibleSongs,
                     style: .detailSongs(subtitle: .none),
@@ -130,7 +140,7 @@ struct AlbumDetailView: View {
                 )
                 .frame(height: songTableHeight(for: visibleSongs.count))
                 .frame(maxWidth: .infinity)
-                
+
                 Text(footerText)
                     .font(.headline)
                     .foregroundStyle(.secondary)
@@ -148,7 +158,7 @@ struct AlbumDetailView: View {
             refreshVisibleSongs()
         }
     }
-    
+
     private var albumHeader: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .center, spacing: 29) {
@@ -156,20 +166,20 @@ struct AlbumDetailView: View {
                 albumHeaderInfo
                     .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             }
-            
+
             VStack(alignment: .leading, spacing: 16) {
                 albumArtwork
                 albumHeaderInfo
             }
         }
     }
-    
+
     private var albumArtwork: some View {
         ArtworkImage(path: album.coverPath, cornerRadius: 16)
             .frame(width: 238, height: 238)
             .shadow(color: .black.opacity(0.28), radius: 17, x: 0, y: 11)
     }
-    
+
     private var albumHeaderInfo: some View {
         VStack(alignment: .leading, spacing: 13) {
             Text(album.title)
@@ -181,32 +191,20 @@ struct AlbumDetailView: View {
                 .foregroundStyle(MintTheme.accent)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            
+
             Text(albumDetailText)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            
-            HStack(spacing: 10) {
-                DetailActionButton(
-                    title: "Play",
-                    systemImage: "play.fill",
-                    role: .primary,
-                    scale: 0.6,
-                    action: playAlbum
-                )
-                
-                DetailActionButton(
-                    title: "Shuffle",
-                    systemImage: "shuffle",
-                    role: .secondary,
-                    scale: 0.6,
-                    action: shuffleAlbum
-                )
-            }
+
+            ListPlaybackControls(
+                songs: albumSongs,
+                playAction: playAlbum,
+                shuffleAction: shuffleAlbum
+            )
             .padding(.top, 44)
         }
     }
-    
+
     private var albumDetailText: String {
         var values: [String] = []
         if let genre = albumSongs.first?.genre, !genre.isEmpty {
@@ -215,25 +213,22 @@ struct AlbumDetailView: View {
         if album.year > 0 {
             values.append("\(album.year)")
         }
-        values.append("\(album.songCount) songs")
+        values.append("\(album.songCount) \(settings.text(.songs).lowercased())")
         return values.joined(separator: " · ")
     }
-    
+
     private var footerText: String {
-        "\(albumSongs.count) items, \(formatDuration(albumSongs.reduce(0) { $0 + $1.duration }))"
+        "\(albumSongs.count) \(settings.text(.items)), \(formatDuration(albumSongs.reduce(0) { $0 + $1.duration }))"
     }
-    
+
     private func playAlbum() {
-        guard let firstSong = albumSongs.first else { return }
-        audioPlayer.play(song: firstSong, in: albumSongs)
+        audioPlayer.play(songs: albumSongs)
     }
-    
+
     private func shuffleAlbum() {
-        let shuffledSongs = albumSongs.shuffled()
-        guard let firstSong = shuffledSongs.first else { return }
-        audioPlayer.play(song: firstSong, in: shuffledSongs)
+        audioPlayer.shuffle(songs: albumSongs)
     }
-    
+
     private func refreshSongs() {
         albumSongs = musicLibrary.songs(forAlbum: album).sorted {
             $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
@@ -241,13 +236,13 @@ struct AlbumDetailView: View {
         selectedSongIDs = []
         refreshVisibleSongs()
     }
-    
+
     private func refreshVisibleSongs() {
         guard !searchText.isEmpty else {
             visibleSongs = albumSongs
             return
         }
-        
+
         visibleSongs = albumSongs.filter {
             $0.title.localizedCaseInsensitiveContains(searchText) ||
                 $0.artist.localizedCaseInsensitiveContains(searchText)
@@ -256,12 +251,12 @@ struct AlbumDetailView: View {
             visibleSongs.contains { $0.id == id }
         }
     }
-    
+
     private func formatDuration(_ duration: TimeInterval) -> String {
         let minutes = Int(duration) / 60
-        return "\(minutes) min"
+        return "\(minutes) \(settings.text(.minutesShort))"
     }
-    
+
     private func songTableHeight(for count: Int) -> CGFloat {
         min(max(CGFloat(max(count, 1)) * 58 + 10, 180), 620)
     }

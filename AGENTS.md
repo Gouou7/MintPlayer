@@ -10,13 +10,14 @@ Mint Player 是一款 macOS 本地音乐播放器，使用原生 Xcode 工程构
 - **系统媒体控制**: MediaPlayer / Now Playing / Remote Command Center
 - **桌面互操作**: AppKit（文件选择、Finder 打开、原生表格、少量窗口与侧栏行为）
 - **状态管理**: `ObservableObject`、`@Published`、`@StateObject`、`@EnvironmentObject`
-- **持久化**: `UserDefaults`；专辑封面缓存写入 Application Support
+- **持久化**: SQLite、`UserDefaults`；专辑封面缓存写入 Application Support
 - **构建工具**: Xcode project
 - **最低系统要求**: macOS 26.0
-- **当前版本**: 0.2.0
+- **当前版本**: 0.3.0
 
-当前项目没有 `Package.swift`、第三方依赖清单、测试 target 或 lint 配置。
+当前项目根目录没有 `Package.swift`、第三方依赖清单、测试 target 或 lint 配置。
 工程中也没有 `package.json`、`go.mod`、`requirements.txt`、`Makefile` 或自定义构建脚本。
+`Reference Proj.` 目录如果存在，仅作为参考资料，不是 Mint Player 的构建入口。
 
 ## 目录结构
 
@@ -30,8 +31,8 @@ MintPlayer/
 │   └── Views/
 │       ├── Root/         # 主窗口布局、NavigationSplitView 路由
 │       ├── Sidebar/      # 侧栏、选择模型、播放列表编辑
-│       ├── Library/      # Songs、Albums、Artists、Recent
-│       ├── Player/       # 播放栏、队列弹窗
+│       ├── Library/      # Songs、Albums、Artists、喜欢的音乐和文件夹视图
+│       ├── Player/       # 播放栏、队列弹窗和歌词窗口
 │       ├── Settings/     # 设置窗口
 │       └── Shared/       # 主题、搜索框、封面、空状态和共享修饰器
 ├── MintPlayer.xcodeproj/ # 唯一构建入口
@@ -101,6 +102,13 @@ xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" build
 xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -destination 'platform=macOS' build
 ```
 
+指定配置构建：
+
+```sh
+xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -configuration Debug -destination 'platform=macOS' build
+xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -configuration Release -destination 'platform=macOS' build
+```
+
 ### 清理并构建
 
 ```sh
@@ -118,6 +126,10 @@ xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -destination 'plat
 ### Lint
 
 当前没有 SwiftLint 或其他 lint 配置。不要假设存在 lint 命令。
+
+### 构建配置
+
+Debug 构建使用 `MintPlayer Debug.app`、`dev.govo.mintplayer.debug`、`MintPlayer-Debug` Application Support 目录和 `mintPlayer.debug` 偏好前缀；Release 使用正式名称和正式配置目录。
 
 ## 测试策略
 
@@ -158,6 +170,7 @@ xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -destination 'plat
 
 ## 版本管理
 
-- 版本号遵循语义化版本，当前版本记录在 `VERSION` 和 `Info.plist`。
-- 发布前同步 `VERSION`、`Info.plist`、设置窗口 About 文案和 `CHANGELOG.md`。
+- 版本号遵循语义化版本，当前版本记录在 `VERSION` 和 Xcode `MARKETING_VERSION`。
+- `Info.plist` 的短版本号应通过 Xcode `MARKETING_VERSION` 注入；设置窗口 About 版本号从 bundle 读取，并追加 `-Debug` 或 `-Release` 后缀。
+- 发布前同步 `VERSION`、Xcode `MARKETING_VERSION`、`CHANGELOG.md` 和 Git tag。
 - `CHANGELOG.md` 遵循 Keep a Changelog，并保留顶部 `Unreleased` 区。

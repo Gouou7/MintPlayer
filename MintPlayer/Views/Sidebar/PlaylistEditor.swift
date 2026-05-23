@@ -7,7 +7,7 @@ struct PlaylistEditorDraft: Identifiable {
     let confirmTitle: String
     var name: String
     var description: String
-    
+
     static func create(defaultName: String = "New Playlist") -> PlaylistEditorDraft {
         PlaylistEditorDraft(
             playlistId: nil,
@@ -17,7 +17,7 @@ struct PlaylistEditorDraft: Identifiable {
             description: ""
         )
     }
-    
+
     static func edit(_ playlist: Playlist) -> PlaylistEditorDraft {
         PlaylistEditorDraft(
             playlistId: playlist.id,
@@ -30,13 +30,15 @@ struct PlaylistEditorDraft: Identifiable {
 }
 
 struct PlaylistEditorSheet: View {
+    @EnvironmentObject private var settings: SettingsManager
+
     let draft: PlaylistEditorDraft
     let onCancel: () -> Void
     let onSave: (String, String) -> Void
-    
+
     @State private var name: String
     @State private var description: String
-    
+
     init(
         draft: PlaylistEditorDraft,
         onCancel: @escaping () -> Void,
@@ -48,35 +50,35 @@ struct PlaylistEditorSheet: View {
         _name = State(initialValue: draft.name)
         _description = State(initialValue: draft.description)
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Text(draft.title)
+            Text(editorTitle)
                 .font(.title2.bold())
-            
+
             VStack(alignment: .leading, spacing: 8) {
-                Text("Name")
+                Text(settings.text(.name))
                     .font(.headline)
                     .foregroundStyle(.secondary)
-                
-                TextField("Playlist Name", text: $name)
+
+                TextField(settings.text(.playlistName), text: $name)
                     .textFieldStyle(.roundedBorder)
                     .font(.title3)
             }
-            
+
             VStack(alignment: .leading, spacing: 8) {
-                Text("Description")
+                Text(settings.text(.description))
                     .font(.headline)
                     .foregroundStyle(.secondary)
-                
+
                 ZStack(alignment: .topLeading) {
                     TextEditor(text: $description)
                         .font(.body)
                         .scrollContentBackground(.hidden)
                         .padding(10)
-                    
+
                     if description.isEmpty {
-                        Text("Add notes, mood, context, or anything useful for this playlist.")
+                        Text(settings.text(.playlistDescriptionHint))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 18)
@@ -91,14 +93,14 @@ struct PlaylistEditorSheet: View {
                         .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
                 }
             }
-            
+
             HStack(spacing: 12) {
                 Spacer()
-                
-                Button("Cancel", action: onCancel)
+
+                Button(settings.text(.cancel), action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                
-                Button(draft.confirmTitle) {
+
+                Button(confirmTitle) {
                     onSave(
                         name.trimmingCharacters(in: .whitespacesAndNewlines),
                         description.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -110,5 +112,13 @@ struct PlaylistEditorSheet: View {
         }
         .padding(26)
         .frame(width: 560, height: 440)
+    }
+
+    private var editorTitle: String {
+        draft.playlistId == nil ? settings.text(.newPlaylist) : settings.text(.editPlaylist)
+    }
+
+    private var confirmTitle: String {
+        draft.playlistId == nil ? settings.text(.create) : settings.text(.save)
     }
 }

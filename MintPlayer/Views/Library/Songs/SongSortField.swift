@@ -7,4 +7,6 @@ enum SongSortField {
     case genre
     case type
     case duration
+    case playCount
+    case dateAdded
 }

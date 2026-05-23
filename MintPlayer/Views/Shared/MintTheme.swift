@@ -6,7 +6,7 @@ enum MintTheme {
         let match = appearance.bestMatch(from: [.darkAqua, .aqua])
         return NSColor(hex: match == .darkAqua ? 0xAAFFC7 : 0x67C090)
     }
-    
+
     static let accent = Color(nsColor: accentNSColor)
     static let textOnAccent = Color.black
     static let activeControl = Color.black
@@ -17,15 +17,15 @@ enum MintTheme {
     static let hoverFill = Color.primary.opacity(0.07)
     static let pressedFill = Color.primary.opacity(0.12)
     static let contentHoverStroke = Color.primary.opacity(0.12)
-    
+
     static func selectedRowFillNSColor(for appearance: NSAppearance?) -> NSColor {
         accentNSColor.withAlphaComponent(0.18)
     }
-    
+
     static func selectedRowStrokeNSColor(for appearance: NSAppearance?) -> NSColor {
         accentNSColor.withAlphaComponent(0.38)
     }
-    
+
     static func hoverFillNSColor(for appearance: NSAppearance?) -> NSColor {
         let match = appearance?.bestMatch(from: [.darkAqua, .aqua])
         let alpha: CGFloat = match == .darkAqua ? 0.12 : 0.08
@@ -36,7 +36,7 @@ enum MintTheme {
 struct MintSelectedRowStyle: ViewModifier {
     let isSelected: Bool
     var cornerRadius: CGFloat = MintTheme.selectedRowCornerRadius
-    
+
     func body(content: Content) -> some View {
         content
             .background {
@@ -63,7 +63,7 @@ extension View {
 struct MintPlainIconButtonStyle: ButtonStyle {
     var isActive = false
     var shape: AnyShape = AnyShape(Circle())
-    
+
     func makeBody(configuration: Configuration) -> some View {
         HoverButtonBody(
             configuration: configuration,
@@ -71,13 +71,13 @@ struct MintPlainIconButtonStyle: ButtonStyle {
             shape: shape
         )
     }
-    
+
     private struct HoverButtonBody: View {
         let configuration: Configuration
         let isActive: Bool
         let shape: AnyShape
         @State private var isHovered = false
-        
+
         var body: some View {
             configuration.label
                 .foregroundStyle(isActive ? MintTheme.accent : Color.primary)
@@ -97,26 +97,29 @@ struct MintPlainIconButtonStyle: ButtonStyle {
 
 struct MintRowButtonStyle: ButtonStyle {
     var isSelected = false
+    var isHighlighted = false
     var cornerRadius = MintTheme.selectedRowCornerRadius
-    
+
     func makeBody(configuration: Configuration) -> some View {
         HoverRowBody(
             configuration: configuration,
             isSelected: isSelected,
+            isHighlighted: isHighlighted,
             cornerRadius: cornerRadius
         )
     }
-    
+
     private struct HoverRowBody: View {
         let configuration: Configuration
         let isSelected: Bool
+        let isHighlighted: Bool
         let cornerRadius: CGFloat
         @State private var isHovered = false
-        
+
         private var shape: RoundedRectangle {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         }
-        
+
         var body: some View {
             configuration.label
                 .background {
@@ -124,7 +127,7 @@ struct MintRowButtonStyle: ButtonStyle {
                         shape.fill(MintTheme.selectedRowFill)
                     } else if configuration.isPressed {
                         shape.fill(MintTheme.pressedFill)
-                    } else if isHovered {
+                    } else if isHovered || isHighlighted {
                         shape.fill(MintTheme.hoverFill)
                     }
                 }
@@ -142,23 +145,23 @@ struct MintRowButtonStyle: ButtonStyle {
 
 struct MintContentButtonStyle: ButtonStyle {
     var cornerRadius: CGFloat = 12
-    
+
     func makeBody(configuration: Configuration) -> some View {
         HoverContentBody(
             configuration: configuration,
             cornerRadius: cornerRadius
         )
     }
-    
+
     private struct HoverContentBody: View {
         let configuration: Configuration
         let cornerRadius: CGFloat
         @State private var isHovered = false
-        
+
         private var shape: RoundedRectangle {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         }
-        
+
         var body: some View {
             configuration.label
                 .background {
@@ -184,11 +187,11 @@ struct MintHoverRowStyle: ViewModifier {
     var isSelected = false
     var cornerRadius = MintTheme.selectedRowCornerRadius
     @State private var isHovered = false
-    
+
     private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
     }
-    
+
     func body(content: Content) -> some View {
         content
             .background {
@@ -224,26 +227,26 @@ final class MintTableRowView: NSTableRowView {
             needsDisplay = true
         }
     }
-    
+
     init(horizontalInset: CGFloat = 4, verticalInset: CGFloat = 3) {
         self.horizontalInset = horizontalInset
         self.verticalInset = verticalInset
         super.init(frame: .zero)
     }
-    
+
     required init?(coder: NSCoder) {
         horizontalInset = 4
         verticalInset = 3
         super.init(coder: coder)
     }
-    
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        
+
         if let hoverTrackingArea {
             removeTrackingArea(hoverTrackingArea)
         }
-        
+
         let options: NSTrackingArea.Options = [
             .mouseEnteredAndExited,
             .activeInKeyWindow,
@@ -258,22 +261,30 @@ final class MintTableRowView: NSTableRowView {
         addTrackingArea(trackingArea)
         hoverTrackingArea = trackingArea
     }
-    
+
     override func mouseEntered(with event: NSEvent) {
         isMouseInside = true
     }
-    
+
     override func mouseExited(with event: NSEvent) {
         isMouseInside = false
     }
-    
+
+    override func scrollWheel(with event: NSEvent) {
+        invalidateVisibleRowHover()
+        super.scrollWheel(with: event)
+        DispatchQueue.main.async { [weak self] in
+            self?.invalidateVisibleRowHover()
+        }
+    }
+
     override func drawBackground(in dirtyRect: NSRect) {
         super.drawBackground(in: dirtyRect)
-        
-        guard isMouseInside, !isSelected else { return }
+
+        guard isMouseOverRow, !isSelected else { return }
         let hoverRect = bounds.insetBy(dx: horizontalInset, dy: verticalInset)
         guard hoverRect.width > 0, hoverRect.height > 0 else { return }
-        
+
         let path = NSBezierPath(
             roundedRect: hoverRect,
             xRadius: MintTheme.selectedRowCornerRadius,
@@ -282,13 +293,13 @@ final class MintTableRowView: NSTableRowView {
         MintTheme.hoverFillNSColor(for: effectiveAppearance).setFill()
         path.fill()
     }
-    
+
     override func drawSelection(in dirtyRect: NSRect) {
         guard selectionHighlightStyle != .none else { return }
-        
+
         let selectionRect = bounds.insetBy(dx: horizontalInset, dy: verticalInset)
         guard selectionRect.width > 0, selectionRect.height > 0 else { return }
-        
+
         let path = NSBezierPath(
             roundedRect: selectionRect,
             xRadius: MintTheme.selectedRowCornerRadius,
@@ -300,43 +311,25 @@ final class MintTableRowView: NSTableRowView {
         path.lineWidth = 1
         path.stroke()
     }
-}
 
-struct DetailActionButton: View {
-    enum Role {
-        case primary
-        case secondary
+    private var isMouseOverRow: Bool {
+        guard let window else { return false }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        return bounds.contains(point)
     }
-    
-    let title: String
-    let systemImage: String
-    let role: Role
-    var scale: CGFloat = 1
-    let action: () -> Void
-    
-    private var width: CGFloat { 210 * scale }
-    private var height: CGFloat { 48 * scale }
-    private var fontSize: CGFloat { max(11, 17 * scale) }
-    
-    var body: some View {
-        switch role {
-        case .primary:
-            baseButton
-                .buttonStyle(.borderedProminent)
-        case .secondary:
-            baseButton
-                .buttonStyle(.bordered)
+
+    private func invalidateVisibleRowHover() {
+        guard let tableView = superview as? NSTableView ?? enclosingScrollView?.documentView as? NSTableView else {
+            needsDisplay = true
+            return
         }
-    }
-    
-    private var baseButton: some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: fontSize, weight: .semibold))
-                .frame(width: width, height: height)
+
+        let visibleRows = tableView.rows(in: tableView.visibleRect)
+        guard visibleRows.location != NSNotFound else { return }
+
+        for row in visibleRows.location..<NSMaxRange(visibleRows) {
+            tableView.rowView(atRow: row, makeIfNecessary: false)?.needsDisplay = true
         }
-        .controlSize(scale < 0.75 ? .regular : .large)
-        .buttonBorderShape(.capsule)
     }
 }
 
@@ -345,7 +338,7 @@ private extension NSColor {
         let red = Double((hex >> 16) & 0xFF) / 255.0
         let green = Double((hex >> 8) & 0xFF) / 255.0
         let blue = Double(hex & 0xFF) / 255.0
-        
+
         self.init(calibratedRed: red, green: green, blue: blue, alpha: 1)
     }
 }
