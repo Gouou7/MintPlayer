@@ -2,16 +2,21 @@
 
 <img src="docs/images/MintPlayer-Light-iOS-Default-1024x1024@1x.png" alt="Mint Player logo" width="120">
 
-A beautiful, Apple Music-like local music player for macOS.
+A native macOS local music player for organizing and playing your own music library.
 
 ## Highlights
 
-- Familiar, polished interface with Liquid Glass styling and dedicated Songs, Albums, and Artists views.
+- Familiar, polished interface with Liquid Glass styling and dedicated Songs, Albums, Artists, Favorites, playlist, and folder views.
 - Local-first library management: import folders without changing your original file structure.
 - Flexible organization with custom playlists, a Favorites list, blocked songs, and play count tracking.
 - Lyrics window with local `.lrc` support. Lyrics files must share the same name and folder as the audio file. Timestamped lyrics sync with playback; plain text lyrics are shown as static text.
 - Native macOS playback controls, including queue, shuffle, repeat, volume, media keys, and Now Playing integration.
+- Native song tables with sortable columns, configurable column visibility, multi-selection, context menus, drag to playlist, and Finder integration.
 - Separate Debug and Release app names and storage, so test data does not pollute the release library.
+
+## Current Version
+
+0.5.0
 
 ## Screenshots
 
@@ -23,8 +28,8 @@ A beautiful, Apple Music-like local music player for macOS.
 - ✅ Basic playback and library management
 - ⬜ More detailed interaction and animation polish
 - ⬜ Audio fade in/out transitions
-- ⬜ Dynamic blurred backgrounds
-- ⬜ Unified main and lyrics experience
+- ✅ Standalone lyrics window with synced local lyrics
+- ✅ Favorites, blocked songs, play count tracking, and restored playback sessions
 - ⬜ Online lyrics search
 
 ## Known Issues

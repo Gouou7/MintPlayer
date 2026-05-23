@@ -25,6 +25,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - None.
 
+## [0.5.0] - 2026-05-24
+
+### Added
+- None.
+
+### Changed
+- Limited song table header columns to at most half of the current screen width, including saved column widths, so oversized columns remain easy to shrink.
+
+### Deprecated
+- None.
+
+### Removed
+- None.
+
+### Fixed
+- Fixed Songs and playlist vertical scrollbars ending above the bottom of the page when the floating player bar bottom inset is applied.
+
+### Security
+- None.
+
 ## [0.4.0] - 2026-05-23
 
 ### Added

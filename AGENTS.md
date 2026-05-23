@@ -13,7 +13,7 @@ Mint Player is a native macOS local music player built with an Xcode project.
 - **Persistence**: SQLite and `UserDefaults`; artwork cache files live under Application Support
 - **Build tool**: Xcode project
 - **Minimum OS**: macOS 26.0
-- **Current version**: 0.4.0
+- **Current version**: 0.5.0
 
 The repository root does not currently contain `Package.swift`, third-party dependency manifests, test targets, or lint configuration.
 There is no `package.json`, `go.mod`, `requirements.txt`, `Makefile`, or custom build script.
@@ -175,3 +175,10 @@ Release builds use `Mint Player.app` and the release configuration directory.
 - `Info.plist` should receive the short version through Xcode `MARKETING_VERSION`; Settings About reads from the bundle and appends `-Debug` or `-Release`.
 - Before release, sync `VERSION`, Xcode `MARKETING_VERSION`, `CHANGELOG.md`, and the Git tag.
 - `CHANGELOG.md` follows Keep a Changelog and keeps an `Unreleased` section at the top.
+
+### Release Checklist
+
+- Move user-facing changes from `Unreleased` into the new version section with the release date.
+- Keep internal documentation-only maintenance out of `CHANGELOG.md` unless it affects users or contributors.
+- Confirm `VERSION`, Xcode `MARKETING_VERSION`, the release heading, and the Git tag all use the same version.
+- Leave unrelated local files such as reference projects, Xcode user state, DerivedData, and build products unstaged.

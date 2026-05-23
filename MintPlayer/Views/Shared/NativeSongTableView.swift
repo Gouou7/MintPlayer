@@ -218,8 +218,9 @@ private final class InsetSongScrollView: NSScrollView {
             contentInsets = desiredInsets
         }
 
-        if !scrollerInsets.isApproximatelyEqual(to: desiredInsets) {
-            scrollerInsets = desiredInsets
+        let scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        if !self.scrollerInsets.isApproximatelyEqual(to: scrollerInsets) {
+            self.scrollerInsets = scrollerInsets
         }
     }
 }
@@ -266,6 +267,7 @@ private enum NativeSongTableMetrics {
     static let detailedArtistMinWidth: CGFloat = 44
     static let detailSongMinWidth: CGFloat = 64
     static let detailIndexWidth: CGFloat = 28
+    static let maxHeaderColumnWidthRatio: CGFloat = 0.5
 }
 
 extension NativeSongTableView {
@@ -330,9 +332,8 @@ extension NativeSongTableView {
                 insetScrollView.desiredBottomContentInset = inset
             } else {
                 scrollView.automaticallyAdjustsContentInsets = false
-                let insets = NSEdgeInsets(top: 0, left: 0, bottom: inset, right: 0)
-                scrollView.contentInsets = insets
-                scrollView.scrollerInsets = insets
+                scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: inset, right: 0)
+                scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
             }
         }
 
@@ -379,6 +380,7 @@ extension NativeSongTableView {
             let usableWidth = max(0, clipWidth - NativeSongTableMetrics.rightSafeInset)
             guard usableWidth > 1 else { return }
             tableView.setFrameSize(NSSize(width: usableWidth, height: tableView.frame.height))
+            updateHeaderColumnMaxWidths()
 
             if parent.style.showsHeader, hasSavedColumnWidths(for: parent.style) {
                 return
@@ -653,7 +655,8 @@ extension NativeSongTableView {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id.rawValue))
             column.headerCell = OpaqueSongTableHeaderCell(textCell: title)
             column.minWidth = minWidth
-            column.width = max(minWidth, savedColumnWidth(for: id, style: parent.style) ?? width)
+            column.maxWidth = max(minWidth, headerColumnMaxWidth())
+            column.width = min(column.maxWidth, max(minWidth, savedColumnWidth(for: id, style: parent.style) ?? width))
             column.resizingMask = .userResizingMask
 
             if let sortKey {
@@ -672,9 +675,30 @@ extension NativeSongTableView {
             tableView?.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(id.rawValue))
         }
 
+        private func updateHeaderColumnMaxWidths() {
+            guard parent.style.showsHeader, let tableView else { return }
+
+            let maxWidth = headerColumnMaxWidth()
+            applyProgrammaticColumnWidths {
+                for column in tableView.tableColumns {
+                    let adjustedMaxWidth = max(column.minWidth, maxWidth)
+                    column.maxWidth = adjustedMaxWidth
+                    if column.width > adjustedMaxWidth {
+                        column.width = adjustedMaxWidth
+                    }
+                }
+            }
+        }
+
+        private func headerColumnMaxWidth() -> CGFloat {
+            let screenWidth = tableView?.window?.screen?.visibleFrame.width ?? NSScreen.main?.visibleFrame.width ?? 0
+            guard screenWidth > 0 else { return CGFloat.greatestFiniteMagnitude }
+            return floor(screenWidth * NativeSongTableMetrics.maxHeaderColumnWidthRatio)
+        }
+
         private func setColumn(_ id: NativeSongColumn, width: CGFloat) {
             guard let column = column(id) else { return }
-            column.width = max(column.minWidth, width)
+            column.width = min(column.maxWidth, max(column.minWidth, width))
         }
 
         private func setColumnIfPresent(_ id: NativeSongColumn, width: CGFloat) {
