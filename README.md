@@ -11,6 +11,7 @@ A native macOS local music player for organizing and playing your own music libr
 - Flexible organization with custom playlists, a Favorites list, blocked songs, and play count tracking.
 - Lyrics window with local `.lrc` support. Lyrics files must share the same name and folder as the audio file. Timestamped lyrics sync with playback; plain text lyrics are shown as static text.
 - Native macOS playback controls, including queue, shuffle, repeat, volume, media keys, and Now Playing integration.
+- Player bar controls include a perceptual volume slider and Space key play/pause support in the main and lyrics windows.
 - Native song tables with sortable columns, configurable column visibility, multi-selection, context menus, drag to playlist, and Finder integration.
 - Separate Debug and Release app names and storage, so test data does not pollute the release library.
 

@@ -48,7 +48,7 @@ struct PlayerBarView: View {
             PlayerIconButton(systemName: "backward.fill") {
                 audioPlayer.previous()
             }
-            Button(action: togglePlay) {
+            Button(action: audioPlayer.togglePlayPause) {
                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 24, weight: .semibold))
                     .frame(width: 30, height: 30)
@@ -176,8 +176,8 @@ struct PlayerBarView: View {
 
             Slider(
                 value: Binding(
-                    get: { audioPlayer.volume },
-                    set: { audioPlayer.setVolume($0) }
+                    get: { audioPlayer.volumeSliderValue },
+                    set: { audioPlayer.setVolumeFromSlider($0) }
                 ),
                 in: 0...1
             )
@@ -211,14 +211,6 @@ struct PlayerBarView: View {
         }
         .buttonStyle(MintContentButtonStyle(cornerRadius: 8, hoverOutset: 0))
         .help(settings.text(.showLyrics))
-    }
-
-    private func togglePlay() {
-        if audioPlayer.isPlaying {
-            audioPlayer.pause()
-        } else {
-            audioPlayer.resume()
-        }
     }
 
     private func toggleCurrentSongFavorite() {

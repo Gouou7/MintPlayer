@@ -20,12 +20,18 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private let volumeDefaultsKey = AppConfiguration.userDefaultsKey("player.volume")
     private let playbackSessionDefaultsKey = AppConfiguration.userDefaultsKey("player.session")
     private let playbackTimerInterval: TimeInterval = 0.2
+    private let volumeSliderExponent: Float = 2
     private let nowPlayingService = NowPlayingService()
     private var lastNowPlayingElapsedUpdate: TimeInterval = 0
     private var lastSessionElapsedUpdate: TimeInterval = 0
     private var pendingStartTime: TimeInterval?
 
     var onSongStarted: ((Song) -> Void)?
+
+    var volumeSliderValue: Float {
+        guard volume > 0 else { return 0 }
+        return powf(volume, 1 / volumeSliderExponent)
+    }
 
     override init() {
         let storedVolume = UserDefaults.standard.object(forKey: volumeDefaultsKey) as? Float
@@ -235,6 +241,14 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
     }
 
+    func togglePlayPause() {
+        if isPlaying {
+            pause()
+        } else {
+            resume()
+        }
+    }
+
     // 停止播放
     func stop() {
         audioPlayer?.stop()
@@ -312,6 +326,11 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         volume = normalizedValue
         audioPlayer?.volume = normalizedValue
         UserDefaults.standard.set(normalizedValue, forKey: volumeDefaultsKey)
+    }
+
+    func setVolumeFromSlider(_ value: Float) {
+        let normalizedValue = min(max(value, 0), 1)
+        setVolume(powf(normalizedValue, volumeSliderExponent))
     }
 
     // 跳转到指定时间

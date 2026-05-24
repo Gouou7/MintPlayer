@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- None.
+- Added Space key play/pause handling while the main window or lyrics playback window is active.
 
 ### Changed
-- None.
+- Changed the player bar volume popover slider to use a perceptual curve so low-volume adjustments are more precise.
 
 ### Deprecated
 - None.

@@ -157,7 +157,7 @@ struct LyricsOverlayView: View {
 
             Spacer(minLength: 24)
 
-            Button(action: togglePlay) {
+            Button(action: audioPlayer.togglePlayPause) {
                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 34, weight: .bold))
                     .frame(width: 43, height: 43)
@@ -211,14 +211,6 @@ struct LyricsOverlayView: View {
                 title: settings.text(.lyricsUnavailable),
                 detail: message
             )
-        }
-    }
-
-    private func togglePlay() {
-        if audioPlayer.isPlaying {
-            audioPlayer.pause()
-        } else {
-            audioPlayer.resume()
         }
     }
 
@@ -748,6 +740,8 @@ struct LyricsWindowView: View {
         .frame(minWidth: 980, minHeight: 600)
         .background {
             LyricsWindowConfigurator()
+                .frame(width: 0, height: 0)
+            PlaybackSpaceKeyHandler()
                 .frame(width: 0, height: 0)
         }
     }

@@ -39,6 +39,8 @@ struct MainView: View {
         .background {
             NoncollapsibleSidebarView()
                 .frame(width: 0, height: 0)
+            PlaybackSpaceKeyHandler()
+                .frame(width: 0, height: 0)
         }
         .onAppear {
             columnVisibility = .all
