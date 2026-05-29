@@ -102,7 +102,7 @@
 		00000000000000000000022E /* MintPlayer/Views/Shared/ListPlaybackControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Shared/ListPlaybackControls.swift; sourceTree = "<group>"; };
 		00000000000000000000022F /* MintPlayer/Services/LibraryPersistenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/LibraryPersistenceStore.swift; sourceTree = "<group>"; };
 		000000000000000000000230 /* MintPlayer/App/AppConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/App/AppConfiguration.swift; sourceTree = "<group>"; };
-		000000000000000000000301 /* MintPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MintPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000301 /* Mint Player Debug.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Mint Player Debug.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6B8086172F99168000930F3F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = MintPlayer/Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -141,7 +141,7 @@
 		000000000000000000000503 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000000301 /* MintPlayer.app */,
+				000000000000000000000301 /* Mint Player Debug.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -316,7 +316,7 @@
 			);
 			name = MintPlayer;
 			productName = MintPlayer;
-			productReference = 000000000000000000000301 /* MintPlayer.app */;
+			productReference = 000000000000000000000301 /* Mint Player Debug.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -453,6 +453,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -525,6 +526,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
