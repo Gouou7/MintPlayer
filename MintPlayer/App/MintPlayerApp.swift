@@ -3,6 +3,7 @@ import AppKit
 
 @main
 struct MintPlayerApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var audioPlayer = AudioPlayer()
     @StateObject private var musicLibrary = MusicLibrary()
     @StateObject private var settings = SettingsManager()
@@ -15,6 +16,9 @@ struct MintPlayerApp: App {
                 .environmentObject(settings)
                 .tint(MintTheme.accent)
                 .preferredColorScheme(settings.preferredColorScheme)
+                .onAppear {
+                    appDelegate.configure(audioPlayer: audioPlayer, musicLibrary: musicLibrary)
+                }
         }
         .windowStyle(.automatic)
 
@@ -39,6 +43,87 @@ struct MintPlayerApp: App {
                 .tint(MintTheme.accent)
                 .preferredColorScheme(settings.preferredColorScheme)
         }
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private weak var audioPlayer: AudioPlayer?
+    private weak var musicLibrary: MusicLibrary?
+
+    func configure(audioPlayer: AudioPlayer, musicLibrary: MusicLibrary) {
+        self.audioPlayer = audioPlayer
+        self.musicLibrary = musicLibrary
+    }
+
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        menu.addItem(menuItem(
+            title: "⏪️ 上一曲",
+            symbolName: "backward.fill",
+            action: #selector(playPrevious),
+            isEnabled: canNavigatePlayback
+        ))
+        let isPlaying = audioPlayer?.isPlaying == true
+        menu.addItem(menuItem(
+            title: isPlaying ? "⏸ 暂停" : "▶️ 播放",
+            symbolName: isPlaying ? "pause.fill" : "play.fill",
+            action: #selector(togglePlayback),
+            isEnabled: audioPlayer?.currentSong != nil
+        ))
+        menu.addItem(menuItem(
+            title: "⏩️ 下一曲",
+            symbolName: "forward.fill",
+            action: #selector(playNext),
+            isEnabled: canNavigatePlayback
+        ))
+        menu.addItem(.separator())
+        menu.addItem(menuItem(
+            title: "🔀 随机播放",
+            symbolName: "shuffle",
+            action: #selector(shuffleSongs),
+            isEnabled: musicLibrary?.songs.isEmpty == false
+        ))
+        return menu
+    }
+
+    private var canNavigatePlayback: Bool {
+        audioPlayer?.currentSong != nil || audioPlayer?.queue.isEmpty == false
+    }
+
+    private func menuItem(
+        title: String,
+        symbolName: String,
+        action: Selector,
+        isEnabled: Bool
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        item.isEnabled = isEnabled
+        item.image = symbolImage(named: symbolName, accessibilityDescription: title)
+        return item
+    }
+
+    private func symbolImage(named symbolName: String, accessibilityDescription: String) -> NSImage? {
+        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: accessibilityDescription)
+        image?.isTemplate = true
+        return image
+    }
+
+    @objc private func playPrevious() {
+        audioPlayer?.previous()
+    }
+
+    @objc private func togglePlayback() {
+        audioPlayer?.togglePlayPause()
+    }
+
+    @objc private func playNext() {
+        audioPlayer?.next()
+    }
+
+    @objc private func shuffleSongs() {
+        guard let songs = musicLibrary?.songs, !songs.isEmpty else { return }
+        audioPlayer?.shuffle(songs: songs)
     }
 }
 

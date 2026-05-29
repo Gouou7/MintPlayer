@@ -13,6 +13,8 @@ struct LyricsOverlayView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var lyricsState: LyricsLoadState = .plainText([])
+    @State private var previousButtonWiggleID = 0
+    @State private var nextButtonWiggleID = 0
 
     private let artworkMaxSize: CGFloat = 400
     private let lyricsColumnWidth: CGFloat = 780
@@ -146,11 +148,13 @@ struct LyricsOverlayView: View {
             Spacer(minLength: 24)
 
             Button {
+                previousButtonWiggleID += 1
                 audioPlayer.previous()
             } label: {
                 Image(systemName: "backward.fill")
                     .font(.system(size: 27, weight: .semibold))
                     .frame(width: 34, height: 34)
+                    .symbolEffect(.wiggle, value: previousButtonWiggleID)
             }
             .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 46, height: 46)))
             .help(settings.text(.previous))
@@ -161,6 +165,8 @@ struct LyricsOverlayView: View {
                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 34, weight: .bold))
                     .frame(width: 43, height: 43)
+                    .contentTransition(.symbolEffect(.replace))
+                    .animation(.snappy(duration: 0.18), value: audioPlayer.isPlaying)
             }
             .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 58, height: 58)))
             .help(audioPlayer.isPlaying ? settings.text(.pause) : settings.text(.play))
@@ -168,11 +174,13 @@ struct LyricsOverlayView: View {
             Spacer(minLength: 24)
 
             Button {
+                nextButtonWiggleID += 1
                 audioPlayer.next()
             } label: {
                 Image(systemName: "forward.fill")
                     .font(.system(size: 27, weight: .semibold))
                     .frame(width: 34, height: 34)
+                    .symbolEffect(.wiggle, value: nextButtonWiggleID)
             }
             .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 46, height: 46)))
             .help(settings.text(.next))

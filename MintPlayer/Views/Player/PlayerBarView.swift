@@ -6,6 +6,8 @@ struct PlayerBarView: View {
     @EnvironmentObject private var settings: SettingsManager
     @State private var isQueuePresented = false
     @State private var isVolumePresented = false
+    @State private var previousButtonWiggleID = 0
+    @State private var nextButtonWiggleID = 0
 
     var onArtworkClick: () -> Void = {}
 
@@ -45,16 +47,20 @@ struct PlayerBarView: View {
             ) {
                 audioPlayer.toggleShuffle()
             }
-            PlayerIconButton(systemName: "backward.fill") {
+            PlayerIconButton(systemName: "backward.fill", symbolEffectValue: previousButtonWiggleID) {
+                previousButtonWiggleID += 1
                 audioPlayer.previous()
             }
             Button(action: audioPlayer.togglePlayPause) {
                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 24, weight: .semibold))
                     .frame(width: 30, height: 30)
+                    .contentTransition(.symbolEffect(.replace))
+                    .animation(.snappy(duration: 0.18), value: audioPlayer.isPlaying)
             }
             .buttonStyle(MintPlainIconButtonStyle())
-            PlayerIconButton(systemName: "forward.fill") {
+            PlayerIconButton(systemName: "forward.fill", symbolEffectValue: nextButtonWiggleID) {
+                nextButtonWiggleID += 1
                 audioPlayer.next()
             }
             PlayerIconButton(
@@ -241,6 +247,7 @@ private struct PlayerIconButton: View {
     var isActive = false
     var isDisabled = false
     var usesSecondaryInactiveColor = false
+    var symbolEffectValue = 0
     let action: () -> Void
 
     var body: some View {
@@ -249,6 +256,9 @@ private struct PlayerIconButton: View {
                 .font(.system(size: 16, weight: .semibold))
                 .symbolRenderingMode(.monochrome)
                 .frame(width: 22, height: 24)
+                .contentTransition(.symbolEffect(.replace))
+                .animation(.snappy(duration: 0.18), value: systemName)
+                .symbolEffect(.wiggle, value: symbolEffectValue)
         }
         .buttonStyle(
             PlayerBarIconButtonStyle(

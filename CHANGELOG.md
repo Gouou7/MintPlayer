@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- None.
+- Added Dock menu playback controls for previous track, play/pause, next track, and shuffle.
 
 ### Changed
-- None.
+- Added system symbol animations to player bar and lyrics playback controls.
 
 ### Deprecated
 - None.
