@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added Space key play/pause handling while the main window or lyrics playback window is active.
+- None.
 
 ### Changed
-- Changed the player bar volume popover slider to use a perceptual curve so low-volume adjustments are more precise.
+- None.
 
 ### Deprecated
 - None.
@@ -21,6 +21,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - None.
+
+### Security
+- None.
+
+## [0.6.0] - 2026-05-29
+
+### Added
+- Added Space key play/pause handling while the main window or lyrics playback window is active.
+- Added remembered sidebar visibility so the app restores the sidebar hidden or shown state on launch.
+- Added a native toolbar tab bar for Favorites, Songs, Albums, and Artists when the sidebar is hidden.
+- Added toolbar back buttons for Album and Artist detail pages.
+
+### Changed
+- Changed the player bar volume popover slider to use a perceptual curve so low-volume adjustments are more precise.
+- Changed Songs, Favorites, Albums, and Artists search to use native toolbar search fields with consistent width.
+- Changed the Songs and Favorites toolbar sorting control to use a standard toolbar menu button.
+- Refined the hidden-sidebar tab bar sizing and shape to use a compact native segmented control.
+
+### Deprecated
+- None.
+
+### Removed
+- Removed duplicate custom toolbar search and glass control code in favor of native toolbar controls.
+
+### Fixed
+- Fixed duplicate sidebar toggle buttons appearing around the toolbar and collapsed sidebar tab bar.
+- Fixed Albums and Artists toolbar search fields using a different width from Songs and Favorites.
+- Fixed missing search icon display in the Songs and Favorites toolbar search field before typing.
 
 ### Security
 - None.

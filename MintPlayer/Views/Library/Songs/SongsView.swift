@@ -91,11 +91,17 @@ struct SongsView: View {
         .toolbar {
             if !isPlayerOverlayPresented {
                 ToolbarItem(placement: .primaryAction) {
-                    LibrarySearchControls(searchText: searchTextBinding, searchPrompt: settings.text(.searchSongs)) {
-                        SongSortButton(sortOrder: sortOrderBinding)
-                    }
+                    SongSortButton(sortOrder: sortOrderBinding)
                 }
-                .sharedBackgroundVisibility(.hidden)
+
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+
+                ToolbarItem(placement: .primaryAction) {
+                    NativeToolbarSearchField(
+                        text: searchTextBinding,
+                        prompt: settings.text(.searchSongs)
+                    )
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

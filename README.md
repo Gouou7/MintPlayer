@@ -7,17 +7,19 @@ A native macOS local music player for organizing and playing your own music libr
 ## Highlights
 
 - Familiar, polished interface with Liquid Glass styling and dedicated Songs, Albums, Artists, Favorites, playlist, and folder views.
+- Collapsible sidebar navigation with a native toolbar tab bar for Favorites, Songs, Albums, and Artists when the sidebar is hidden.
 - Local-first library management: import folders without changing your original file structure.
 - Flexible organization with custom playlists, a Favorites list, blocked songs, and play count tracking.
 - Lyrics window with local `.lrc` support. Lyrics files must share the same name and folder as the audio file. Timestamped lyrics sync with playback; plain text lyrics are shown as static text.
 - Native macOS playback controls, including queue, shuffle, repeat, volume, media keys, and Now Playing integration.
 - Player bar controls include a perceptual volume slider and Space key play/pause support in the main and lyrics windows.
 - Native song tables with sortable columns, configurable column visibility, multi-selection, context menus, drag to playlist, and Finder integration.
+- Native toolbar search fields for Songs, Favorites, Albums, and Artists, with detail-level search in Albums and Artists drill-down pages.
 - Separate Debug and Release app names and storage, so test data does not pollute the release library.
 
 ## Current Version
 
-0.5.0
+0.6.0
 
 ## Screenshots
 

@@ -13,7 +13,7 @@ Mint Player is a native macOS local music player built with an Xcode project.
 - **Persistence**: SQLite and `UserDefaults`; artwork cache files live under Application Support
 - **Build tool**: Xcode project
 - **Minimum OS**: macOS 26.0
-- **Current version**: 0.5.0
+- **Current version**: 0.6.0
 
 The repository root does not currently contain `Package.swift`, third-party dependency manifests, test targets, or lint configuration.
 There is no `package.json`, `go.mod`, `requirements.txt`, `Makefile`, or custom build script.
@@ -70,7 +70,8 @@ MintPlayer/
 - Song, playlist, Folder, and detail-page song lists currently depend on `NativeSongTableView`; preserve native `NSTableView` selection, multi-selection, double-click, menus, and drag behavior when changing interactions.
 - Albums and Artists browsing pages should remain responsive grids, with at least four primary items visible per row at the minimum window width.
 - Artists use a drill-in structure across artist browsing, artist detail, and album detail. Do not reintroduce a permanent three-column artist layout.
-- Search fields live in the top-right page toolbar by default, and their search semantics should follow the current page or detail level.
+- Search fields live in the top-right page toolbar by default, use native macOS search controls, and their search semantics should follow the current page or detail level.
+- When the main sidebar is hidden, the top toolbar uses a native segmented tab bar for the primary library destinations. Preserve the system sidebar and toolbar behavior instead of replacing them with custom-painted chrome.
 - The bottom player bar is a fixed-width, centered floating Liquid Glass control and must intercept clicks so events do not pass through to content underneath.
 
 ### Comments

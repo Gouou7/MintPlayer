@@ -2,13 +2,16 @@ import SwiftUI
 import AppKit
 
 struct MainView: View {
+    private static let sidebarCollapsedDefaultsKey = AppConfiguration.userDefaultsKey("sidebar.isCollapsed")
+
     @Environment(\.openWindow) private var openWindow
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
 
+    @AppStorage(Self.sidebarCollapsedDefaultsKey) private var isSidebarCollapsedStored = false
     @State private var selection: LibrarySelection = .songs
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var columnVisibility: NavigationSplitViewVisibility = UserDefaults.standard.bool(forKey: Self.sidebarCollapsedDefaultsKey) ? .detailOnly : .all
     @State private var didRestorePlaybackSession = false
 
     private let playerBarWidth: CGFloat = 648
@@ -35,18 +38,37 @@ struct MainView: View {
         .navigationTitle(currentTitle)
         .scrollEdgeEffectStyle(.soft, for: .top)
         .toolbar(removing: .sidebarToggle)
+        .toolbar {
+            if isSidebarCollapsed {
+                ToolbarItem(placement: .principal) {
+                    CollapsedSidebarNavigationPicker(selection: $selection)
+                }
+            }
+        }
         .frame(minWidth: 980, minHeight: 600)
         .background {
-            NoncollapsibleSidebarView()
+            SidebarToolbarToggleRemover()
                 .frame(width: 0, height: 0)
             PlaybackSpaceKeyHandler()
                 .frame(width: 0, height: 0)
         }
         .onAppear {
-            columnVisibility = .all
+            columnVisibility = preferredColumnVisibility
             restorePlaybackSessionIfNeeded()
             audioPlayer.onSongStarted = { song in
                 musicLibrary.recordSongPlayback(song)
+            }
+        }
+        .onChange(of: columnVisibility) { _, newVisibility in
+            switch newVisibility {
+            case .detailOnly:
+                isSidebarCollapsedStored = true
+            case .all, .doubleColumn:
+                isSidebarCollapsedStored = false
+            case .automatic:
+                break
+            default:
+                break
             }
         }
         .onChange(of: musicLibrary.songs) { _, _ in
@@ -55,6 +77,14 @@ struct MainView: View {
         .onDisappear {
             audioPlayer.onSongStarted = nil
         }
+    }
+
+    private var isSidebarCollapsed: Bool {
+        columnVisibility == .detailOnly
+    }
+
+    private var preferredColumnVisibility: NavigationSplitViewVisibility {
+        isSidebarCollapsedStored ? .detailOnly : .all
     }
 
     private var currentTitle: String {
@@ -142,7 +172,130 @@ struct MainView: View {
     }
 }
 
-private struct NoncollapsibleSidebarView: NSViewRepresentable {
+private struct CollapsedSidebarNavigationPicker: View {
+    @Binding var selection: LibrarySelection
+    @EnvironmentObject private var settings: SettingsManager
+
+    private let items: [LibrarySidebarItem] = [.favorites, .songs, .albums, .artists]
+
+    var body: some View {
+        NativeCollapsedSidebarTabBar(
+            items: items,
+            selectedItem: selectedItem,
+            titleProvider: tabTitle(for:)
+        )
+        .fixedSize()
+    }
+
+    private var selectedItem: Binding<LibrarySidebarItem?> {
+        Binding(
+            get: {
+                LibrarySidebarItem(selection: selection)
+            },
+            set: { item in
+                guard let item else { return }
+                selection = item.selection
+            }
+        )
+    }
+
+    private func tabTitle(for item: LibrarySidebarItem) -> String {
+        switch item {
+        case .favorites:
+            return settings.effectiveLanguage == .chinese ? "喜欢" : "Favorites"
+        case .songs, .albums, .artists:
+            return item.title(language: settings.effectiveLanguage)
+        }
+    }
+}
+
+private struct NativeCollapsedSidebarTabBar: NSViewRepresentable {
+    let items: [LibrarySidebarItem]
+    @Binding var selectedItem: LibrarySidebarItem?
+    let titleProvider: (LibrarySidebarItem) -> String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selectedItem: $selectedItem, items: items)
+    }
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl()
+        control.segmentStyle = .automatic
+        control.borderShape = .capsule
+        control.trackingMode = .selectOne
+        control.segmentDistribution = .fillEqually
+        control.controlSize = .regular
+        control.target = context.coordinator
+        control.action = #selector(Coordinator.selectionChanged(_:))
+        configure(control, context: context)
+        return control
+    }
+
+    func updateNSView(_ nsView: NSSegmentedControl, context: Context) {
+        context.coordinator.selectedItem = $selectedItem
+        context.coordinator.items = items
+        configure(nsView, context: context)
+    }
+
+    private func configure(_ control: NSSegmentedControl, context: Context) {
+        control.segmentCount = items.count
+
+        for (index, item) in items.enumerated() {
+            let title = titleProvider(item)
+            control.setLabel(title, forSegment: index)
+            control.setTag(index, forSegment: index)
+            control.setAlignment(.center, forSegment: index)
+            control.setWidth(segmentWidth(for: title, control: control), forSegment: index)
+        }
+
+        if let selectedItem, let selectedIndex = items.firstIndex(of: selectedItem) {
+            control.selectedSegment = selectedIndex
+        } else {
+            control.selectedSegment = -1
+        }
+    }
+
+    private func segmentWidth(for title: String, control: NSSegmentedControl) -> CGFloat {
+        let font = control.font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize(for: control.controlSize))
+        let measuredWidth = (title as NSString).size(withAttributes: [.font: font]).width
+        return ceil(measuredWidth + 38)
+    }
+
+    final class Coordinator: NSObject {
+        var selectedItem: Binding<LibrarySidebarItem?>
+        var items: [LibrarySidebarItem]
+
+        init(selectedItem: Binding<LibrarySidebarItem?>, items: [LibrarySidebarItem]) {
+            self.selectedItem = selectedItem
+            self.items = items
+        }
+
+        @objc func selectionChanged(_ sender: NSSegmentedControl) {
+            let index = sender.selectedSegment
+            guard items.indices.contains(index) else { return }
+            selectedItem.wrappedValue = items[index]
+        }
+    }
+}
+
+private extension LibrarySidebarItem {
+    init?(selection: LibrarySelection) {
+        switch selection {
+        case .favorites:
+            self = .favorites
+        case .songs:
+            self = .songs
+        case .albums:
+            self = .albums
+        case .artists:
+            self = .artists
+        case .playlist, .folder:
+            return nil
+        }
+    }
+}
+
+private struct SidebarToolbarToggleRemover: NSViewRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
@@ -155,7 +308,7 @@ private struct NoncollapsibleSidebarView: NSViewRepresentable {
 
     func updateNSView(_ nsView: HostView, context: Context) {
         nsView.coordinator = context.coordinator
-        context.coordinator.configureSoon(from: nsView)
+        context.coordinator.removeSoon(from: nsView)
     }
 
     final class HostView: NSView {
@@ -163,41 +316,21 @@ private struct NoncollapsibleSidebarView: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            coordinator?.configureSoon(from: self)
+            coordinator?.removeSoon(from: self)
         }
     }
 
     final class Coordinator {
-        func configureSoon(from view: NSView) {
+        func removeSoon(from view: NSView) {
             DispatchQueue.main.async { [weak view] in
                 guard let view else { return }
-                self.configure(from: view)
+                self.removeSidebarToggle(from: view.window?.toolbar)
             }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak view] in
                 guard let view else { return }
-                self.configure(from: view)
+                self.removeSidebarToggle(from: view.window?.toolbar)
             }
-        }
-
-        private func configure(from view: NSView) {
-            guard let window = view.window else { return }
-            configureSplitViewControllers(in: window.contentViewController)
-            removeSidebarToggle(from: window.toolbar)
-        }
-
-        private func configureSplitViewControllers(in viewController: NSViewController?) {
-            guard let viewController else { return }
-
-            if let splitViewController = viewController as? NSSplitViewController,
-               let sidebarItem = splitViewController.splitViewItems.first {
-                sidebarItem.canCollapse = false
-                sidebarItem.minimumThickness = 200
-                sidebarItem.maximumThickness = 300
-                sidebarItem.preferredThicknessFraction = 0
-            }
-
-            viewController.children.forEach(configureSplitViewControllers)
         }
 
         private func removeSidebarToggle(from toolbar: NSToolbar?) {

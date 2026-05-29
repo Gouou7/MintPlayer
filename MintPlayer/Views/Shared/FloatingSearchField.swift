@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 private struct PlayerOverlayPresentationKey: EnvironmentKey {
     static let defaultValue = false
@@ -11,92 +12,71 @@ extension EnvironmentValues {
     }
 }
 
-private enum FloatingSearchMetrics {
-    static let height: CGFloat = 34
-    static let searchWidth: CGFloat = 245
-    static let spacing: CGFloat = 9
-}
-
-struct LibrarySearchControls<LeadingControls: View>: View {
-    @Binding var searchText: String
-    let searchPrompt: String
-    private let leadingControls: LeadingControls
-
-    init(
-        searchText: Binding<String>,
-        searchPrompt: String,
-        @ViewBuilder leadingControls: () -> LeadingControls
-    ) {
-        self._searchText = searchText
-        self.searchPrompt = searchPrompt
-        self.leadingControls = leadingControls()
-    }
-
-    var body: some View {
-        HStack(spacing: FloatingSearchMetrics.spacing) {
-            leadingControls
-            FloatingSearchField(text: $searchText, prompt: searchPrompt)
-        }
-        .fixedSize()
-    }
-}
-
-extension LibrarySearchControls where LeadingControls == EmptyView {
-    init(searchText: Binding<String>, searchPrompt: String) {
-        self.init(searchText: searchText, searchPrompt: searchPrompt) {
-            EmptyView()
-        }
-    }
-}
-
-struct FloatingSearchField: View {
+struct NativeToolbarSearchField: NSViewRepresentable {
     @Binding var text: String
     let prompt: String
 
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.secondary)
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
 
-            TextField(prompt, text: $text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 15, weight: .semibold))
+    func makeNSView(context: Context) -> NSSearchField {
+        let searchField = NSSearchField()
+        searchField.placeholderString = prompt
+        searchField.stringValue = text
+        searchField.target = context.coordinator
+        searchField.action = #selector(Coordinator.searchFieldDidChange(_:))
+        searchField.delegate = context.coordinator
+        searchField.sendsSearchStringImmediately = true
+        searchField.translatesAutoresizingMaskIntoConstraints = false
+        searchField.widthAnchor.constraint(equalToConstant: 245).isActive = true
+        return searchField
+    }
+
+    func updateNSView(_ nsView: NSSearchField, context: Context) {
+        context.coordinator.text = $text
+        nsView.placeholderString = prompt
+        if nsView.stringValue != text {
+            nsView.stringValue = text
         }
-        .padding(.horizontal, 13)
-        .frame(width: FloatingSearchMetrics.searchWidth, height: FloatingSearchMetrics.height)
-        .modifier(CapsuleGlassControlSurface(height: FloatingSearchMetrics.height))
+    }
+
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        @objc func searchFieldDidChange(_ sender: NSSearchField) {
+            text.wrappedValue = sender.stringValue
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let searchField = notification.object as? NSSearchField else { return }
+            text.wrappedValue = searchField.stringValue
+        }
     }
 }
 
 struct SongSortButton: View {
     @EnvironmentObject private var settings: SettingsManager
     @Binding var sortOrder: [KeyPathComparator<Song>]
-    @State private var isPopoverPresented = false
 
     var body: some View {
-        Button {
-            isPopoverPresented.toggle()
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease")
-                .font(.system(size: 15, weight: .medium))
-                .frame(width: FloatingSearchMetrics.height, height: FloatingSearchMetrics.height)
-                .contentShape(Circle())
-        }
-        .buttonStyle(MintPlainIconButtonStyle())
-        .modifier(CircleGlassButtonSurface())
-        .labelStyle(.iconOnly)
-        .fixedSize()
-        .help(settings.text(.sortSongs))
-        .popover(isPresented: $isPopoverPresented, arrowEdge: .top) {
+        Menu {
             sortOptions
-                .frame(width: 220)
-                .padding(10)
+        } label: {
+            Label(settings.text(.sortSongs), systemImage: "line.3.horizontal.decrease")
         }
+        .labelStyle(.iconOnly)
+        .tint(Color.primary)
+        .foregroundStyle(.primary)
+        .help(settings.text(.sortSongs))
     }
 
     private var sortOptions: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        Group {
             sortFieldButton(settings.text(.title), field: .title)
             sortFieldButton(settings.text(.artist), field: .artist)
             sortFieldButton(settings.text(.album), field: .album)
@@ -113,46 +93,24 @@ struct SongSortButton: View {
         Button {
             setSort(field, order: activeSortOrder)
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .semibold))
-                    .opacity(activeSortField == field ? 1 : 0)
-                    .frame(width: 16)
-
+            if activeSortField == field {
+                Label(title, systemImage: "checkmark")
+            } else {
                 Text(title)
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
             }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(MintRowButtonStyle())
     }
 
     private func sortOrderButton(_ title: String, order: Foundation.SortOrder) -> some View {
         Button {
             setSort(activeSortField, order: order)
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .semibold))
-                    .opacity(activeSortOrder == order ? 1 : 0)
-                    .frame(width: 16)
-
+            if activeSortOrder == order {
+                Label(title, systemImage: "checkmark")
+            } else {
                 Text(title)
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
             }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(MintRowButtonStyle())
     }
 
     private var activeSortField: SongSortField {
@@ -203,18 +161,5 @@ struct SongSortButton: View {
         case .dateAdded:
             sortOrder = [KeyPathComparator(\Song.dateAdded, order: order)]
         }
-    }
-}
-
-struct CapsuleGlassControlSurface: ViewModifier {
-    let height: CGFloat
-
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .glassEffect(.regular.interactive(), in: shape)
     }
 }

@@ -3,7 +3,6 @@ import SwiftUI
 struct AlbumsView: View {
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
-    @Environment(\.isPlayerOverlayPresented) private var isPlayerOverlayPresented
     @State private var searchText = ""
     @State private var selectedAlbum: AlbumSummary?
 
@@ -31,14 +30,11 @@ struct AlbumsView: View {
 
         }
         .toolbar {
-            if !isPlayerOverlayPresented {
-                ToolbarItem(placement: .primaryAction) {
-                    LibrarySearchControls(
-                        searchText: $searchText,
-                        searchPrompt: selectedAlbum == nil ? settings.text(.searchAlbums) : settings.text(.searchInAlbum)
-                    )
-                }
-                .sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .primaryAction) {
+                NativeToolbarSearchField(
+                    text: $searchText,
+                    prompt: selectedAlbum == nil ? settings.text(.searchAlbums) : settings.text(.searchInAlbum)
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -114,19 +110,6 @@ struct AlbumDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 34) {
-                Button(action: onBack) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.clear)
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 17, weight: .semibold))
-                    }
-                    .frame(width: 34, height: 34)
-                    .contentShape(Circle())
-                }
-                .buttonStyle(MintPlainIconButtonStyle())
-                .modifier(CircleGlassButtonSurface())
-
                 albumHeader
 
                 NativeSongTableView(
@@ -157,6 +140,18 @@ struct AlbumDetailView: View {
         .onChange(of: searchText) {
             refreshVisibleSongs()
         }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: onBack) {
+                    Label(backButtonTitle, systemImage: "chevron.left")
+                }
+                .labelStyle(.iconOnly)
+            }
+        }
+    }
+
+    private var backButtonTitle: String {
+        settings.effectiveLanguage == .chinese ? "返回" : "Back"
     }
 
     private var albumHeader: some View {
