@@ -7,28 +7,54 @@ struct LibrarySettingsView: View {
 
     @State private var selectedTheme = ThemeMode.dark
     @State private var selectedLanguage = AppLanguage.system
+    @State private var lyricsBlurEnabled = true
     @State private var showFolderPicker = false
     @State private var newLibraryPath = ""
+    @State private var folderPendingDeletion: MusicLibrarySource?
 
     var body: some View {
         Form {
             appearanceSettings
-            libraryControls
-            foldersSettings
+            playbackSettings
+            librarySettings
             aboutSettings
         }
         .formStyle(.grouped)
-        .frame(width: 620, height: 640)
-        .scenePadding()
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .frame(minWidth: 620, minHeight: 640)
+        .background {
+            SettingsWindowConfigurator()
+                .frame(width: 0, height: 0)
+        }
         .onAppear {
             selectedTheme = settings.theme
             selectedLanguage = settings.language
+            lyricsBlurEnabled = settings.lyricsBlurEnabled
         }
         .onChange(of: selectedTheme) { _, newTheme in
             settings.updateTheme(newTheme)
         }
         .onChange(of: selectedLanguage) { _, newLanguage in
             settings.updateLanguage(newLanguage)
+        }
+        .onChange(of: lyricsBlurEnabled) { _, isEnabled in
+            settings.updateLyricsBlurEnabled(isEnabled)
+        }
+        .confirmationDialog(
+            settings.text(.deleteFolderQuestion),
+            isPresented: folderDeletionConfirmationBinding,
+            titleVisibility: .visible,
+            presenting: folderPendingDeletion
+        ) { source in
+            Button(settings.text(.deleteFolder), role: .destructive) {
+                musicLibrary.removeLibrarySource(id: source.id)
+                folderPendingDeletion = nil
+            }
+            Button(settings.text(.cancel), role: .cancel) {
+                folderPendingDeletion = nil
+            }
+        } message: { source in
+            Text(String(format: settings.text(.deleteFolderMessage), source.name))
         }
         .fileImporter(
             isPresented: $showFolderPicker,
@@ -48,59 +74,49 @@ struct LibrarySettingsView: View {
 
     private var appearanceSettings: some View {
         Section(settings.text(.appearance)) {
-            Picker(settings.text(.theme), selection: $selectedTheme) {
+            SettingsPickerRow(
+                title: settings.text(.interfaceTheme),
+                description: settings.text(.themeDescription),
+                selection: $selectedTheme
+            ) {
                 ForEach(ThemeMode.allCases, id: \.self) { theme in
                     Text(themeTitle(theme))
                         .tag(theme)
                 }
             }
-            .pickerStyle(.menu)
 
-            Text(settings.text(.themeDescription))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Picker(settings.text(.language), selection: $selectedLanguage) {
-                ForEach(AppLanguage.allCases, id: \.self) { language in
+            SettingsPickerRow(
+                title: settings.text(.language),
+                description: settings.text(.languageDescription),
+                selection: $selectedLanguage
+            ) {
+                ForEach([AppLanguage.system, .chinese, .english], id: \.self) { language in
                     Text(languageTitle(language))
                         .tag(language)
                 }
             }
-            .pickerStyle(.menu)
-
-            Text(settings.text(.languageDescription))
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
-    private var libraryControls: some View {
-        Section {
-            HStack {
-                Button {
-                    showFolderPicker = true
-                } label: {
-                    Label(settings.text(.addMusicLibrary), systemImage: "plus")
-                }
-                .buttonStyle(.borderedProminent)
+    private var playbackSettings: some View {
+        Section(settings.text(.playbackPage)) {
+            SettingsToggleRow(
+                title: settings.text(.lyricsBlurEffect),
+                description: settings.text(.lyricsBlurDescription),
+                isOn: $lyricsBlurEnabled
+            )
+        }
+    }
 
-                Button {
-                    musicLibrary.rescanAllLibraries()
-                } label: {
-                    Label(settings.text(.rescanAll), systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.bordered)
-                .disabled(musicLibrary.librarySources.isEmpty)
+    private var librarySettings: some View {
+        Section(settings.text(.library)) {
+            Button {
+                showFolderPicker = true
+            } label: {
+                Label(settings.text(.addMusicLibrary), systemImage: "plus")
             }
-        } header: {
-            Text(settings.text(.musicLibrary))
-        } footer: {
-            Text(settings.text(.libraryDescription))
-        }
-    }
+            .buttonStyle(.borderedProminent)
 
-    private var foldersSettings: some View {
-        Section(settings.text(.folders)) {
             if musicLibrary.librarySources.isEmpty {
                 ContentUnavailableView(
                     settings.text(.noMusicLibraries),
@@ -121,6 +137,14 @@ struct LibrarySettingsView: View {
                     }
                 }
             }
+
+            Button {
+                musicLibrary.rescanAllLibraries()
+            } label: {
+                Label(settings.text(.rescanAll), systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.bordered)
+            .disabled(musicLibrary.librarySources.isEmpty)
         }
     }
 
@@ -134,20 +158,21 @@ struct LibrarySettingsView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(source.name)
-                        .font(.body.weight(.medium))
-                        .lineLimit(1)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(source.name)
+                            .font(.body.weight(.medium))
+
+                        Text("(\(source.path))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .lineLimit(1)
 
                     if source.isScanning {
                         ProgressView()
                             .controlSize(.small)
                     }
                 }
-
-                Text(source.path)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
 
                 if let lastScanned = source.lastScanned {
                     Text("\(settings.text(.lastScanned)): \(formattedDate(lastScanned))")
@@ -168,7 +193,7 @@ struct LibrarySettingsView: View {
             .help(settings.text(.rescan))
 
             Button(role: .destructive) {
-                musicLibrary.removeLibrarySource(id: source.id)
+                folderPendingDeletion = source
             } label: {
                 Image(systemName: "trash.fill")
             }
@@ -180,9 +205,9 @@ struct LibrarySettingsView: View {
 
     private func blockedSongsList(_ songs: [BlockedSong]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(settings.text(.blockedSongs), systemImage: "eye.slash")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+            Label("\(settings.text(.blockedSongs)):", systemImage: "eye.slash")
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.primary)
 
             ForEach(songs) { song in
                 blockedSongRow(song)
@@ -199,7 +224,7 @@ struct LibrarySettingsView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title)
-                    .font(.callout.weight(.medium))
+                    .font(.caption.weight(.medium))
                     .lineLimit(1)
 
                 Text("\(song.artist) - \(song.album)")
@@ -241,6 +266,17 @@ struct LibrarySettingsView: View {
             }
             .padding(.vertical, 4)
         }
+    }
+
+    private var folderDeletionConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { folderPendingDeletion != nil },
+            set: { isPresented in
+                if !isPresented {
+                    folderPendingDeletion = nil
+                }
+            }
+        )
     }
 
     private func addLibrary(url: URL) {
@@ -286,7 +322,138 @@ struct LibrarySettingsView: View {
         case .english:
             return "English"
         case .chinese:
-            return "简体中文"
+            return settings.effectiveLanguage == .chinese ? "中文简体" : "Simplified Chinese"
+        }
+    }
+}
+
+private struct SettingsPickerRow<SelectionValue: Hashable, Content: View>: View {
+    let title: String
+    let description: String
+    @Binding var selection: SelectionValue
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            settingsLabel
+
+            Spacer(minLength: 16)
+
+            Picker("", selection: $selection) {
+                content()
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .fixedSize()
+        }
+    }
+
+    private var settingsLabel: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.body.weight(.semibold))
+
+            Text(description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct SettingsToggleRow: View {
+    let title: String
+    let description: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 16)
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .fixedSize()
+        }
+    }
+}
+
+private struct SettingsWindowConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> HostView {
+        HostView()
+    }
+
+    func updateNSView(_ nsView: HostView, context: Context) {
+        nsView.configureSoon()
+    }
+
+    final class HostView: NSView {
+        private weak var configuredWindow: NSWindow?
+        private var frameObservers: [NSObjectProtocol] = []
+
+        deinit {
+            removeFrameObservers()
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            configureSoon()
+        }
+
+        func configureSoon() {
+            DispatchQueue.main.async { [weak self] in
+                self?.configureWindow()
+            }
+        }
+
+        private func configureWindow() {
+            guard let window else { return }
+
+            if configuredWindow !== window {
+                removeFrameObservers()
+                configuredWindow = window
+            }
+
+            window.styleMask.insert(.resizable)
+            window.minSize = NSSize(width: 620, height: 640)
+            observeFrameChanges(for: window)
+        }
+
+        private func observeFrameChanges(for window: NSWindow) {
+            guard frameObservers.isEmpty else { return }
+
+            let center = NotificationCenter.default
+            let notifications: [NSNotification.Name] = [
+                NSWindow.didMoveNotification,
+                NSWindow.didResizeNotification,
+                NSWindow.didEndLiveResizeNotification,
+                NSWindow.willCloseNotification
+            ]
+
+            frameObservers = notifications.map { name in
+                center.addObserver(forName: name, object: window, queue: .main) { [weak self, weak window] _ in
+                    guard let self, let window, self.configuredWindow === window else { return }
+                    self.saveFrame(for: window)
+                }
+            }
+        }
+
+        private func saveFrame(for window: NSWindow) {
+            WindowFramePersistence.saveFrame(window.frame, for: .settings)
+        }
+
+        private func removeFrameObservers() {
+            frameObservers.forEach(NotificationCenter.default.removeObserver)
+            frameObservers = []
         }
     }
 }

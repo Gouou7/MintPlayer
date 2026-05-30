@@ -62,6 +62,7 @@ extension View {
 
 struct MintPlainIconButtonStyle: ButtonStyle {
     var isActive = false
+    var inactiveForeground = Color.primary
     var shape: AnyShape = AnyShape(Circle())
     var hoverSize: CGSize = CGSize(width: 38, height: 38)
 
@@ -69,6 +70,7 @@ struct MintPlainIconButtonStyle: ButtonStyle {
         HoverButtonBody(
             configuration: configuration,
             isActive: isActive,
+            inactiveForeground: inactiveForeground,
             shape: shape,
             hoverSize: hoverSize
         )
@@ -77,13 +79,14 @@ struct MintPlainIconButtonStyle: ButtonStyle {
     private struct HoverButtonBody: View {
         let configuration: Configuration
         let isActive: Bool
+        let inactiveForeground: Color
         let shape: AnyShape
         let hoverSize: CGSize
         @State private var isHovered = false
 
         var body: some View {
             configuration.label
-                .foregroundStyle(isActive ? MintTheme.accent : Color.primary)
+                .foregroundStyle(isActive ? MintTheme.accent : inactiveForeground)
                 .background {
                     if configuration.isPressed {
                         shape.fill(MintTheme.pressedFill)

@@ -21,10 +21,9 @@ struct CollapsibleSidebarHeader: View {
                 Button(action: addAction) {
                     Image(systemName: addSystemImage)
                         .font(.system(size: 11, weight: .bold))
-                        .frame(width: 18, height: 18)
+                        .frame(width: 24, height: 22)
                 }
-                .buttonStyle(MintPlainIconButtonStyle())
-                .foregroundStyle(.secondary)
+                .buttonStyle(MintPlainIconButtonStyle(inactiveForeground: .secondary, hoverSize: CGSize(width: 26, height: 22)))
                 .help(addHelp ?? "")
                 .opacity(isHovering ? 1 : 0)
             }

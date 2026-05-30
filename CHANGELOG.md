@@ -9,9 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added continuous artwork transitions between album and artist grids and their detail pages.
+- Added an optional full-screen lyrics blur effect with a Settings toggle.
+- Added remembered window size and placement for the lyrics and Settings windows.
 
 ### Changed
 - Improved album and artist artwork transitions so artwork size and position animate together.
+- Reorganized Settings into Appearance, Playback Page, Library, and About sections.
+- Renamed the sidebar Folders section to Library and refined its add-button color and hover area.
+- Updated Library settings rows to show the library name, path, last scan time, and blocked songs more compactly.
+- Hid album and artist toolbar search fields while detail pages are open.
 
 ### Deprecated
 - None.
@@ -22,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed artist artwork transitions clipping the moving avatar to only the start and end circles.
 - Fixed selected song rows using low-contrast white text in the light theme.
+- Fixed Settings window resizing, scroll coverage, and top scroll edge behavior.
+- Fixed library folder removal in Settings to ask for confirmation before deleting the app reference.
 
 ### Security
 - None.

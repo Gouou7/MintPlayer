@@ -40,11 +40,13 @@ struct AlbumsView: View {
 
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NativeToolbarSearchField(
-                    text: $searchText,
-                    prompt: selectedAlbum == nil ? settings.text(.searchAlbums) : settings.text(.searchInAlbum)
-                )
+            if selectedAlbum == nil {
+                ToolbarItem(placement: .primaryAction) {
+                    NativeToolbarSearchField(
+                        text: $searchText,
+                        prompt: settings.text(.searchAlbums)
+                    )
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

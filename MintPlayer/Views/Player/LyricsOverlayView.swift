@@ -620,6 +620,7 @@ private struct SyncedLyricsView: View {
     let lines: [LyricLine]
 
     @EnvironmentObject private var audioPlayer: AudioPlayer
+    @EnvironmentObject private var settings: SettingsManager
     @State private var lyricsScrollView: NSScrollView?
     @State private var lineMidYByID: [LyricLine.ID: CGFloat] = [:]
 
@@ -682,6 +683,11 @@ private struct SyncedLyricsView: View {
         .timingCurve(0.45, 0.0, 0.20, 1.0, duration: duration)
     }
 
+    private func distanceFromActiveLine(for index: Int) -> Int {
+        guard let activeLineIndex else { return 4 }
+        return abs(index - activeLineIndex)
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let focusSpacerHeight = focusSpacerHeight(for: geometry.size.height)
@@ -691,10 +697,11 @@ private struct SyncedLyricsView: View {
                     Color.clear
                         .frame(height: focusSpacerHeight)
 
-                    ForEach(lines) { line in
+                    ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
                         LyricLineRow(
                             line: line,
-                            isHighlighted: line.id == highlightedLineID,
+                            distanceFromActiveLine: distanceFromActiveLine(for: index),
+                            isBlurEnabled: settings.lyricsBlurEnabled,
                             transitionAnimation: activeLineTransitionAnimation(duration: highlightTransitionDuration)
                         )
                         .id(line.id)
@@ -773,17 +780,83 @@ private struct SyncedLyricsView: View {
 
 private struct LyricLineRow: View {
     let line: LyricLine
-    let isHighlighted: Bool
+    let distanceFromActiveLine: Int
+    let isBlurEnabled: Bool
     let transitionAnimation: Animation
 
     var body: some View {
         Text(line.text)
             .font(.system(size: 24, weight: .semibold))
             .lineSpacing(8)
-            .foregroundStyle(isHighlighted ? .primary : .secondary)
-            .opacity(isHighlighted ? 0.96 : 0.44)
+            .foregroundStyle(distanceFromActiveLine == 0 ? .primary : .secondary)
+            .opacity(opacity)
+            .blur(radius: blurRadius)
             .contentShape(Rectangle())
-            .animation(transitionAnimation, value: isHighlighted)
+            .animation(transitionAnimation, value: distanceFromActiveLine)
+    }
+
+    private var blurRadius: CGFloat {
+        guard isBlurEnabled else { return 0 }
+
+        switch distanceFromActiveLine {
+        case 0:
+            return 0
+        case 1:
+            return 0.25
+        case 2:
+            return 0.48
+        case 3:
+            return 0.70
+        case 4:
+            return 0.92
+        case 5:
+            return 1.14
+        case 6:
+            return 1.36
+        case 7:
+            return 1.58
+        case 8:
+            return 1.80
+        case 9:
+            return 2.02
+        case 10:
+            return 2.24
+        case 11:
+            return 2.42
+        default:
+            return 2.6
+        }
+    }
+
+    private var opacity: Double {
+        switch distanceFromActiveLine {
+        case 0:
+            return 0.98
+        case 1:
+            return 0.62
+        case 2:
+            return 0.58
+        case 3:
+            return 0.54
+        case 4:
+            return 0.50
+        case 5:
+            return 0.46
+        case 6:
+            return 0.42
+        case 7:
+            return 0.38
+        case 8:
+            return 0.35
+        case 9:
+            return 0.32
+        case 10:
+            return 0.29
+        case 11:
+            return 0.27
+        default:
+            return 0.25
+        }
     }
 }
 
@@ -918,6 +991,13 @@ private struct LyricsWindowConfigurator: NSViewRepresentable {
     }
 
     final class HostView: NSView {
+        private weak var configuredWindow: NSWindow?
+        private var frameObservers: [NSObjectProtocol] = []
+
+        deinit {
+            removeFrameObservers()
+        }
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             configureSoon()
@@ -935,6 +1015,12 @@ private struct LyricsWindowConfigurator: NSViewRepresentable {
 
         private func configureWindow() {
             guard let window else { return }
+
+            if configuredWindow !== window {
+                removeFrameObservers()
+                configuredWindow = window
+            }
+
             window.identifier = NSUserInterfaceItemIdentifier("mintPlayer.lyricsWindow")
             window.styleMask.insert(.resizable)
             window.collectionBehavior.insert(.fullScreenPrimary)
@@ -944,7 +1030,72 @@ private struct LyricsWindowConfigurator: NSViewRepresentable {
             window.isOpaque = false
             window.backgroundColor = .clear
             window.standardWindowButton(.zoomButton)?.isEnabled = true
+
+            observeFrameChanges(for: window)
         }
+
+        private func observeFrameChanges(for window: NSWindow) {
+            guard frameObservers.isEmpty else { return }
+
+            let center = NotificationCenter.default
+            let notifications: [NSNotification.Name] = [
+                NSWindow.didMoveNotification,
+                NSWindow.didResizeNotification,
+                NSWindow.didEndLiveResizeNotification,
+                NSWindow.willCloseNotification
+            ]
+
+            frameObservers = notifications.map { name in
+                center.addObserver(forName: name, object: window, queue: .main) { [weak self, weak window] _ in
+                    guard let self, let window, self.configuredWindow === window else { return }
+                    self.saveFrame(for: window)
+                }
+            }
+        }
+
+        private func saveFrame(for window: NSWindow) {
+            WindowFramePersistence.saveFrame(window.frame, for: .lyrics)
+        }
+
+        private func removeFrameObservers() {
+            frameObservers.forEach(NotificationCenter.default.removeObserver)
+            frameObservers = []
+        }
+    }
+}
+
+enum WindowFramePersistence {
+    enum Window: String {
+        case lyrics
+        case settings
+    }
+
+    static func savedFrame(for window: Window) -> CGRect? {
+        guard let frameString = UserDefaults.standard.string(forKey: key(for: window)) else { return nil }
+
+        let frame = NSRectFromString(frameString)
+        return frame.isEmpty ? nil : frame
+    }
+
+    static func saveFrame(_ frame: CGRect, for window: Window) {
+        UserDefaults.standard.set(NSStringFromRect(frame), forKey: key(for: window))
+    }
+
+    static func constrainedFrame(_ frame: CGRect, minimumSize: CGSize, displayFrame: CGRect) -> CGRect {
+        var constrainedFrame = frame
+        constrainedFrame.size.width = min(max(constrainedFrame.width, minimumSize.width), displayFrame.width)
+        constrainedFrame.size.height = min(max(constrainedFrame.height, minimumSize.height), displayFrame.height)
+
+        if !displayFrame.intersects(constrainedFrame) {
+            constrainedFrame.origin.x = displayFrame.midX - constrainedFrame.width / 2
+            constrainedFrame.origin.y = displayFrame.midY - constrainedFrame.height / 2
+        }
+
+        return constrainedFrame
+    }
+
+    private static func key(for window: Window) -> String {
+        AppConfiguration.userDefaultsKey("window.\(window.rawValue).frame")
     }
 }
 

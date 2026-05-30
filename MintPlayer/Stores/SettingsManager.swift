@@ -4,10 +4,12 @@ import SwiftUI
 class SettingsManager: ObservableObject {
     @Published var theme: ThemeMode = .dark
     @Published var language: AppLanguage = .system
+    @Published var lyricsBlurEnabled = true
 
     private let userDefaults = UserDefaults.standard
     private let themeKey = AppConfiguration.userDefaultsKey("settings.theme")
     private let languageKey = AppConfiguration.userDefaultsKey("settings.language")
+    private let lyricsBlurEnabledKey = AppConfiguration.userDefaultsKey("settings.lyrics.blurEnabled")
 
     init() {
         loadSettings()
@@ -21,12 +23,16 @@ class SettingsManager: ObservableObject {
         if let languageString = userDefaults.string(forKey: languageKey), let savedLanguage = AppLanguage(rawValue: languageString) {
             language = savedLanguage
         }
+        if userDefaults.object(forKey: lyricsBlurEnabledKey) != nil {
+            lyricsBlurEnabled = userDefaults.bool(forKey: lyricsBlurEnabledKey)
+        }
     }
 
     // 保存设置
     func saveSettings() {
         userDefaults.set(theme.rawValue, forKey: themeKey)
         userDefaults.set(language.rawValue, forKey: languageKey)
+        userDefaults.set(lyricsBlurEnabled, forKey: lyricsBlurEnabledKey)
     }
 
     // 更新主题
@@ -37,6 +43,11 @@ class SettingsManager: ObservableObject {
 
     func updateLanguage(_ newLanguage: AppLanguage) {
         language = newLanguage
+        saveSettings()
+    }
+
+    func updateLyricsBlurEnabled(_ isEnabled: Bool) {
+        lyricsBlurEnabled = isEnabled
         saveSettings()
     }
 
@@ -84,10 +95,16 @@ enum L10n {
     enum Key: String {
         case general
         case appearance
+        case interfaceTheme
         case theme
         case language
         case themeDescription
         case languageDescription
+        case playbackPage
+        case lyrics
+        case lyricsBlur
+        case lyricsBlurEffect
+        case lyricsBlurDescription
         case library
         case musicLibrary
         case addMusicLibrary
@@ -223,14 +240,20 @@ enum L10n {
     private static let en: [Key: String] = [
         .general: "General",
         .appearance: "Appearance",
+        .interfaceTheme: "Interface Theme",
         .theme: "Theme",
         .language: "Language",
         .themeDescription: "Choose the appearance used by Mint Player windows.",
         .languageDescription: "Choose the language used by Mint Player text.",
+        .playbackPage: "Playback Page",
+        .lyrics: "Lyrics",
+        .lyricsBlur: "Blur inactive lyrics",
+        .lyricsBlurEffect: "Lyrics Blur Effect",
+        .lyricsBlurDescription: "Slightly blur lyrics farther from the current line.",
         .library: "Library",
         .musicLibrary: "Music Library",
-        .addMusicLibrary: "Add Music Library",
-        .rescanAll: "Rescan All",
+        .addMusicLibrary: "Add Library",
+        .rescanAll: "Rescan Library",
         .libraryDescription: "Add folders that contain local music files. Rescanning updates metadata and artwork for existing library folders.",
         .folders: "Folders",
         .noMusicLibraries: "No music libraries",
@@ -251,7 +274,7 @@ enum L10n {
         .artists: "Artists",
         .favorites: "Favorites",
         .playlists: "Playlists",
-        .foldersSection: "Folders",
+        .foldersSection: "Library",
         .noPlaylists: "No playlists",
         .noFolders: "No folders",
         .newPlaylist: "New Playlist",
@@ -357,14 +380,20 @@ enum L10n {
     private static let zh: [Key: String] = [
         .general: "通用",
         .appearance: "外观",
+        .interfaceTheme: "界面主题",
         .theme: "主题",
         .language: "语言",
         .themeDescription: "选择 Mint Player 窗口使用的外观。",
         .languageDescription: "选择 Mint Player 界面文本使用的语言。",
+        .playbackPage: "播放页面",
+        .lyrics: "歌词",
+        .lyricsBlur: "模糊非当前歌词",
+        .lyricsBlurEffect: "歌词模糊效果",
+        .lyricsBlurDescription: "对远离当前行的歌词添加轻微模糊。",
         .library: "资料库",
         .musicLibrary: "音乐资料库",
-        .addMusicLibrary: "添加音乐资料库",
-        .rescanAll: "重新扫描全部",
+        .addMusicLibrary: "添加资料库",
+        .rescanAll: "重新扫描资料库",
         .libraryDescription: "添加包含本地音乐文件的文件夹。重新扫描会更新已有资料库文件夹的元数据和封面。",
         .folders: "文件夹",
         .noMusicLibraries: "没有音乐资料库",
@@ -385,7 +414,7 @@ enum L10n {
         .artists: "艺人",
         .favorites: "喜欢的音乐",
         .playlists: "播放列表",
-        .foldersSection: "文件夹",
+        .foldersSection: "资料库",
         .noPlaylists: "没有播放列表",
         .noFolders: "没有文件夹",
         .newPlaylist: "新播放列表",

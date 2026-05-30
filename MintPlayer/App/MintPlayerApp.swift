@@ -32,6 +32,21 @@ struct MintPlayerApp: App {
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         }
         .defaultSize(width: 1180, height: 760)
+        .defaultWindowPlacement { _, context in
+            let fallbackSize = CGSize(width: 1180, height: 760)
+            let displayFrame = context.defaultDisplay.visibleRect
+
+            guard let savedFrame = WindowFramePersistence.savedFrame(for: .lyrics) else {
+                return WindowPlacement(size: fallbackSize)
+            }
+
+            let frame = WindowFramePersistence.constrainedFrame(
+                savedFrame,
+                minimumSize: CGSize(width: 980, height: 600),
+                displayFrame: displayFrame
+            )
+            return WindowPlacement(frame.origin, size: frame.size)
+        }
         .windowBackgroundDragBehavior(.enabled)
         .restorationBehavior(.disabled)
 
@@ -43,6 +58,22 @@ struct MintPlayerApp: App {
                 .tint(MintTheme.accent)
                 .preferredColorScheme(settings.preferredColorScheme)
         }
+        .defaultWindowPlacement { _, context in
+            let fallbackSize = CGSize(width: 620, height: 640)
+            let displayFrame = context.defaultDisplay.visibleRect
+
+            guard let savedFrame = WindowFramePersistence.savedFrame(for: .settings) else {
+                return WindowPlacement(size: fallbackSize)
+            }
+
+            let frame = WindowFramePersistence.constrainedFrame(
+                savedFrame,
+                minimumSize: fallbackSize,
+                displayFrame: displayFrame
+            )
+            return WindowPlacement(frame.origin, size: frame.size)
+        }
+        .windowResizability(.contentMinSize)
     }
 }
 

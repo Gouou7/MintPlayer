@@ -59,8 +59,10 @@ struct ArtistsView: View {
             content
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NativeToolbarSearchField(text: activeSearchText, prompt: searchPrompt)
+            if selectedArtist == nil && selectedAlbum == nil {
+                ToolbarItem(placement: .primaryAction) {
+                    NativeToolbarSearchField(text: activeSearchText, prompt: searchPrompt)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
