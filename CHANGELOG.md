@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added Dock menu playback controls for previous track, play/pause, next track, and shuffle.
+- None.
 
 ### Changed
-- Added system symbol animations to player bar and lyrics playback controls.
+- None.
 
 ### Deprecated
 - None.
@@ -21,6 +21,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - None.
+
+### Security
+- None.
+
+## [0.7.0] - 2026-05-30
+
+### Added
+- Added Dock menu playback controls for previous track, play/pause, next track, and shuffle.
+- Added audio fade out on pause and fade in on resume.
+- Added direct crossfade transitions for full-screen lyrics artwork and blurred background changes.
+- Added gray artwork and lyrics background placeholders for songs without cover art.
+
+### Changed
+- Changed play count tracking to count only qualified plays after 60% of the song duration has actually played.
+- Improved full-screen lyrics scrolling with deterministic AppKit scroll offset animation and Logistic-based timing.
+- Moved the highlighted lyric focus position toward the top of the lyrics window to align with the artwork area.
+- Added system symbol animations to player bar and lyrics playback controls.
+- Reduced full-screen lyrics background edge darkening.
+
+### Deprecated
+- None.
+
+### Removed
+- None.
+
+### Fixed
+- Fixed full-screen lyrics artwork and blurred backgrounds flashing through an intermediate empty or dark frame during track changes.
+- Fixed songs without artwork reusing the previous song's artwork or blurred background.
 
 ### Security
 - None.

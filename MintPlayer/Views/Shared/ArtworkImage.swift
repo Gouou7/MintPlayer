@@ -5,10 +5,16 @@ struct ArtworkImage: View {
     let path: String?
     var cornerRadius: CGFloat = 10
     var targetSize: CGSize = CGSize(width: 360, height: 360)
+    var crossfadeChanges = false
     
     @Environment(\.displayScale) private var displayScale
     @State private var image: NSImage?
     @State private var displayedCacheKey: String?
+    @State private var previousImage: NSImage?
+    @State private var showsPreviousImage = false
+    @State private var crossfadeGeneration = 0
+
+    private let imageTransitionDuration: TimeInterval = 0.28
     
     var body: some View {
         ZStack {
@@ -16,20 +22,28 @@ struct ArtworkImage: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .id(displayedCacheKey)
             } else {
-                LinearGradient(
-                    colors: [MintTheme.accent.opacity(0.34), Color.secondary.opacity(0.18)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                
-                Image(systemName: "music.note")
-                    .font(.system(size: 44, weight: .semibold))
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.16))
+
+                Image(systemName: "rectangle.stack.fill")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: min(targetSize.width, targetSize.height) * 0.34)
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.secondary)
             }
+
+            if let previousImage {
+                Image(nsImage: previousImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .opacity(showsPreviousImage ? 1 : 0)
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .animation(crossfadeChanges ? .easeInOut(duration: imageTransitionDuration) : nil, value: showsPreviousImage)
         .task(id: cacheKey) {
             await loadImage(for: cacheKey)
         }
@@ -45,8 +59,7 @@ struct ArtworkImage: View {
         guard displayedCacheKey != requestedCacheKey else { return }
         
         guard let path, !path.isEmpty else {
-            image = nil
-            displayedCacheKey = requestedCacheKey
+            updateDisplayedImage(nil, cacheKey: requestedCacheKey)
             return
         }
         
@@ -55,14 +68,15 @@ struct ArtworkImage: View {
             pointSize: targetSize,
             scale: displayScale
         ) {
-            image = cachedImage
-            displayedCacheKey = requestedCacheKey
+            updateDisplayedImage(cachedImage, cacheKey: requestedCacheKey)
             return
         }
-        
-        image = nil
-        displayedCacheKey = nil
-        
+
+        if !crossfadeChanges {
+            image = nil
+            displayedCacheKey = nil
+        }
+
         let loadedImage = await ArtworkCache.shared.image(
             path: path,
             pointSize: targetSize,
@@ -70,8 +84,38 @@ struct ArtworkImage: View {
         )
         
         guard cacheKey == requestedCacheKey else { return }
-        image = loadedImage
-        displayedCacheKey = requestedCacheKey
+        updateDisplayedImage(loadedImage, cacheKey: requestedCacheKey)
+    }
+
+    @MainActor
+    private func updateDisplayedImage(_ nextImage: NSImage?, cacheKey nextCacheKey: String) {
+        guard displayedCacheKey != nextCacheKey else { return }
+
+        if crossfadeChanges, let image {
+            previousImage = image
+            showsPreviousImage = true
+        } else {
+            previousImage = nil
+            showsPreviousImage = false
+        }
+
+        image = nextImage
+        displayedCacheKey = nextCacheKey
+
+        guard crossfadeChanges, previousImage != nil else { return }
+
+        crossfadeGeneration += 1
+        let generation = crossfadeGeneration
+
+        withAnimation(.easeInOut(duration: imageTransitionDuration)) {
+            showsPreviousImage = false
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(imageTransitionDuration * 1_000_000_000))
+            guard crossfadeGeneration == generation else { return }
+            previousImage = nil
+        }
     }
 }
 

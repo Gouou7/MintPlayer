@@ -309,10 +309,9 @@ class MusicLibrary: ObservableObject {
         ids.compactMap { songsByID[$0] ?? song(withId: $0) }
     }
 
-    // 记录播放统计。
-    func recordSongPlayback(_ song: Song) {
-        incrementPlaybackStats(for: song.id)
-        saveLibraryState()
+    // 记录一次达到有效播放阈值的播放统计。
+    func recordQualifiedPlayback(for songId: Song.ID) {
+        incrementPlaybackStats(for: songId)
     }
 
     // 删除歌曲
@@ -484,6 +483,12 @@ class MusicLibrary: ObservableObject {
         songs[index] = updatedSong
         syncSongCopies(updatedSong)
         rebuildAlbumsAndArtists()
+
+        do {
+            try persistenceStore?.updatePlaybackStats(for: updatedSong)
+        } catch {
+            lastScanError = "无法保存播放统计：\(error.localizedDescription)"
+        }
     }
 
     private func syncSongCopies(_ updatedSong: Song) {

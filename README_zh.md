@@ -1,47 +1,48 @@
 # Mint Player
 
-<img src="docs/images/MintPlayer-Light-iOS-Default-1024x1024@1x.png" alt="MintPlayerLogo" width="120">
+<img src="docs/images/MintPlayer-Light-iOS-Default-1024x1024@1x.png" alt="Mint Player logo" width="120">
 
-美观、现代的 macOS 本地音乐播放器。
+一款原生 macOS 本地音乐播放器，用于整理和播放你自己的音乐资料库。
 
 ## 主要功能
 
-- 美观熟悉的界面：使用液态玻璃设计，支持按照歌曲视图、按专辑视图、按艺人视图显示；
-- 基于本地音乐库：导入本地音乐库，不影响其文件结构；
-- 灵活的歌曲组织：支持自定义播放列表、喜欢的音乐列表、屏蔽歌曲和播放次数记录；
-- 歌词显示：支持与歌曲文件同名且同目录的 `.lrc` 文件；带时间戳的歌词会同步滚动，不带时间戳的文本会作为纯文本歌词显示。
+- 熟悉且精致的界面：使用 Liquid Glass 风格，并提供歌曲、专辑、艺人、喜欢、播放列表和文件夹视图。
+- 本地优先的资料库管理：导入文件夹时不会改变原始文件结构。
+- 灵活歌曲整理：可自定义播放列表、喜欢列表、屏蔽歌曲和播放次数统计。
+- 本地歌词显示：支持显示本地 `.lrc` 文件歌词。
 
-### 界面
+## 截图
 
-![MintPlayer](docs/images/MintPlayer0.3.0Main.png)
-![MintPlayer](docs/images/MintPlayer0.3.0FullScreen.png)
+![Mint Player 主窗口](docs/images/MintPlayer0.3.0Main.png)
+![Mint Player 歌词窗口](docs/images/MintPlayer0.3.0FullScreen.png)
 
-## TODO
+## 路线图
 
-- ✅ 基本功能
-- ⬜ 细节和动画优化
-- ⬜ 音频淡入淡出过渡
-- ⬜ 动态模糊背景
-- ⬜ 统一主界面和歌词界面
+- ✅ 基础播放和资料库管理
+- ✅ 更细致的交互和动画打磨
+- ✅ 音频淡入淡出过渡
+- ✅ 独立歌词窗口和同步本地歌词
+- ✅ 喜欢、屏蔽歌曲、播放次数统计和播放会话恢复
 - ⬜ 在线歌词搜索
+- ⬜ 在线艺人图片搜索
 
-### BUG
+## 已知问题
 
-- ❌ 主界面上边缘 `scrollEdgeEffectStyle` 效果随机失效
+- ❌ 主窗口顶部的 `scrollEdgeEffectStyle` 效果可能随机失效。
 
 ## 构建
 
-### 运行环境
+### 要求
 
 - macOS 26.0 或更高版本
-- 支持 macOS 26 SDK 的 Xcode
+- 带 macOS 26 SDK 的 Xcode
 
-### XCode构建
+### 使用 Xcode 运行
 
-1. 使用 Xcode 打开 `MintPlayer.xcodeproj`。
+1. 在 Xcode 中打开 `MintPlayer.xcodeproj`。
 2. 选择 `MintPlayer` scheme 和 `My Mac`。
 3. 按 `Command + R` 运行。
-4. 在设置窗口中添加本地音乐文件夹。
+4. 在设置中添加本地音乐文件夹。
 
 ### 命令行构建
 
@@ -49,8 +50,8 @@
 xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -destination 'platform=macOS' build
 ```
 
-> [!TIPS]
-> - Debug 构建会生成 `Mint Player Debug.app`
+> [!TIP]
+> - Debug 构建会生成 `Mint Player Debug.app`。
 > - Release 构建会生成 `Mint Player.app`。
 
 ```sh
@@ -60,12 +61,12 @@ xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -configuration Rel
 
 ## 许可证
 
-本项目使用 GPLv3 许可证，详见 `LICENSE`。
+本项目使用 GPLv3 许可证。详见 `LICENSE`。
 
-## 声明
-
-> [!WARNING]
-> 本应用使用 Agent 构建，如果您不喜欢 AI 程序，请勿使用。
+## 免责声明
 
 > [!WARNING]
-> 请自行检查代码，作者不为使用本应用造成的任何问题负责。
+> 本应用由 Agent 辅助开发。使用前请自行审查代码。
+
+> [!WARNING]
+> 使用本应用的风险由你自行承担。作者不对使用本应用造成的任何问题负责。

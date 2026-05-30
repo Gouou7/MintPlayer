@@ -21,12 +21,15 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private let playbackSessionDefaultsKey = AppConfiguration.userDefaultsKey("player.session")
     private let playbackTimerInterval: TimeInterval = 0.2
     private let volumeSliderExponent: Float = 2
+    private let playbackFadeDuration: TimeInterval = 0.22
     private let nowPlayingService = NowPlayingService()
     private var lastNowPlayingElapsedUpdate: TimeInterval = 0
     private var lastSessionElapsedUpdate: TimeInterval = 0
     private var pendingStartTime: TimeInterval?
+    private var playbackCountingSession: PlaybackCountingSession?
+    private var pendingPauseWorkItem: DispatchWorkItem?
 
-    var onSongStarted: ((Song) -> Void)?
+    var onPlaybackCounted: ((Song.ID) -> Void)?
 
     var volumeSliderValue: Float {
         guard volume > 0 else { return 0 }
@@ -163,6 +166,9 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     private func start(song: Song) {
+        cancelPendingPause()
+        updatePlaybackCounting()
+
         if let previousSong = currentSong, previousSong.id != song.id {
             history.insert(previousSong, at: 0)
             if history.count > 50 {
@@ -193,12 +199,12 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             // 开始播放
             audioPlayer?.play()
             isPlaying = true
+            startPlaybackCounting(for: song, duration: duration)
             updateNowPlayingInfo()
             updateRemoteCommandAvailability()
 
             // 启动播放计时器
             startPlaybackTimer()
-            onSongStarted?(song)
             savePlaybackSession()
 
             print("Playing: \(song.title) by \(song.artist)")
@@ -206,6 +212,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             print("Error playing song: \(error)")
             playbackError = "无法播放 \(song.title)：\(error.localizedDescription)"
             isPlaying = false
+            playbackCountingSession = nil
             updateNowPlayingInfo()
             updateRemoteCommandAvailability()
             savePlaybackSession()
@@ -214,9 +221,12 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 暂停播放
     func pause() {
-        audioPlayer?.pause()
-        playbackTimer?.invalidate()
+        guard isPlaying else { return }
+
         isPlaying = false
+        updatePlaybackCounting()
+        playbackTimer?.invalidate()
+        fadeOutAndPause()
         updateNowPlayingPlaybackState()
         savePlaybackSession()
         print("Paused")
@@ -224,15 +234,20 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 恢复播放
     func resume() {
+        cancelPendingPause()
+
         if let audioPlayer {
             if currentTime >= duration, let currentSong {
                 play(song: currentSong)
                 return
             }
 
+            audioPlayer.volume = 0
             audioPlayer.play()
-            startPlaybackTimer()
+            audioPlayer.setVolume(volume, fadeDuration: playbackFadeDuration)
             isPlaying = true
+            resumePlaybackCounting()
+            startPlaybackTimer()
             updateNowPlayingPlaybackState()
             savePlaybackSession()
             print("Resumed")
@@ -251,11 +266,13 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 停止播放
     func stop() {
+        cancelPendingPause()
+        isPlaying = false
+        updatePlaybackCounting()
         audioPlayer?.stop()
         audioPlayer?.currentTime = 0
         playbackTimer?.invalidate()
         currentTime = 0
-        isPlaying = false
         updateNowPlayingPlaybackState()
         savePlaybackSession()
         print("Stopped")
@@ -324,7 +341,11 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func setVolume(_ value: Float) {
         let normalizedValue = min(max(value, 0), 1)
         volume = normalizedValue
-        audioPlayer?.volume = normalizedValue
+        if isPlaying {
+            audioPlayer?.setVolume(normalizedValue, fadeDuration: playbackFadeDuration)
+        } else {
+            audioPlayer?.volume = normalizedValue
+        }
         UserDefaults.standard.set(normalizedValue, forKey: volumeDefaultsKey)
     }
 
@@ -335,6 +356,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 跳转到指定时间
     func seek(to time: TimeInterval) {
+        updatePlaybackCounting()
         let normalizedTime = min(max(time, 0), duration)
         audioPlayer?.currentTime = normalizedTime
         currentTime = normalizedTime
@@ -358,6 +380,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 self.lastSessionElapsedUpdate = self.currentTime
             }
 
+            self.updatePlaybackCounting()
         }
     }
 
@@ -403,12 +426,79 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     private func finishPlayback() {
+        cancelPendingPause()
+        isPlaying = false
+        updatePlaybackCounting()
         playbackTimer?.invalidate()
         audioPlayer?.stop()
         currentTime = duration
-        isPlaying = false
         updateNowPlayingPlaybackState()
         savePlaybackSession()
+    }
+
+    private func startPlaybackCounting(for song: Song, duration: TimeInterval) {
+        let threshold = duration * 0.6
+        guard threshold.isFinite, threshold > 0 else {
+            playbackCountingSession = nil
+            return
+        }
+
+        playbackCountingSession = PlaybackCountingSession(
+            songID: song.id,
+            countedThreshold: threshold,
+            accumulatedPlaybackTime: 0,
+            lastStartedAt: Date(),
+            hasCounted: false
+        )
+    }
+
+    private func resumePlaybackCounting() {
+        guard var session = playbackCountingSession,
+              !session.hasCounted,
+              session.lastStartedAt == nil
+        else { return }
+
+        session.lastStartedAt = Date()
+        playbackCountingSession = session
+    }
+
+    private func fadeOutAndPause() {
+        guard let player = audioPlayer else { return }
+
+        player.setVolume(0, fadeDuration: playbackFadeDuration)
+
+        let pauseWorkItem = DispatchWorkItem { [weak self, weak player] in
+            guard let self, let player, self.audioPlayer === player, !self.isPlaying else { return }
+            player.pause()
+            player.volume = self.volume
+        }
+
+        pendingPauseWorkItem = pauseWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + playbackFadeDuration, execute: pauseWorkItem)
+    }
+
+    private func cancelPendingPause() {
+        pendingPauseWorkItem?.cancel()
+        pendingPauseWorkItem = nil
+    }
+
+    private func updatePlaybackCounting() {
+        guard var session = playbackCountingSession,
+              !session.hasCounted,
+              let lastStartedAt = session.lastStartedAt
+        else { return }
+
+        let now = Date()
+        session.accumulatedPlaybackTime += max(0, now.timeIntervalSince(lastStartedAt))
+        session.lastStartedAt = isPlaying ? now : nil
+
+        if session.accumulatedPlaybackTime >= session.countedThreshold {
+            session.hasCounted = true
+            session.lastStartedAt = nil
+            onPlaybackCounted?(session.songID)
+        }
+
+        playbackCountingSession = session
     }
 
     // 接入系统“正在播放”和媒体键控制
@@ -543,11 +633,21 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 清理资源
     deinit {
+        cancelPendingPause()
+        updatePlaybackCounting()
         savePlaybackSession()
         audioPlayer?.stop()
         playbackTimer?.invalidate()
         nowPlayingService.reset()
     }
+}
+
+private struct PlaybackCountingSession {
+    let songID: Song.ID
+    let countedThreshold: TimeInterval
+    var accumulatedPlaybackTime: TimeInterval
+    var lastStartedAt: Date?
+    var hasCounted: Bool
 }
 
 private struct PlaybackSession: Codable {

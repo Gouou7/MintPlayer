@@ -55,8 +55,8 @@ struct MainView: View {
         .onAppear {
             columnVisibility = preferredColumnVisibility
             restorePlaybackSessionIfNeeded()
-            audioPlayer.onSongStarted = { song in
-                musicLibrary.recordSongPlayback(song)
+            audioPlayer.onPlaybackCounted = { songId in
+                musicLibrary.recordQualifiedPlayback(for: songId)
             }
         }
         .onChange(of: columnVisibility) { _, newVisibility in
@@ -75,7 +75,7 @@ struct MainView: View {
             restorePlaybackSessionIfNeeded()
         }
         .onDisappear {
-            audioPlayer.onSongStarted = nil
+            audioPlayer.onPlaybackCounted = nil
         }
     }
 

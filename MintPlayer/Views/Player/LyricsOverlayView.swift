@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import QuartzCore
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import ImageIO
@@ -75,7 +76,8 @@ struct LyricsOverlayView: View {
             ArtworkImage(
                 path: song.coverPath,
                 cornerRadius: 24,
-                targetSize: CGSize(width: artworkSize, height: artworkSize)
+                targetSize: CGSize(width: artworkSize, height: artworkSize),
+                crossfadeChanges: true
             )
                 .shadow(color: .black.opacity(0.22), radius: 24, x: 0, y: 16)
             .frame(width: artworkSize, height: artworkSize)
@@ -265,19 +267,33 @@ private struct StaticLyricsBackground: View {
     let coverPath: String?
     @Environment(\.colorScheme) private var colorScheme
     @State private var image: NSImage?
+    @State private var displayedCacheKey: String?
+    @State private var previousImage: NSImage?
+    @State private var showsPreviousImage = false
+    @State private var crossfadeGeneration = 0
+
+    private let imageTransitionDuration: TimeInterval = 0.36
 
     var body: some View {
         ZStack {
             Rectangle()
-                .fill(Color(nsColor: .windowBackgroundColor))
+                .fill(hasCoverArt ? Color(nsColor: .windowBackgroundColor) : Color.secondary.opacity(0.16))
 
             if let image {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
-                    .transition(.opacity.animation(.easeInOut(duration: 0.22)))
+                    .id(displayedCacheKey)
+            }
+
+            if let previousImage {
+                Image(nsImage: previousImage)
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(showsPreviousImage ? 1 : 0)
             }
         }
+        .animation(.easeInOut(duration: imageTransitionDuration), value: showsPreviousImage)
         .overlay {
             Color.black.opacity(colorScheme == .dark ? 0.10 : 0.04)
         }
@@ -285,8 +301,62 @@ private struct StaticLyricsBackground: View {
             LyricsBackgroundEdgeFade(colorScheme: colorScheme)
         }
         .ignoresSafeArea()
-        .task(id: "\(coverPath ?? "empty")|\(colorScheme == .dark ? "dark" : "light")") {
-            image = await LyricsBackdropCache.shared.image(for: coverPath, colorScheme: colorScheme)
+        .task(id: cacheKey) {
+            await loadImage(for: cacheKey)
+        }
+    }
+
+    private var cacheKey: String {
+        "\(coverPath ?? "empty")|\(colorScheme == .dark ? "dark" : "light")"
+    }
+
+    private var hasCoverArt: Bool {
+        guard let coverPath else { return false }
+        return !coverPath.isEmpty
+    }
+
+    @MainActor
+    private func loadImage(for requestedCacheKey: String) async {
+        guard displayedCacheKey != requestedCacheKey else { return }
+
+        guard hasCoverArt else {
+            updateDisplayedImage(nil, cacheKey: requestedCacheKey)
+            return
+        }
+
+        let loadedImage = await LyricsBackdropCache.shared.image(for: coverPath, colorScheme: colorScheme)
+        guard cacheKey == requestedCacheKey else { return }
+        updateDisplayedImage(loadedImage, cacheKey: requestedCacheKey)
+    }
+
+    @MainActor
+    private func updateDisplayedImage(_ nextImage: NSImage?, cacheKey nextCacheKey: String) {
+        guard displayedCacheKey != nextCacheKey else { return }
+
+        if let image {
+            previousImage = image
+            showsPreviousImage = true
+        } else {
+            previousImage = nil
+            showsPreviousImage = false
+        }
+
+        image = nextImage
+        displayedCacheKey = nextCacheKey
+
+        guard previousImage != nil else { return }
+
+        crossfadeGeneration += 1
+        let generation = crossfadeGeneration
+
+        withAnimation(.easeInOut(duration: imageTransitionDuration)) {
+            showsPreviousImage = false
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(imageTransitionDuration * 1_000_000_000))
+            guard crossfadeGeneration == generation else { return }
+            previousImage = nil
         }
     }
 }
@@ -302,7 +372,7 @@ private struct LyricsBackgroundEdgeFade: View {
         ZStack {
             VStack(spacing: 0) {
                 LinearGradient(
-                    colors: [edgeColor.opacity(colorScheme == .dark ? 0.34 : 0.22), .clear],
+                    colors: [edgeColor.opacity(colorScheme == .dark ? 0.18 : 0.10), .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -311,29 +381,11 @@ private struct LyricsBackgroundEdgeFade: View {
                 Spacer(minLength: 0)
 
                 LinearGradient(
-                    colors: [.clear, edgeColor.opacity(colorScheme == .dark ? 0.30 : 0.18)],
+                    colors: [.clear, edgeColor.opacity(colorScheme == .dark ? 0.16 : 0.08)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .frame(height: 74)
-            }
-
-            HStack(spacing: 0) {
-                LinearGradient(
-                    colors: [edgeColor.opacity(colorScheme == .dark ? 0.26 : 0.16), .clear],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(width: 58)
-
-                Spacer(minLength: 0)
-
-                LinearGradient(
-                    colors: [.clear, edgeColor.opacity(colorScheme == .dark ? 0.26 : 0.16)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(width: 58)
             }
         }
         .allowsHitTesting(false)
@@ -568,9 +620,11 @@ private struct SyncedLyricsView: View {
     let lines: [LyricLine]
 
     @EnvironmentObject private var audioPlayer: AudioPlayer
+    @State private var lyricsScrollView: NSScrollView?
+    @State private var lineMidYByID: [LyricLine.ID: CGFloat] = [:]
 
     private let lineSpacing: CGFloat = 18
-    private let lyricFocusAnchorY: CGFloat = 0.5
+    private let lyricFocusAnchorY: CGFloat = 0.18
     private let compactFocusSpacerHeight: CGFloat = 132
 
     private var activeLineIndex: Int? {
@@ -596,59 +650,115 @@ private struct SyncedLyricsView: View {
         return lines[activeLineIndex].id
     }
 
-    private var activeLineTransitionDuration: TimeInterval {
+    private var activeLineLyricWindow: TimeInterval {
         guard let activeLineIndex else { return 0.32 }
 
         let activeLine = lines[activeLineIndex]
         let nextLineTime = lines.indices.contains(activeLineIndex + 1)
             ? lines[activeLineIndex + 1].time
             : activeLine.time + 1.6
-        let lyricWindow = max(nextLineTime - activeLine.time, 0)
+        return max(nextLineTime - activeLine.time, 0)
+    }
 
-        return min(max(lyricWindow * 0.28, 0.28), 0.72)
+    private var scrollTransitionDuration: TimeInterval {
+        min(logisticTransitionDuration(for: activeLineLyricWindow) * 0.519, max(0.17, activeLineLyricWindow * 0.338))
+    }
+
+    private var highlightTransitionDuration: TimeInterval {
+        min(logisticTransitionDuration(for: activeLineLyricWindow) * 0.58, max(0.22, activeLineLyricWindow * 0.42))
+    }
+
+    private func logisticTransitionDuration(for lyricWindow: TimeInterval) -> TimeInterval {
+        let minimumDuration: TimeInterval = 0.68
+        let maximumDuration: TimeInterval = 1.92
+        let midpoint: TimeInterval = 2.0
+        let steepness: TimeInterval = 2.2
+        let normalized = 1 / (1 + exp(-steepness * (lyricWindow - midpoint)))
+
+        return minimumDuration + (maximumDuration - minimumDuration) * normalized
+    }
+
+    private func activeLineTransitionAnimation(duration: TimeInterval) -> Animation {
+        .timingCurve(0.45, 0.0, 0.20, 1.0, duration: duration)
     }
 
     var body: some View {
         GeometryReader { geometry in
             let focusSpacerHeight = focusSpacerHeight(for: geometry.size.height)
 
-            ScrollViewReader { proxy in
-                ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(alignment: .leading, spacing: lineSpacing) {
-                        Color.clear
-                            .frame(height: focusSpacerHeight)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: lineSpacing) {
+                    Color.clear
+                        .frame(height: focusSpacerHeight)
 
-                        ForEach(lines) { line in
-                            LyricLineRow(
-                                line: line,
-                                isHighlighted: line.id == highlightedLineID,
-                                transitionDuration: activeLineTransitionDuration
-                            )
-                            .id(line.id)
-                            .onTapGesture {
-                                audioPlayer.seek(to: line.time)
-                            }
+                    ForEach(lines) { line in
+                        LyricLineRow(
+                            line: line,
+                            isHighlighted: line.id == highlightedLineID,
+                            transitionAnimation: activeLineTransitionAnimation(duration: highlightTransitionDuration)
+                        )
+                        .id(line.id)
+                        .background {
+                            LyricsLinePositionReader(lineID: line.id)
                         }
-
-                        Color.clear
-                            .frame(height: focusSpacerHeight)
+                        .onTapGesture {
+                            audioPlayer.seek(to: line.time)
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Color.clear
+                        .frame(height: focusSpacerHeight)
                 }
-                .onAppear {
-                    scrollToHighlightedLine(with: proxy)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .coordinateSpace(name: LyricsScrollCoordinateSpace.name)
+                .background {
+                    LyricsScrollViewResolver { scrollView in
+                        lyricsScrollView = scrollView
+                    }
                 }
-                .onChange(of: highlightedLineID) { _, _ in
-                    scrollToHighlightedLine(with: proxy)
-                }
+            }
+            .onPreferenceChange(LyricsLinePositionPreferenceKey.self) { positions in
+                lineMidYByID = positions
+                scrollToHighlightedLine(viewportHeight: geometry.size.height, animated: false)
+            }
+            .onAppear {
+                scrollToHighlightedLine(viewportHeight: geometry.size.height, animated: false)
+            }
+            .onChange(of: lyricsScrollView != nil) { _, hasScrollView in
+                guard hasScrollView else { return }
+                scrollToHighlightedLine(viewportHeight: geometry.size.height, animated: false)
+            }
+            .onChange(of: highlightedLineID) { _, _ in
+                scrollToHighlightedLine(viewportHeight: geometry.size.height, animated: true)
             }
         }
     }
 
-    private func scrollToHighlightedLine(with proxy: ScrollViewProxy) {
-        guard let highlightedLineID else { return }
-        withAnimation(.easeInOut(duration: activeLineTransitionDuration)) {
-            proxy.scrollTo(highlightedLineID, anchor: UnitPoint(x: 0.5, y: lyricFocusAnchorY))
+    private func scrollToHighlightedLine(viewportHeight: CGFloat, animated: Bool) {
+        guard let highlightedLineID,
+              let lineMidY = lineMidYByID[highlightedLineID],
+              let scrollView = lyricsScrollView
+        else { return }
+
+        let documentHeight = scrollView.documentView?.bounds.height ?? 0
+        let visibleHeight = scrollView.contentView.bounds.height
+        let focusY = viewportHeight * lyricFocusAnchorY
+        let maximumOffsetY = max(documentHeight - visibleHeight, 0)
+        let targetOffsetY = min(max(lineMidY - focusY, 0), maximumOffsetY)
+        let targetOrigin = CGPoint(x: scrollView.contentView.bounds.origin.x, y: targetOffsetY)
+
+        guard animated else {
+            scrollView.contentView.scroll(to: targetOrigin)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = scrollTransitionDuration
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.45, 0.0, 0.20, 1.0)
+            scrollView.contentView.animator().setBoundsOrigin(targetOrigin)
+        } completionHandler: {
+            scrollView.reflectScrolledClipView(scrollView.contentView)
         }
     }
 
@@ -664,7 +774,7 @@ private struct SyncedLyricsView: View {
 private struct LyricLineRow: View {
     let line: LyricLine
     let isHighlighted: Bool
-    let transitionDuration: TimeInterval
+    let transitionAnimation: Animation
 
     var body: some View {
         Text(line.text)
@@ -673,7 +783,50 @@ private struct LyricLineRow: View {
             .foregroundStyle(isHighlighted ? .primary : .secondary)
             .opacity(isHighlighted ? 0.96 : 0.44)
             .contentShape(Rectangle())
-            .animation(.easeInOut(duration: transitionDuration), value: isHighlighted)
+            .animation(transitionAnimation, value: isHighlighted)
+    }
+}
+
+private enum LyricsScrollCoordinateSpace {
+    static let name = "LyricsScrollCoordinateSpace"
+}
+
+private struct LyricsLinePositionPreferenceKey: PreferenceKey {
+    static var defaultValue: [LyricLine.ID: CGFloat] = [:]
+
+    static func reduce(value: inout [LyricLine.ID: CGFloat], nextValue: () -> [LyricLine.ID: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
+    }
+}
+
+private struct LyricsLinePositionReader: View {
+    let lineID: LyricLine.ID
+
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: LyricsLinePositionPreferenceKey.self,
+                value: [lineID: proxy.frame(in: .named(LyricsScrollCoordinateSpace.name)).midY]
+            )
+        }
+    }
+}
+
+private struct LyricsScrollViewResolver: NSViewRepresentable {
+    let onResolve: (NSScrollView?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            onResolve(view.enclosingScrollView)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            onResolve(nsView.enclosingScrollView)
+        }
     }
 }
 

@@ -77,6 +77,22 @@ final class LibraryPersistenceStore {
         }
     }
 
+    func updatePlaybackStats(for song: Song) throws {
+        var statement = try prepare(
+            """
+            UPDATE songs
+            SET playCount = ?, lastPlayedAt = ?
+            WHERE id = ?
+            """
+        )
+        defer { sqlite3_finalize(statement) }
+
+        bindInt(song.playCount, to: statement, at: 1)
+        bindOptionalDate(song.lastPlayedAt, to: statement, at: 2)
+        bindText(song.id.uuidString, to: statement, at: 3)
+        try stepDone(statement)
+    }
+
     private func open() throws {
         if sqlite3_open(databaseURL.path, &database) != SQLITE_OK {
             let message = databaseErrorMessage

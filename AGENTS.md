@@ -1,5 +1,11 @@
 # Mint Player Development Guide
 
+## 全局要求
+
+- 不要擅自修改或向 README.md 写入内容，每次写入要请求许可
+- README_zh.md 是 README.md 的中文翻译，两者同步更新
+- 每次提交的 commit 消息需要向用户确认，同意后再提交
+
 ## Project Overview
 
 Mint Player is a native macOS local music player built with an Xcode project.
@@ -13,7 +19,6 @@ Mint Player is a native macOS local music player built with an Xcode project.
 - **Persistence**: SQLite and `UserDefaults`; artwork cache files live under Application Support
 - **Build tool**: Xcode project
 - **Minimum OS**: macOS 26.0
-- **Current version**: 0.6.0
 
 The repository root does not currently contain `Package.swift`, third-party dependency manifests, test targets, or lint configuration.
 There is no `package.json`, `go.mod`, `requirements.txt`, `Makefile`, or custom build script.
@@ -73,6 +78,11 @@ MintPlayer/
 - Search fields live in the top-right page toolbar by default, use native macOS search controls, and their search semantics should follow the current page or detail level.
 - When the main sidebar is hidden, the top toolbar uses a native segmented tab bar for the primary library destinations. Preserve the system sidebar and toolbar behavior instead of replacing them with custom-painted chrome.
 - The bottom player bar is a fixed-width, centered floating Liquid Glass control and must intercept clicks so events do not pass through to content underneath.
+- Playback counts are recorded only after a song has actually played for 60% of its duration. Do not count clicks, seeks, or short previews as plays.
+- Full-screen lyrics scrolling uses a narrow AppKit `NSScrollView` bridge for deterministic animated offsets. Keep SwiftUI as the source of truth for lyric content and highlighting; use the bridge only for scroll-position control.
+- Full-screen lyrics artwork and blurred backgrounds should crossfade directly between old and new images. Do not clear to a black or empty intermediate frame during normal covered-song transitions.
+- Songs without artwork should show the gray `rectangle.stack.fill` placeholder and gray lyrics background rather than reusing the previous song's artwork or blurred background.
+- Playback pause and resume use short audio fade out/in transitions in `AudioPlayer`. Preserve user volume separately from temporary fade volume.
 
 ### Comments
 
@@ -139,6 +149,8 @@ Release builds use `Mint Player.app` and the release configuration directory.
 - **Manual regression**: Cover folder import, music scanning, Songs double-click playback, Albums/Artists playback, playlist editing, queue, volume, Settings, and system media controls as relevant.
 - **Table interaction regression**: For `NativeSongTableView` or `NativeArtistTableView` changes, verify normal click, Shift range selection, Command multi-selection, double-click playback, context menus, trailing action menus, column resizing, and dragging to playlist / Finder.
 - **Layout regression**: For main window, sidebar, Artists, or Albums detail changes, verify narrow window behavior, sidebar width, Scroll Edge Effect, floating player bar, and search field placement.
+- **Playback regression**: For `AudioPlayer` changes, verify pause fade-out, resume fade-in, stop, seek, previous/next, natural track completion, repeat, shuffle, volume changes, Now Playing state, and play count qualification.
+- **Lyrics regression**: For full-screen lyrics changes, verify synced scrolling, highlighted-line position, seek by tapping lyrics, missing artwork placeholders, artwork/background crossfades, and no dark intermediate frame during track changes.
 - **Unit tests**: There is currently no test target. Confirm with the user before creating one for complex pure logic.
 - **Integration/e2e**: There are no automated integration or e2e tests. Use local manual verification for UI and playback behavior.
 
