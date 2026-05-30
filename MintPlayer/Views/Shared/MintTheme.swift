@@ -238,6 +238,10 @@ final class MintTableRowView: NSTableRowView {
         }
     }
 
+    override var interiorBackgroundStyle: NSView.BackgroundStyle {
+        .normal
+    }
+
     init(horizontalInset: CGFloat = 4, verticalInset: CGFloat = 3) {
         self.horizontalInset = horizontalInset
         self.verticalInset = verticalInset

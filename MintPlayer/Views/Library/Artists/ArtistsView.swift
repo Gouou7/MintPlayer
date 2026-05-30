@@ -8,6 +8,8 @@ struct ArtistsView: View {
     @State private var albumSearchText = ""
     @State private var selectedArtist: ArtistSummary?
     @State private var selectedAlbum: AlbumSummary?
+    @Namespace private var artistArtworkTransitionNamespace
+    @Namespace private var artistAlbumArtworkTransitionNamespace
 
     private var filteredArtists: [ArtistSummary] {
         guard !searchText.isEmpty else {
@@ -76,26 +78,43 @@ struct ArtistsView: View {
     @ViewBuilder
     private var content: some View {
         if let selectedAlbum {
-            AlbumDetailView(album: selectedAlbum, searchText: $albumSearchText) {
-                albumSearchText = ""
-                self.selectedAlbum = nil
+            AlbumDetailView(
+                album: selectedAlbum,
+                searchText: $albumSearchText,
+                artworkTransitionNamespace: artistAlbumArtworkTransitionNamespace,
+                artworkTransitionID: selectedAlbum.id
+            ) {
+                withAnimation(.smooth(duration: 0.32)) {
+                    albumSearchText = ""
+                    self.selectedAlbum = nil
+                }
             }
+            .zIndex(2)
         } else if let selectedArtist {
             ArtistDetailView(
                 artist: selectedArtist,
                 searchText: $artistSearchText,
+                artistArtworkTransitionNamespace: artistArtworkTransitionNamespace,
+                artistArtworkTransitionID: selectedArtist.id,
+                albumArtworkTransitionNamespace: artistAlbumArtworkTransitionNamespace,
                 onBack: {
-                    artistSearchText = ""
-                    albumSearchText = ""
-                    self.selectedArtist = nil
+                    withAnimation(.smooth(duration: 0.32)) {
+                        artistSearchText = ""
+                        albumSearchText = ""
+                        self.selectedArtist = nil
+                    }
                 },
                 onAlbumSelect: { album in
-                    albumSearchText = ""
-                    selectedAlbum = album
+                    withAnimation(.smooth(duration: 0.32)) {
+                        albumSearchText = ""
+                        selectedAlbum = album
+                    }
                 }
             )
+            .zIndex(1)
         } else {
             artistGrid
+                .zIndex(0)
         }
     }
 
@@ -113,11 +132,17 @@ struct ArtistsView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 22)], spacing: 28) {
                         ForEach(filteredArtists, id: \.id) { artist in
                             Button {
-                                selectedArtist = artist
-                                artistSearchText = ""
-                                albumSearchText = ""
+                                withAnimation(.smooth(duration: 0.32)) {
+                                    selectedArtist = artist
+                                    artistSearchText = ""
+                                    albumSearchText = ""
+                                }
                             } label: {
-                                ArtistTile(artist: artist)
+                                ArtistTile(
+                                    artist: artist,
+                                    artworkTransitionNamespace: artistArtworkTransitionNamespace,
+                                    artworkTransitionID: artist.id
+                                )
                             }
                             .buttonStyle(MintContentButtonStyle(cornerRadius: 14))
                         }
@@ -134,12 +159,15 @@ struct ArtistsView: View {
 private struct ArtistTile: View {
     @EnvironmentObject private var settings: SettingsManager
     let artist: ArtistSummary
+    let artworkTransitionNamespace: Namespace.ID
+    let artworkTransitionID: String
 
     var body: some View {
         VStack(alignment: .center, spacing: 12) {
             ArtworkImage(path: artist.coverPath, cornerRadius: 66, targetSize: CGSize(width: 132, height: 132))
                 .frame(width: 132, height: 132)
                 .clipShape(Circle())
+                .matchedGeometryEffect(id: artworkTransitionID, in: artworkTransitionNamespace, properties: .frame)
                 .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 7)
 
             VStack(alignment: .center, spacing: 4) {
@@ -168,13 +196,27 @@ private struct ArtistDetailView: View {
 
     let artist: ArtistSummary
     @Binding var searchText: String
+    let artistArtworkTransitionNamespace: Namespace.ID?
+    let artistArtworkTransitionID: String?
+    let albumArtworkTransitionNamespace: Namespace.ID?
     let onBack: () -> Void
     let onAlbumSelect: (AlbumSummary) -> Void
 
-    @State private var artistSongs: [Song] = []
-    @State private var artistAlbums: [AlbumSummary] = []
     @State private var selectedSongIDs = Set<Song.ID>()
     @State private var songSortOrder = [KeyPathComparator(\Song.album), KeyPathComparator(\Song.title)]
+
+    private var artistAlbums: [AlbumSummary] {
+        musicLibrary.albums(forArtist: artist)
+    }
+
+    private var artistSongs: [Song] {
+        musicLibrary.songs(forArtist: artist).sorted {
+            if $0.album == $1.album {
+                return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+            }
+            return $0.album.localizedCaseInsensitiveCompare($1.album) == .orderedAscending
+        }
+    }
 
     private var visibleArtistAlbums: [AlbumSummary] {
         guard !searchText.isEmpty else {
@@ -221,9 +263,6 @@ private struct ArtistDetailView: View {
             .padding(.top, 32)
             .padding(.bottom, 150)
         }
-        .task(id: artist.id) {
-            refreshArtistData()
-        }
         .onChange(of: searchText) {
             pruneSongSelection()
         }
@@ -253,7 +292,11 @@ private struct ArtistDetailView: View {
                         Button {
                             onAlbumSelect(album)
                         } label: {
-                            ArtistAlbumTile(album: album)
+                            ArtistAlbumTile(
+                                album: album,
+                                artworkTransitionNamespace: albumArtworkTransitionNamespace,
+                                artworkTransitionID: album.id
+                            )
                         }
                         .buttonStyle(MintContentButtonStyle())
                     }
@@ -286,17 +329,10 @@ private struct ArtistDetailView: View {
     }
 
     private var artistHeader: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 28) {
-                artistArtwork
-                artistHeaderInfo
-                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-            }
-
-            VStack(alignment: .leading, spacing: 16) {
-                artistArtwork
-                artistHeaderInfo
-            }
+        ArtworkHeaderLayout(spacing: 28, minimumHorizontalInfoWidth: 300) {
+            artistArtwork
+            artistHeaderInfo
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -304,6 +340,7 @@ private struct ArtistDetailView: View {
         ArtworkImage(path: artist.coverPath, cornerRadius: 82, targetSize: CGSize(width: 164, height: 164))
             .frame(width: 164, height: 164)
             .clipShape(Circle())
+            .matchedGeometryEffectIfPresent(id: artistArtworkTransitionID, in: artistArtworkTransitionNamespace, properties: .frame)
             .shadow(color: .black.opacity(0.22), radius: 13, x: 0, y: 7)
     }
 
@@ -334,17 +371,6 @@ private struct ArtistDetailView: View {
         audioPlayer.shuffle(songs: artistSongs)
     }
 
-    private func refreshArtistData() {
-        artistAlbums = musicLibrary.albums(forArtist: artist)
-        artistSongs = musicLibrary.songs(forArtist: artist).sorted {
-            if $0.album == $1.album {
-                return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
-            }
-            return $0.album.localizedCaseInsensitiveCompare($1.album) == .orderedAscending
-        }
-        pruneSongSelection()
-    }
-
     private func pruneSongSelection() {
         let visibleIDs = Set(visibleArtistSongs.map(\.id))
         selectedSongIDs = selectedSongIDs.filter { visibleIDs.contains($0) }
@@ -358,10 +384,13 @@ private struct ArtistDetailView: View {
 private struct ArtistAlbumTile: View {
     @EnvironmentObject private var settings: SettingsManager
     let album: AlbumSummary
+    let artworkTransitionNamespace: Namespace.ID?
+    let artworkTransitionID: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ArtworkImage(path: album.coverPath, cornerRadius: 10)
+                .matchedGeometryEffectIfPresent(id: artworkTransitionID, in: artworkTransitionNamespace, properties: .frame)
                 .frame(width: 140, height: 140)
                 .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
             Text(album.title)
@@ -374,5 +403,20 @@ private struct ArtistAlbumTile: View {
         }
         .frame(width: 140, alignment: .leading)
         .contentShape(Rectangle())
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func matchedGeometryEffectIfPresent(
+        id: String?,
+        in namespace: Namespace.ID?,
+        properties: MatchedGeometryProperties = .frame
+    ) -> some View {
+        if let id, let namespace {
+            matchedGeometryEffect(id: id, in: namespace, properties: properties)
+        } else {
+            self
+        }
     }
 }

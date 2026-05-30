@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- None.
+- Added continuous artwork transitions between album and artist grids and their detail pages.
 
 ### Changed
-- None.
+- Improved album and artist artwork transitions so artwork size and position animate together.
 
 ### Deprecated
 - None.
@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - None.
 
 ### Fixed
-- None.
+- Fixed artist artwork transitions clipping the moving avatar to only the start and end circles.
+- Fixed selected song rows using low-contrast white text in the light theme.
 
 ### Security
 - None.

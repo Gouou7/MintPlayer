@@ -5,6 +5,7 @@ struct AlbumsView: View {
     @EnvironmentObject private var settings: SettingsManager
     @State private var searchText = ""
     @State private var selectedAlbum: AlbumSummary?
+    @Namespace private var albumArtworkTransitionNamespace
 
     private var filteredAlbums: [AlbumSummary] {
         guard !searchText.isEmpty else {
@@ -21,11 +22,20 @@ struct AlbumsView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let selectedAlbum {
-                AlbumDetailView(album: selectedAlbum, searchText: $searchText) {
-                    self.selectedAlbum = nil
+                AlbumDetailView(
+                    album: selectedAlbum,
+                    searchText: $searchText,
+                    artworkTransitionNamespace: albumArtworkTransitionNamespace,
+                    artworkTransitionID: selectedAlbum.id
+                ) {
+                    withAnimation(.smooth(duration: 0.32)) {
+                        self.selectedAlbum = nil
+                    }
                 }
+                .zIndex(1)
             } else {
                 albumGrid
+                    .zIndex(0)
             }
 
         }
@@ -46,9 +56,15 @@ struct AlbumsView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 22)], spacing: 28) {
                     ForEach(filteredAlbums, id: \.id) { album in
                         Button {
-                            selectedAlbum = album
+                            withAnimation(.smooth(duration: 0.32)) {
+                                selectedAlbum = album
+                            }
                         } label: {
-                            AlbumTile(album: album)
+                            AlbumTile(
+                                album: album,
+                                artworkTransitionNamespace: albumArtworkTransitionNamespace,
+                                artworkTransitionID: album.id
+                            )
                         }
                         .buttonStyle(MintContentButtonStyle())
                     }
@@ -64,10 +80,13 @@ struct AlbumsView: View {
 private struct AlbumTile: View {
     @EnvironmentObject private var settings: SettingsManager
     let album: AlbumSummary
+    let artworkTransitionNamespace: Namespace.ID
+    let artworkTransitionID: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ArtworkImage(path: album.coverPath, cornerRadius: 10)
+                .matchedGeometryEffect(id: artworkTransitionID, in: artworkTransitionNamespace, properties: .frame)
                 .frame(width: 150, height: 150)
                 .shadow(color: .black.opacity(0.22), radius: 14, x: 0, y: 8)
 
@@ -100,6 +119,8 @@ struct AlbumDetailView: View {
 
     let album: AlbumSummary
     @Binding var searchText: String
+    var artworkTransitionNamespace: Namespace.ID?
+    var artworkTransitionID: String?
     let onBack: () -> Void
 
     @State private var albumSongs: [Song] = []
@@ -155,22 +176,16 @@ struct AlbumDetailView: View {
     }
 
     private var albumHeader: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 29) {
-                albumArtwork
-                albumHeaderInfo
-                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-            }
-
-            VStack(alignment: .leading, spacing: 16) {
-                albumArtwork
-                albumHeaderInfo
-            }
+        ArtworkHeaderLayout(spacing: 29, minimumHorizontalInfoWidth: 320) {
+            albumArtwork
+            albumHeaderInfo
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var albumArtwork: some View {
         ArtworkImage(path: album.coverPath, cornerRadius: 16)
+            .matchedGeometryEffectIfPresent(id: artworkTransitionID, in: artworkTransitionNamespace, properties: .frame)
             .frame(width: 238, height: 238)
             .shadow(color: .black.opacity(0.28), radius: 17, x: 0, y: 11)
     }
@@ -254,5 +269,84 @@ struct AlbumDetailView: View {
 
     private func songTableHeight(for count: Int) -> CGFloat {
         min(max(CGFloat(max(count, 1)) * 58 + 10, 180), 620)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func matchedGeometryEffectIfPresent(
+        id: String?,
+        in namespace: Namespace.ID?,
+        properties: MatchedGeometryProperties = .frame
+    ) -> some View {
+        if let id, let namespace {
+            matchedGeometryEffect(id: id, in: namespace, properties: properties)
+        } else {
+            self
+        }
+    }
+}
+
+struct ArtworkHeaderLayout: Layout {
+    let spacing: CGFloat
+    let minimumHorizontalInfoWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+
+        let artworkSize = subviews[0].sizeThatFits(.unspecified)
+        let proposalWidth = proposal.width
+
+        if usesHorizontalLayout(width: proposalWidth, artworkWidth: artworkSize.width) {
+            let availableInfoWidth = max((proposalWidth ?? 0) - artworkSize.width - spacing, 0)
+            let infoSize = subviews[1].sizeThatFits(ProposedViewSize(width: availableInfoWidth, height: nil))
+            return CGSize(
+                width: proposalWidth ?? artworkSize.width + spacing + infoSize.width,
+                height: max(artworkSize.height, infoSize.height)
+            )
+        }
+
+        let infoSize = subviews[1].sizeThatFits(ProposedViewSize(width: proposalWidth, height: nil))
+        return CGSize(
+            width: proposalWidth ?? max(artworkSize.width, infoSize.width),
+            height: artworkSize.height + spacing + infoSize.height
+        )
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+
+        let artworkSize = subviews[0].sizeThatFits(.unspecified)
+
+        if usesHorizontalLayout(width: bounds.width, artworkWidth: artworkSize.width) {
+            let infoWidth = max(bounds.width - artworkSize.width - spacing, 0)
+            let infoSize = subviews[1].sizeThatFits(ProposedViewSize(width: infoWidth, height: nil))
+            let artworkY = bounds.minY + (bounds.height - artworkSize.height) / 2
+            let infoY = bounds.minY + (bounds.height - infoSize.height) / 2
+
+            subviews[0].place(
+                at: CGPoint(x: bounds.minX, y: artworkY),
+                proposal: ProposedViewSize(artworkSize)
+            )
+            subviews[1].place(
+                at: CGPoint(x: bounds.minX + artworkSize.width + spacing, y: infoY),
+                proposal: ProposedViewSize(width: infoWidth, height: infoSize.height)
+            )
+        } else {
+            let infoSize = subviews[1].sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
+            subviews[0].place(
+                at: CGPoint(x: bounds.minX, y: bounds.minY),
+                proposal: ProposedViewSize(artworkSize)
+            )
+            subviews[1].place(
+                at: CGPoint(x: bounds.minX, y: bounds.minY + artworkSize.height + spacing),
+                proposal: ProposedViewSize(width: bounds.width, height: infoSize.height)
+            )
+        }
+    }
+
+    private func usesHorizontalLayout(width: CGFloat?, artworkWidth: CGFloat) -> Bool {
+        guard let width else { return true }
+        return width >= artworkWidth + spacing + minimumHorizontalInfoWidth
     }
 }
