@@ -280,7 +280,7 @@ extension NativeSongTableView {
         private var isSyncingSelection = false
         private var isApplyingColumnWidths = false
         private var isApplyingSortDescriptors = false
-        private var menuSongs: [Song] = []
+        private var songContextMenuController: SongContextMenuController?
         private var clipViewObservers: [NSObjectProtocol] = []
 
         init(parent: NativeSongTableView) {
@@ -565,8 +565,31 @@ extension NativeSongTableView {
 
         func menu(forRow row: Int) -> NSMenu {
             selectRowForInteraction(row)
-            menuSongs = selectedSongs()
-            return makeMenu()
+            let selectedSongs = selectedSongs()
+            let controller = SongContextMenuController(
+                songs: selectedSongs,
+                queueSongs: parent.songs,
+                playlists: parent.musicLibrary.playlists,
+                playlistId: parent.playlistId,
+                settings: parent.settings,
+                enabledActions: .tableActions,
+                onPlay: parent.onPlay,
+                onPlayNext: parent.onPlayNext,
+                onAddToQueue: parent.onAddToQueue,
+                onAddToPlaylist: { [weak self] songs, playlistId in
+                    self?.parent.musicLibrary.addSongsToPlaylist(songs, playlistId: playlistId)
+                },
+                onBlockSongs: { [weak self] ids in
+                    self?.parent.musicLibrary.blockSongs(withIds: ids)
+                    self?.parent.selectedSongIDs.subtract(ids)
+                },
+                onRemoveFromPlaylist: { [weak self] ids, playlistId in
+                    self?.parent.musicLibrary.removeSongsFromPlaylist(songIds: ids, playlistId: playlistId)
+                    self?.parent.selectedSongIDs.subtract(ids)
+                }
+            )
+            songContextMenuController = controller
+            return controller.makeMenu()
         }
 
         @objc func doubleClick(_ sender: NSTableView) {
@@ -1003,80 +1026,6 @@ extension NativeSongTableView {
             return parent.songs.indices.contains(row) ? [parent.songs[row]] : []
         }
 
-        private func makeMenu() -> NSMenu {
-            let menu = NSMenu()
-            menu.addItem(menuItem(parent.settings.text(.play), systemImage: "play.fill", action: #selector(playSongs)))
-            menu.addItem(menuItem(parent.settings.text(.playNext), systemImage: "text.line.first.and.arrowtriangle.forward", action: #selector(playNext)))
-            menu.addItem(menuItem(parent.settings.text(.addToQueue), systemImage: "text.badge.plus", action: #selector(addToQueue)))
-
-            if !parent.musicLibrary.playlists.isEmpty {
-                let playlistTitle = parent.settings.text(.addToPlaylist)
-                let playlistItem = NSMenuItem(title: playlistTitle, action: nil, keyEquivalent: "")
-                playlistItem.image = NSImage(systemSymbolName: "music.note.list", accessibilityDescription: playlistTitle)
-                let submenu = NSMenu()
-                for playlist in parent.musicLibrary.playlists {
-                    let item = menuItem(playlist.name, systemImage: "plus", action: #selector(addToPlaylist(_:)))
-                    item.representedObject = playlist.id.uuidString
-                    submenu.addItem(item)
-                }
-                menu.setSubmenu(submenu, for: playlistItem)
-                menu.addItem(playlistItem)
-            }
-
-            menu.addItem(.separator())
-            menu.addItem(menuItem(parent.settings.text(.showInFinder), systemImage: "folder", action: #selector(showInFinder)))
-
-            if parent.playlistId != nil {
-                menu.addItem(menuItem(parent.settings.text(.removeFromPlaylist), systemImage: "minus.circle", action: #selector(removeFromPlaylist)))
-            }
-            menu.addItem(menuItem(parent.settings.text(.blockSong), systemImage: "eye.slash", action: #selector(blockSongs)))
-            return menu
-        }
-
-        private func menuItem(_ title: String, systemImage: String, action: Selector) -> NSMenuItem {
-            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-            item.target = self
-            item.isEnabled = !menuSongs.isEmpty
-            item.image = NSImage(systemSymbolName: systemImage, accessibilityDescription: title)
-            return item
-        }
-
-        @objc private func playSongs() {
-            guard let firstSong = menuSongs.first else { return }
-            parent.onPlay(firstSong, parent.songs)
-        }
-
-        @objc private func playNext() {
-            menuSongs.forEach(parent.onPlayNext)
-        }
-
-        @objc private func addToQueue() {
-            menuSongs.forEach(parent.onAddToQueue)
-        }
-
-        @objc private func addToPlaylist(_ sender: NSMenuItem) {
-            guard let idString = sender.representedObject as? String, let id = UUID(uuidString: idString) else { return }
-            parent.musicLibrary.addSongsToPlaylist(menuSongs, playlistId: id)
-        }
-
-        @objc private func showInFinder() {
-            guard let firstSong = menuSongs.first else { return }
-            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: firstSong.path)])
-        }
-
-        @objc private func blockSongs() {
-            let ids = Set(menuSongs.map(\.id))
-            parent.musicLibrary.blockSongs(withIds: ids)
-            parent.selectedSongIDs.subtract(ids)
-        }
-
-        @objc private func removeFromPlaylist() {
-            guard let playlistId = parent.playlistId else { return }
-            let ids = Set(menuSongs.map(\.id))
-            parent.musicLibrary.removeSongsFromPlaylist(songIds: ids, playlistId: playlistId)
-            parent.selectedSongIDs.subtract(ids)
-        }
-
         private func hostingView<V: View>(_ view: V) -> NSView {
             let hostingView = NSHostingView(rootView: view)
             hostingView.sizingOptions = []
@@ -1094,6 +1043,166 @@ extension NativeSongTableView {
             }
         }
     }
+}
+
+final class SongContextMenuController: NSObject {
+    enum Action: Hashable {
+        case play
+        case playNext
+        case addToQueue
+        case addToPlaylist
+        case showInFinder
+        case removeFromPlaylist
+        case blockSong
+    }
+
+    let songs: [Song]
+    let queueSongs: [Song]
+    let playlists: [Playlist]
+    let playlistId: UUID?
+    let settings: SettingsManager
+    let enabledActions: Set<Action>
+    let onPlay: ((Song, [Song]) -> Void)?
+    let onPlayNext: ((Song) -> Void)?
+    let onAddToQueue: ((Song) -> Void)?
+    let onAddToPlaylist: ([Song], UUID) -> Void
+    let onBlockSongs: (Set<Song.ID>) -> Void
+    let onRemoveFromPlaylist: (Set<Song.ID>, UUID) -> Void
+
+    init(
+        songs: [Song],
+        queueSongs: [Song] = [],
+        playlists: [Playlist],
+        playlistId: UUID? = nil,
+        settings: SettingsManager,
+        enabledActions: Set<Action>,
+        onPlay: ((Song, [Song]) -> Void)? = nil,
+        onPlayNext: ((Song) -> Void)? = nil,
+        onAddToQueue: ((Song) -> Void)? = nil,
+        onAddToPlaylist: @escaping ([Song], UUID) -> Void,
+        onBlockSongs: @escaping (Set<Song.ID>) -> Void,
+        onRemoveFromPlaylist: @escaping (Set<Song.ID>, UUID) -> Void = { _, _ in }
+    ) {
+        self.songs = songs
+        self.queueSongs = queueSongs
+        self.playlists = playlists
+        self.playlistId = playlistId
+        self.settings = settings
+        self.enabledActions = enabledActions
+        self.onPlay = onPlay
+        self.onPlayNext = onPlayNext
+        self.onAddToQueue = onAddToQueue
+        self.onAddToPlaylist = onAddToPlaylist
+        self.onBlockSongs = onBlockSongs
+        self.onRemoveFromPlaylist = onRemoveFromPlaylist
+    }
+
+    func makeMenu() -> NSMenu {
+        let menu = NSMenu()
+
+        if enabledActions.contains(.play) {
+            menu.addItem(menuItem(settings.text(.play), systemImage: "play.fill", action: #selector(playSongs)))
+        }
+        if enabledActions.contains(.playNext) {
+            menu.addItem(menuItem(settings.text(.playNext), systemImage: "text.line.first.and.arrowtriangle.forward", action: #selector(playNext)))
+        }
+        if enabledActions.contains(.addToQueue) {
+            menu.addItem(menuItem(settings.text(.addToQueue), systemImage: "text.badge.plus", action: #selector(addToQueue)))
+        }
+
+        if enabledActions.contains(.addToPlaylist), !playlists.isEmpty {
+            let playlistTitle = settings.text(.addToPlaylist)
+            let playlistItem = NSMenuItem(title: playlistTitle, action: nil, keyEquivalent: "")
+            playlistItem.image = NSImage(systemSymbolName: "music.note.list", accessibilityDescription: playlistTitle)
+
+            let submenu = NSMenu()
+            for playlist in playlists {
+                let item = menuItem(playlist.name, systemImage: "plus", action: #selector(addToPlaylist(_:)))
+                item.representedObject = playlist.id.uuidString
+                submenu.addItem(item)
+            }
+            menu.setSubmenu(submenu, for: playlistItem)
+            menu.addItem(playlistItem)
+        }
+
+        if enabledActions.contains(.showInFinder) || enabledActions.contains(.removeFromPlaylist) || enabledActions.contains(.blockSong) {
+            if !menu.items.isEmpty {
+                menu.addItem(.separator())
+            }
+            if enabledActions.contains(.showInFinder) {
+                menu.addItem(menuItem(settings.text(.showInFinder), systemImage: "folder", action: #selector(showInFinder)))
+            }
+            if enabledActions.contains(.removeFromPlaylist), playlistId != nil {
+                menu.addItem(menuItem(settings.text(.removeFromPlaylist), systemImage: "minus.circle", action: #selector(removeFromPlaylist)))
+            }
+            if enabledActions.contains(.blockSong) {
+                menu.addItem(menuItem(settings.text(.blockSong), systemImage: "eye.slash", action: #selector(blockSongs)))
+            }
+        }
+
+        return menu
+    }
+
+    private func menuItem(_ title: String, systemImage: String, action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        item.isEnabled = !songs.isEmpty
+        item.image = NSImage(systemSymbolName: systemImage, accessibilityDescription: title)
+        return item
+    }
+
+    @objc private func playSongs() {
+        guard let firstSong = songs.first else { return }
+        onPlay?(firstSong, queueSongs)
+    }
+
+    @objc private func playNext() {
+        guard let onPlayNext else { return }
+        songs.forEach(onPlayNext)
+    }
+
+    @objc private func addToQueue() {
+        guard let onAddToQueue else { return }
+        songs.forEach(onAddToQueue)
+    }
+
+    @objc private func addToPlaylist(_ sender: NSMenuItem) {
+        guard let idString = sender.representedObject as? String,
+              let id = UUID(uuidString: idString)
+        else { return }
+        onAddToPlaylist(songs, id)
+    }
+
+    @objc private func showInFinder() {
+        guard let firstSong = songs.first else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: firstSong.path)])
+    }
+
+    @objc private func blockSongs() {
+        onBlockSongs(Set(songs.map(\.id)))
+    }
+
+    @objc private func removeFromPlaylist() {
+        guard let playlistId else { return }
+        onRemoveFromPlaylist(Set(songs.map(\.id)), playlistId)
+    }
+}
+
+extension Set where Element == SongContextMenuController.Action {
+    static let tableActions: Self = [
+        .play,
+        .playNext,
+        .addToQueue,
+        .addToPlaylist,
+        .showInFinder,
+        .removeFromPlaylist,
+        .blockSong
+    ]
+
+    static let nowPlayingActions: Self = [
+        .addToPlaylist,
+        .blockSong
+    ]
 }
 
 private struct DetailedNativeSongCell: View {

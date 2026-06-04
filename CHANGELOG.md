@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added continuous artwork transitions between album and artist grids and their detail pages.
 - Added an optional full-screen lyrics blur effect with a Settings toggle.
 - Added remembered window size and placement for the lyrics and Settings windows.
+- Added a player bar context menu for adding the current song to playlists or blocking it.
 
 ### Changed
 - Improved album and artist artwork transitions so artwork size and position animate together.

@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct PlayerBarView: View {
     @EnvironmentObject private var audioPlayer: AudioPlayer
@@ -93,6 +94,19 @@ struct PlayerBarView: View {
                         .padding(.top, 2)
                 }
                 .frame(minWidth: infoMinWidth, idealWidth: infoIdealWidth, maxWidth: infoMaxWidth, alignment: .leading)
+            }
+            .background {
+                NowPlayingSongContextMenuInstaller(
+                    song: currentSong,
+                    playlists: musicLibrary.playlists,
+                    settings: settings,
+                    onAddToPlaylist: { songs, playlistId in
+                        musicLibrary.addSongsToPlaylist(songs, playlistId: playlistId)
+                    },
+                    onBlockSongs: { ids in
+                        musicLibrary.blockSongs(withIds: ids)
+                    }
+                )
             }
         } else {
             HStack(alignment: .center, spacing: 12) {
@@ -222,6 +236,64 @@ struct PlayerBarView: View {
     private func toggleCurrentSongFavorite() {
         guard let song = audioPlayer.currentSong else { return }
         musicLibrary.toggleFavorite(for: song.id)
+    }
+}
+
+private struct NowPlayingSongContextMenuInstaller: NSViewRepresentable {
+    let song: Song
+    let playlists: [Playlist]
+    let settings: SettingsManager
+    let onAddToPlaylist: ([Song], UUID) -> Void
+    let onBlockSongs: (Set<Song.ID>) -> Void
+
+    func makeNSView(context: Context) -> MenuInstallerView {
+        MenuInstallerView()
+    }
+
+    func updateNSView(_ nsView: MenuInstallerView, context: Context) {
+        nsView.configure(
+            song: song,
+            playlists: playlists,
+            settings: settings,
+            onAddToPlaylist: onAddToPlaylist,
+            onBlockSongs: onBlockSongs
+        )
+    }
+
+    final class MenuInstallerView: NSView {
+        private var controller: SongContextMenuController?
+        private var installedMenu: NSMenu?
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            installMenu()
+        }
+
+        func configure(
+            song: Song,
+            playlists: [Playlist],
+            settings: SettingsManager,
+            onAddToPlaylist: @escaping ([Song], UUID) -> Void,
+            onBlockSongs: @escaping (Set<Song.ID>) -> Void
+        ) {
+            let controller = SongContextMenuController(
+                songs: [song],
+                playlists: playlists,
+                settings: settings,
+                enabledActions: .nowPlayingActions,
+                onAddToPlaylist: onAddToPlaylist,
+                onBlockSongs: onBlockSongs
+            )
+
+            self.controller = controller
+            installedMenu = controller.makeMenu()
+            installMenu()
+        }
+
+        private func installMenu() {
+            guard let superview else { return }
+            superview.menu = installedMenu
+        }
     }
 }
 
