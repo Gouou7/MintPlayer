@@ -277,7 +277,7 @@ private struct StaticLyricsBackground: View {
     var body: some View {
         ZStack {
             Rectangle()
-                .fill(hasCoverArt ? Color(nsColor: .windowBackgroundColor) : Color.secondary.opacity(0.16))
+                .fill(Color(nsColor: .windowBackgroundColor))
 
             if let image {
                 Image(nsImage: image)
@@ -310,19 +310,9 @@ private struct StaticLyricsBackground: View {
         "\(coverPath ?? "empty")|\(colorScheme == .dark ? "dark" : "light")"
     }
 
-    private var hasCoverArt: Bool {
-        guard let coverPath else { return false }
-        return !coverPath.isEmpty
-    }
-
     @MainActor
     private func loadImage(for requestedCacheKey: String) async {
         guard displayedCacheKey != requestedCacheKey else { return }
-
-        guard hasCoverArt else {
-            updateDisplayedImage(nil, cacheKey: requestedCacheKey)
-            return
-        }
 
         let loadedImage = await LyricsBackdropCache.shared.image(for: coverPath, colorScheme: colorScheme)
         guard cacheKey == requestedCacheKey else { return }

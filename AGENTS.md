@@ -1,120 +1,136 @@
 # Mint Player Development Guide
 
-## 全局要求
+## Global Requirements
 
-- 不要擅自修改或向 README.md 写入内容，每次写入要请求许可
-- README_zh.md 是 README.md 的中文翻译，两者同步更新
-- 每次提交的 commit 消息需要向用户确认，同意后再提交
-- 多语言支持，修改功能、按钮、说明等文本时，要同步修改所有已支持的语言
+- Unless explicitly requested, do not run builds or tests by default.
+- Unless explicitly requested, use native macOS controls and system behavior before custom implementations.
+- Unless explicitly requested, do not change the version, create Git commits, or write changes into an existing released section of `CHANGELOG.md`; user-facing unreleased changes belong in `Unreleased`.
+- Do not write to `README.md` without explicit permission. When `README.md` changes, keep `README_zh.md` synchronized.
+- Commit messages must be confirmed by the user before committing.
+- When changing user-facing text, buttons, labels, or descriptions, update every supported language in `SettingsManager`.
 
 ## Project Overview
 
-Mint Player is a native macOS local music player built with an Xcode project.
+Mint Player is a native macOS local music player built from a single Xcode project. It manages user-selected music folders, indexes metadata and artwork, plays local audio files, displays local synchronized lyrics, and exposes native macOS table, window, sidebar, toolbar, and media-control behavior.
 
 - **Language**: Swift 5
-- **UI framework**: SwiftUI; complex song and artist lists bridge to AppKit `NSTableView`
-- **Audio framework**: AVFoundation
-- **System media controls**: MediaPlayer / Now Playing / Remote Command Center
-- **Desktop interop**: AppKit for folder picking, Finder integration, native tables, and small window/sidebar behaviors
-- **State management**: `ObservableObject`, `@Published`, `@StateObject`, `@EnvironmentObject`
-- **Persistence**: SQLite and `UserDefaults`; artwork cache files live under Application Support
-- **Build tool**: Xcode project
+- **UI**: SwiftUI, with AppKit bridges for native tables, windows, search fields, file pickers, and narrow platform behavior
+- **Audio**: AVFoundation / `AVAudioPlayer`
+- **System media controls**: MediaPlayer, Now Playing, Remote Command Center, and Dock menu actions
+- **Persistence**: SQLite for library state, `UserDefaults` for preferences and window/table state, artwork cache files under Application Support
+- **Build entry point**: `MintPlayer.xcodeproj`
 - **Minimum OS**: macOS 26.0
 
-The repository root does not currently contain `Package.swift`, third-party dependency manifests, test targets, or lint configuration.
-There is no `package.json`, `go.mod`, `requirements.txt`, `Makefile`, or custom build script.
-If a `Reference Proj.` directory exists, it is reference material only and is not the Mint Player build entry point.
+The repository currently has no Swift Package manifest, third-party dependency manifest, test target, lint configuration, CI configuration, or custom build script. If a `Reference Proj.` directory exists, treat it as reference material only; it is not part of the Mint Player build.
 
-## Directory Structure
+## Project Structure
 
 ```text
 MintPlayer/
 ├── MintPlayer/
-│   ├── App/              # `MintPlayerApp` and `Info.plist`
-│   ├── Models/           # `Song`, `Album`, `Artist`, `Playlist`, and related models
-│   ├── Stores/           # `MusicLibrary`, `SettingsManager`
-│   ├── Services/         # `AudioPlayer`, `NowPlayingService`
+│   ├── App/              # App entry, app delegate, configuration, Info.plist
+│   ├── Models/           # Song, album, artist, playlist, source, and theme models
+│   ├── Stores/           # Observable app state such as MusicLibrary and SettingsManager
+│   ├── Services/         # Audio playback, SQLite persistence, lyrics parsing, Now Playing
 │   └── Views/
-│       ├── Root/         # Main window layout and NavigationSplitView routing
-│       ├── Sidebar/      # Sidebar, selection model, playlist editing
-│       ├── Library/      # Songs, Albums, Artists, Favorites, and folder views
-│       ├── Player/       # Player bar, queue popover, and lyrics window
-│       ├── Settings/     # Settings window
-│       └── Shared/       # Theme, search field, artwork, empty states, shared modifiers
-├── MintPlayer.xcodeproj/ # The only build entry point
-├── README.md             # English user-facing overview
-├── README_zh.md          # Chinese user-facing overview
+│       ├── Root/         # Main window, split view, toolbar, collapsed sidebar tab bar
+│       ├── Sidebar/      # Sidebar sections, rows, selection, playlist editing, drops
+│       ├── Library/      # Songs, Albums, Artists, Favorites, and folder/detail views
+│       ├── Player/       # Player bar, queue, lyrics window, lyrics scrolling
+│       ├── Settings/     # Settings window and library management UI
+│       └── Shared/       # Theme, search, artwork, native tables, empty states, controls
+├── MintPlayer.xcodeproj/ # Only build entry point
+├── README.md             # English user/developer overview
+├── README_zh.md          # Chinese translation of README.md
 ├── CHANGELOG.md          # Keep a Changelog release notes
-├── VERSION               # Current version
-└── AGENTS.md             # This file
+├── VERSION               # Current release version
+└── AGENTS.md             # Agent and maintainer guide
 ```
+
+## Architecture Notes
+
+`MintPlayerApp` creates three scene families: the main app window, the lyrics window, and the Settings scene. Shared state is created once with `@StateObject` and injected through `@EnvironmentObject`.
+
+`MusicLibrary` owns library sources, songs, playlists, blocked songs, album summaries, and artist summaries. It scans folders on background queues, extracts metadata with AVFoundation, caches artwork, rebuilds album/artist indexes, and persists app state through `LibraryPersistenceStore`.
+
+`AudioPlayer` wraps `AVAudioPlayer`, queue state, shuffle/repeat behavior, playback restoration, play-count qualification, volume, fade in/out, and Now Playing updates. Playback count is based on actual listened duration, not clicks.
+
+SwiftUI owns high-level view state and layout. AppKit is used only where native macOS behavior is required: `NSTableView`, `NSSearchField`, `NSWindow`, file import, event monitoring, drag/drop boundaries, and deterministic lyrics scrolling.
+
+## Data Flow
+
+1. The user adds a library folder in Settings or imports files.
+2. `MusicLibrary` scans supported audio files and extracts metadata.
+3. `LibraryPersistenceStore` saves songs, playlists, blocked records, sources, favorites, and play counts into SQLite.
+4. Album and artist indexes are rebuilt from the current song snapshot.
+5. Library views read summaries and song lists from `MusicLibrary`.
+6. Playback actions call `AudioPlayer`, which updates queue state, `AVAudioPlayer`, Now Playing, session restoration, and qualified play counts.
+7. Lyrics views read current playback state and parsed lyrics, then drive highlighting, scrolling, blur, and tap-to-seek behavior.
 
 ## Coding Standards
 
 ### Naming
 
-- Use PascalCase for types, enums, and protocols, such as `MusicLibrary` and `LibrarySelection`.
-- Use camelCase for methods, variables, and properties, such as `play(song:)` and `currentSong`.
-- Name SwiftUI view files after their primary type, such as `PlayerBarView.swift`.
-- Place files by responsibility: models in `Models/`, state in `Stores/`, platform services in `Services/`, and UI components in the matching `Views/` subdirectory.
-- Use clear `Native...View` names or dedicated helper names for AppKit bridge types, and keep them in `Views/Shared/` or the relevant feature directory.
+- Use PascalCase for types, enums, and protocols.
+- Use camelCase for methods, variables, properties, and bindings.
+- Name SwiftUI view files after their primary type.
+- Use `Native...View` or focused helper names for AppKit bridges.
+- Keep model, store, service, and view files in their matching directories.
 
 ### Formatting
 
 - Use 4 spaces for indentation.
-- Put opening braces `{` on the declaration line.
+- Put opening braces on the declaration line.
 - Leave a blank line between methods.
-- Avoid unrelated formatting churn.
+- Avoid unrelated formatting churn and large mechanical rewrites.
 
-### Types And State
+### State And Types
 
-- Prefer Swift type inference; add explicit types for complex generics, closures, or public APIs when useful.
-- Prefer `guard let` or `if let` for optionals. Avoid force unwraps.
-- Use SwiftUI state properties in views; inject cross-page shared state through `@EnvironmentObject`.
-- Do not spread AppKit objects through ordinary SwiftUI views. Keep AppKit usage in narrow `NSViewRepresentable`, helper, or service boundaries.
-- Keep the main sidebar aligned with native `NavigationSplitView` and system Liquid Glass behavior. Do not replace the system sidebar with a custom painted background.
-- Song, playlist, Folder, and detail-page song lists currently depend on `NativeSongTableView`; preserve native `NSTableView` selection, multi-selection, double-click, menus, and drag behavior when changing interactions.
-- Albums and Artists browsing pages should remain responsive grids, with at least four primary items visible per row at the minimum window width.
-- Artists use a drill-in structure across artist browsing, artist detail, and album detail. Do not reintroduce a permanent three-column artist layout.
-- Search fields live in the top-right page toolbar by default, use native macOS search controls, and their search semantics should follow the current page or detail level.
-- When the main sidebar is hidden, the top toolbar uses a native segmented tab bar for the primary library destinations. Preserve the system sidebar and toolbar behavior instead of replacing them with custom-painted chrome.
-- The bottom player bar is a fixed-width, centered floating Liquid Glass control and must intercept clicks so events do not pass through to content underneath.
-- Playback counts are recorded only after a song has actually played for 60% of its duration. Do not count clicks, seeks, or short previews as plays.
-- Full-screen lyrics scrolling uses a narrow AppKit `NSScrollView` bridge for deterministic animated offsets. Keep SwiftUI as the source of truth for lyric content and highlighting; use the bridge only for scroll-position control.
-- Full-screen lyrics artwork and blurred backgrounds should crossfade directly between old and new images. Do not clear to a black or empty intermediate frame during normal covered-song transitions.
-- Songs without artwork should show the gray `rectangle.stack.fill` placeholder and gray lyrics background rather than reusing the previous song's artwork or blurred background.
-- Playback pause and resume use short audio fade out/in transitions in `AudioPlayer`. Preserve user volume separately from temporary fade volume.
+- Prefer Swift type inference unless explicit types clarify complex generics, closures, or public APIs.
+- Prefer `guard let` and `if let`; avoid force unwraps.
+- Use SwiftUI state wrappers for view-local state and `@EnvironmentObject` for shared app state.
+- Keep AppKit objects inside representables, coordinators, helpers, or services. Do not pass AppKit objects broadly through SwiftUI view trees.
+- Preserve existing persistence compatibility unless the user explicitly approves a migration or breaking change.
 
 ### Comments
 
-- Keep comments concise and only add them for complex logic, platform constraints, or non-obvious behavior.
-- Do not add comments that merely restate the code.
+- Add comments only for platform constraints, non-obvious behavior, or complex logic.
+- Do not add comments that restate the code.
 
-## Common Commands
+## UI And Interaction Rules
+
+- Keep the main sidebar aligned with native `NavigationSplitView` and system Liquid Glass behavior. Do not replace it with custom-painted chrome.
+- The bottom player bar is a centered floating Liquid Glass control and must intercept clicks so events do not pass through to content underneath.
+- Search fields live in the top-right toolbar by default and should use native macOS search controls. Do not customize `NSSearchField` text layout unless the native control is demonstrably insufficient.
+- Songs, playlists, folder views, and detail-page song lists depend on `NativeSongTableView`; preserve native selection, multi-selection, double-click playback, sorting, context menus, trailing actions, column resizing, and dragging.
+- Albums and Artists browsing pages should remain responsive grids with at least four primary items visible per row at the minimum window width.
+- Artists use a drill-in flow across artist browsing, artist detail, and album detail. Do not reintroduce a permanent three-column artist layout.
+- Use `matchedGeometryEffect` only for artwork continuity between grids and detail pages. Do not apply matched geometry to page containers, text, tables, or whole cards.
+- Full-screen lyrics scrolling uses a narrow AppKit `NSScrollView` bridge for deterministic animated offsets. SwiftUI remains the source of truth for lyric content and highlighting.
+- Full-screen lyrics artwork and blurred backgrounds should crossfade directly between old and new images. Do not clear to black or an empty frame during normal track changes.
+- Songs without artwork should show the gray placeholder artwork and gray lyrics background, never a previous song's artwork.
+
+## Build, Run, Test, And Lint
 
 ### Dependencies
 
-No third-party dependency installation is required. Open `MintPlayer.xcodeproj` to develop.
+No third-party dependency installation is required.
 
-### Inspect Project
+### Inspect
 
 ```sh
 xcodebuild -list -project MintPlayer.xcodeproj
 ```
 
+### Run
+
+Open `MintPlayer.xcodeproj`, select the `MintPlayer` scheme, choose `My Mac`, and press `Command + R`.
+
 ### Build
-
-```sh
-xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" build
-```
-
-Build for macOS explicitly:
 
 ```sh
 xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -destination 'platform=macOS' build
 ```
-
-Build a specific configuration:
 
 ```sh
 xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -configuration Debug -destination 'platform=macOS' build
@@ -127,72 +143,149 @@ xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -configuration Rel
 xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -destination 'platform=macOS' clean build
 ```
 
-### Run
+### Tests
 
-For daily development, open `MintPlayer.xcodeproj`, select the `MintPlayer` scheme, and press `Command + R`.
-
-### Test
-
-There is currently no test target. After changes, run at least one clean build and perform manual regression based on the affected area.
+There is currently no test target. Do not create one without user approval.
 
 ### Lint
 
 There is currently no SwiftLint or other lint configuration. Do not assume a lint command exists.
 
-### Build Configuration
+### Build Configurations
 
 Debug builds use `Mint Player Debug.app`, `dev.govo.mintplayer.debug`, the `MintPlayer-Debug` Application Support directory, and the `mintPlayer.debug` preferences prefix.
-Release builds use `Mint Player.app` and the release configuration directory.
 
-## Testing Strategy
+Release builds use `Mint Player.app` and the release Application Support/preferences namespace.
 
-- **Build verification**: Run `xcodebuild -project MintPlayer.xcodeproj -scheme "MintPlayer" -destination 'platform=macOS' clean build` after code changes.
-- **Manual regression**: Cover folder import, music scanning, Songs double-click playback, Albums/Artists playback, playlist editing, queue, volume, Settings, and system media controls as relevant.
-- **Table interaction regression**: For `NativeSongTableView` or `NativeArtistTableView` changes, verify normal click, Shift range selection, Command multi-selection, double-click playback, context menus, trailing action menus, column resizing, and dragging to playlist / Finder.
-- **Layout regression**: For main window, sidebar, Artists, or Albums detail changes, verify narrow window behavior, sidebar width, Scroll Edge Effect, floating player bar, and search field placement.
-- **Playback regression**: For `AudioPlayer` changes, verify pause fade-out, resume fade-in, stop, seek, previous/next, natural track completion, repeat, shuffle, volume changes, Now Playing state, and play count qualification.
-- **Lyrics regression**: For full-screen lyrics changes, verify synced scrolling, highlighted-line position, seek by tapping lyrics, missing artwork placeholders, artwork/background crossfades, and no dark intermediate frame during track changes.
-- **Unit tests**: There is currently no test target. Confirm with the user before creating one for complex pure logic.
-- **Integration/e2e**: There are no automated integration or e2e tests. Use local manual verification for UI and playback behavior.
+## Manual Regression Guide
+
+- **Library**: folder add/remove, duplicate folder prevention, rescan, blocked-song hiding/unblocking, missing folder behavior.
+- **Playback**: double-click playback, play/pause fade, seek, stop, previous/next, natural completion, shuffle, repeat, volume, session restoration, Now Playing, Dock menu actions.
+- **Tables**: click, Shift selection, Command selection, double-click, context menu, trailing actions, column resize, column visibility, sorting, drag to playlist/Finder.
+- **Albums and Artists**: grid responsiveness, detail navigation, artwork matched transitions, search, playback buttons, return animations.
+- **Lyrics**: `.lrc` parsing, highlighted line timing, smooth scrolling, tap-to-seek, inactive-line blur toggle, missing artwork placeholder, artwork/background crossfade, remembered window size.
+- **Settings**: theme, language, lyrics blur, library folder layout, rescan, delete confirmation, blocked-song list, resizing, scroll coverage, top scroll edge effect.
+- **Layout**: narrow windows, hidden sidebar mode, toolbar tab bar, sidebar width, floating player bar hit testing, search field placement.
 
 ## Git Workflow
 
-- Work on the current branch by default. Do not create commits unless the user explicitly asks.
-- Suggested branch names: `feature/<name>`, `bugfix/<name>`, `refactor/<name>`.
-- Use English commit messages in Conventional Commits style, for example `feat: improve playback controls`.
-- Suggested types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
-- Before committing, run `git status --short` and confirm there are no unrelated files, personal environment files, or build outputs staged.
+- Work on the current branch by default.
+- Do not commit, tag, push, or create pull requests unless explicitly requested.
+- Use English Conventional Commits, for example `feat: improve playback controls`.
+- Before committing, run `git status --short` and confirm that only task-related files are staged.
+- Do not stage personal files, build products, Xcode user state, DerivedData, `.DS_Store`, local caches, or user music files.
+
+## Versioning And Releases
+
+- Versions follow Semantic Versioning.
+- `VERSION`, Xcode `MARKETING_VERSION`, release headings in `CHANGELOG.md`, and Git tags must match for a release.
+- `CHANGELOG.md` follows Keep a Changelog and keeps `Unreleased` at the top.
+- Do not record version-number-only changes or ordinary documentation maintenance in `CHANGELOG.md`.
+- Move user-facing `Unreleased` entries into a dated release section only when preparing a release.
+
+## Security And Data Safety
+
+- Never commit secrets, tokens, `.env` files, personal paths, user music files, or real user library data.
+- Do not hardcode absolute user paths in source or docs.
+- Folder deletion in the app must only remove the app's library reference and internal index entries. It must not delete user files from disk.
+- Keep permission requests minimal and limited to local music management.
 
 ## Agent Constraints
 
-- Do not automatically commit, push, or create pull requests unless explicitly asked.
-- Read existing code and documentation before making changes; do not invent architecture from assumptions.
-- After changes, run the smallest useful verification command. The default is the clean `xcodebuild` command above.
-- Ask the user before decisions that affect architecture or data compatibility when the answer cannot be discovered locally.
-- Do not revert or overwrite user changes. In a dirty worktree, touch only task-related files.
-- Do not introduce a new package manager entry, test target, or script unless explicitly requested.
-- Do not write internal documentation maintenance into `CHANGELOG.md`.
-- Do not leave fake or placeholder features in the UI. Remove them or ask the user if backend logic is missing.
-- Do not hide native control issues with timers, forced view rebuilds, or close-and-reopen workarounds. Understand the SwiftUI/AppKit boundary first, then use the narrowest bridge.
+- Read the relevant code before changing behavior.
+- Prefer existing patterns and helpers over new abstractions.
+- Prefer narrow extensions over rewrites.
+- Preserve API and database compatibility unless the user explicitly approves a breaking change.
+- Do not hide native control issues with timers, forced rebuilds, or close-and-reopen workarounds. Understand the SwiftUI/AppKit boundary first.
+- Do not introduce a package manager, dependency, test target, script, or CI configuration unless explicitly requested.
+- Do not leave fake or placeholder UI. Implement the backing behavior or ask the user.
+- Do not revert user changes. If the worktree is dirty, touch only task-related files.
 
-## Security Notes
+## Pitfalls And Lessons Learned
 
-- Do not commit secrets, tokens, `.env` files, personal paths, user music files, or real user data.
-- Do not hardcode absolute paths. Use user-selected URLs or project-relative paths for file access.
-- Do not commit Xcode user state, DerivedData, `.xcuserstate`, local caches, or build products.
-- Folder deletion should only remove the app's library reference and internal index entries. It must not delete user files from disk.
-- Keep permission requests minimal and limited to local music management.
+### Native Search Field Layout
 
-## Versioning
+- **Problem**: Replacing `NSSearchFieldCell` or manually changing the field editor can make placeholder text, edited placeholder text, and typed text use different vertical positions.
+- **Cause**: `NSSearchField` has separate native drawing/editing paths for the placeholder, editor, search icon, clear button, and focus ring.
+- **Avoid**: Custom search-field cells or manual editor insets for toolbar search fields unless there is a proven native-control bug.
+- **Use**: Plain `NSSearchField` in `NSViewRepresentable`, with only binding, delegate/action, prompt, and width configuration when possible.
 
-- Versions follow Semantic Versioning and are recorded in `VERSION` and Xcode `MARKETING_VERSION`.
-- `Info.plist` should receive the short version through Xcode `MARKETING_VERSION`; Settings About reads from the bundle and appends `-Debug` or `-Release`.
-- Before release, sync `VERSION`, Xcode `MARKETING_VERSION`, `CHANGELOG.md`, and the Git tag.
-- `CHANGELOG.md` follows Keep a Changelog and keeps an `Unreleased` section at the top.
+### Window Restoration
 
-### Release Checklist
+- **Problem**: Applying a saved frame after a SwiftUI window appears causes a visible jump from the default frame to the restored frame.
+- **Cause**: Post-creation AppKit frame mutation happens after the system has already shown the window.
+- **Avoid**: Delayed frame restoration, close/reopen workarounds, or timers.
+- **Use**: SwiftUI scene-level `defaultWindowPlacement` for the initial frame, then a narrow AppKit observer only to save frame changes.
 
-- Move user-facing changes from `Unreleased` into the new version section with the release date.
-- Keep internal documentation-only maintenance out of `CHANGELOG.md` unless it affects users or contributors.
-- Confirm `VERSION`, Xcode `MARKETING_VERSION`, the release heading, and the Git tag all use the same version.
-- Leave unrelated local files such as reference projects, Xcode user state, DerivedData, and build products unstaged.
+### Lyrics Scrolling Performance
+
+- **Problem**: Driving lyrics scrolling through broad SwiftUI layout changes can create janky highlighting and scrolling.
+- **Cause**: High-frequency playback updates can invalidate too much of the view tree.
+- **Avoid**: Full view rebuilds, unrelated animation state, or expensive per-frame effects.
+- **Use**: Keep lyric content in SwiftUI, use the AppKit scroll bridge only for deterministic offset animation, and limit blur to simple per-line radius changes.
+
+### Artwork And Background Transitions
+
+- **Problem**: Clearing artwork/background state during track changes causes a black or empty intermediate frame.
+- **Cause**: The old image is removed before the new image is ready.
+- **Avoid**: Resetting image state to `nil` as a visible transition step.
+- **Use**: Crossfade directly from old image to new image; songs without artwork should crossfade to the gray placeholder/background.
+
+### Database Compatibility
+
+- **Problem**: Changing models without considering SQLite persistence can lose user metadata.
+- **Cause**: Playlists, favorites, blocked songs, play counts, and sources are stored in SQLite and merged during scans.
+- **Avoid**: Renaming persisted fields, changing IDs, or replacing merge logic casually.
+- **Use**: Preserve persistent fields during rescans and add explicit migrations when schema changes are required.
+
+## Architecture Decisions
+
+### Xcode Project As Build Entry
+
+Mint Player is project-first rather than SwiftPM-first. Keep `MintPlayer.xcodeproj` as the source of truth for schemes, configurations, signing, and build settings.
+
+### SwiftUI With Narrow AppKit Bridges
+
+SwiftUI is used for app structure and most UI. AppKit bridges are intentionally narrow and exist where native macOS behavior is required or SwiftUI behavior is insufficient: `NSTableView`, `NSSearchField`, `NSWindow`, event monitors, and deterministic scroll control.
+
+### SQLite For Library State
+
+SQLite stores library state because the app needs durable records for songs, playlists, library sources, blocked songs, favorites, play counts, and scan metadata. `UserDefaults` is reserved for lightweight preferences and UI state.
+
+### Local-First Library Model
+
+The app indexes user-selected folders and keeps app metadata separately. It must not modify, move, or delete user audio files as part of library management.
+
+### Drill-In Artist Navigation
+
+Artists use a drill-in structure rather than a permanent multi-column layout. This preserves space for responsive grids and detail pages and keeps the main navigation consistent with Albums.
+
+## Agent Memory
+
+#### 2026-05-30
+
+- **Background**: Full-screen lyrics scrolling and highlighting needed smoother timing without excessive resource use.
+- **Problem**: SwiftUI-driven scrolling and highlighting could become janky when unrelated view updates happened at playback cadence.
+- **Decision**: Keep SwiftUI as the lyric content source, but use a focused AppKit `NSScrollView` bridge for deterministic scroll offsets and keep visual effects per-line.
+- **Impact**: Future lyrics changes should avoid broad state invalidation and should verify both scroll smoothness and highlight timing.
+
+#### 2026-05-30
+
+- **Background**: Lyrics and Settings windows needed remembered size/position.
+- **Problem**: Restoring frames after a window appears creates visible jumps.
+- **Decision**: Use scene-level `defaultWindowPlacement` for initial restoration and AppKit observers only to save new frames.
+- **Impact**: Do not reintroduce delayed frame mutation or close/reopen restoration workarounds.
+
+#### 2026-05-30
+
+- **Background**: Album and artist artwork needed continuous transitions between grid/detail states.
+- **Problem**: Applying matched geometry to too much UI caused clipping, size mismatch, or unnatural page transitions.
+- **Decision**: Apply `matchedGeometryEffect` only to artwork containers and keep text, tables, and page layout outside the shared geometry.
+- **Impact**: Future navigation animation work should keep matched geometry scoped to the visual element that should morph.
+
+#### 2026-05-31
+
+- **Background**: Toolbar search fields showed inconsistent vertical text positions after custom cell/editor adjustments.
+- **Problem**: Native `NSSearchField` draws placeholder and edited text through different internal paths.
+- **Decision**: Keep toolbar search fields plain and native; hide them on album/artist detail pages rather than repurposing them for detail-level search.
+- **Impact**: Do not replace `NSSearchFieldCell` or manually tune field-editor insets without a strong platform-specific reason.
