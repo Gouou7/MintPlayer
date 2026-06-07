@@ -17,6 +17,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var audioPlayer: AVAudioPlayer?
     private var playbackTimer: Timer?
     private var currentIndex: Int?
+    private var sourceQueue: [Song] = []
     private let volumeDefaultsKey = AppConfiguration.userDefaultsKey("player.volume")
     private let playbackSessionDefaultsKey = AppConfiguration.userDefaultsKey("player.session")
     private let playbackTimerInterval: TimeInterval = 0.2
@@ -55,11 +56,13 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func play(song: Song) {
         if queue.isEmpty {
             queue = [song]
+            sourceQueue = [song]
             currentIndex = 0
         } else if let index = queue.firstIndex(where: { $0.id == song.id }) {
             currentIndex = index
         } else {
             queue.append(song)
+            appendToSourceQueueIfNeeded(song)
             currentIndex = queue.count - 1
         }
 
@@ -68,8 +71,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 使用指定队列播放歌曲
     func play(song: Song, in songs: [Song]) {
-        queue = songs
-        currentIndex = songs.firstIndex(where: { $0.id == song.id })
+        configureQueue(startingWith: song, sourceSongs: songs, shuffled: isShuffleEnabled)
         start(song: song)
     }
 
@@ -82,17 +84,20 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 随机播放指定歌曲列表，并同步播放器随机状态
     func shuffle(songs: [Song]) {
-        let shuffledSongs = songs.shuffled()
-        guard let firstSong = shuffledSongs.first else { return }
+        guard let firstSong = songs.randomElement() else { return }
         isShuffleEnabled = true
-        play(song: firstSong, in: shuffledSongs)
+        configureQueue(startingWith: firstSong, sourceSongs: songs, shuffled: true)
+        start(song: firstSong)
     }
 
     // 更新播放队列
     func setQueue(_ songs: [Song]) {
-        queue = songs
         if let currentSong = currentSong {
-            currentIndex = songs.firstIndex(where: { $0.id == currentSong.id })
+            configureQueue(startingWith: currentSong, sourceSongs: songs, shuffled: isShuffleEnabled)
+        } else {
+            sourceQueue = songs
+            queue = isShuffleEnabled ? songs.shuffled() : songs
+            currentIndex = nil
         }
         updateRemoteCommandAvailability()
         savePlaybackSession()
@@ -104,6 +109,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
         let insertIndex = min((currentIndex ?? -1) + 1, queue.count)
         queue.insert(song, at: insertIndex)
+        insertIntoSourceQueueAfterCurrentIfNeeded(song)
         if currentIndex == nil {
             currentIndex = 0
         }
@@ -115,14 +121,17 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func addToQueue(_ song: Song) {
         guard !queue.contains(where: { $0.id == song.id }) else { return }
         queue.append(song)
+        appendToSourceQueueIfNeeded(song)
         updateRemoteCommandAvailability()
         savePlaybackSession()
     }
 
     // 从队列移除
     func removeFromQueue(songId: UUID) {
+        guard songId != currentSong?.id else { return }
         guard let index = queue.firstIndex(where: { $0.id == songId }) else { return }
         queue.remove(at: index)
+        sourceQueue.removeAll { $0.id == songId }
 
         if let currentIndex {
             if index < currentIndex {
@@ -137,8 +146,15 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 清空队列
     func clearQueue() {
-        queue.removeAll()
-        currentIndex = nil
+        if let currentSong {
+            queue = [currentSong]
+            sourceQueue = [currentSong]
+            currentIndex = 0
+        } else {
+            queue.removeAll()
+            sourceQueue.removeAll()
+            currentIndex = nil
+        }
         updateRemoteCommandAvailability()
         savePlaybackSession()
     }
@@ -152,8 +168,15 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         let restoredQueue = session.queue.compactMap { item in
             resolveSong(id: item.id, path: item.path, from: songs)
         }
-        queue = restoredQueue.isEmpty ? [restoredSong] : restoredQueue
-        currentIndex = queue.firstIndex(where: { $0.id == restoredSong.id }) ?? session.currentIndex
+        let restoredSourceQueue = session.sourceQueue?.compactMap { item in
+            resolveSong(id: item.id, path: item.path, from: songs)
+        } ?? []
+        queue = queueIncludingCurrentSong(restoredSong, songs: restoredQueue)
+        sourceQueue = queueIncludingCurrentSong(
+            restoredSong,
+            songs: restoredSourceQueue.isEmpty ? queue : restoredSourceQueue
+        )
+        currentIndex = queue.firstIndex(where: { $0.id == restoredSong.id })
         currentSong = restoredSong
         duration = restoredSong.duration
         currentTime = min(max(session.currentTime, 0), max(restoredSong.duration, 0))
@@ -301,14 +324,16 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 下一曲
     func next() {
-        guard !queue.isEmpty else { return }
+        guard !queue.isEmpty else {
+            finishPlayback()
+            return
+        }
 
         let index = currentIndex ?? queue.firstIndex(where: { $0.id == currentSong?.id }) ?? 0
 
         guard index < queue.count - 1 else {
             if isRepeatEnabled {
-                currentIndex = 0
-                start(song: queue[0])
+                startNextQueueCycle()
             } else {
                 finishPlayback()
             }
@@ -325,6 +350,8 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         isShuffleEnabled.toggle()
         if isShuffleEnabled {
             shuffleUpcomingQueue()
+        } else {
+            restoreSourceQueueOrder()
         }
         updateRemoteCommandAvailability()
         savePlaybackSession()
@@ -407,22 +434,107 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     private func shuffleUpcomingQueue() {
-        guard !queue.isEmpty else { return }
-
-        guard let currentSong,
-              let index = currentIndex ?? queue.firstIndex(where: { $0.id == currentSong.id }) else {
-            queue.shuffle()
+        guard !queue.isEmpty else {
+            queue = sourceQueue.shuffled()
             currentIndex = nil
             return
         }
 
-        let upcomingSongs = queue.enumerated()
-            .filter { $0.offset != index }
-            .map(\.element)
+        guard let currentSong,
+              (currentIndex ?? queue.firstIndex(where: { $0.id == currentSong.id })) != nil else {
+            if sourceQueue.isEmpty {
+                sourceQueue = queue
+            }
+            queue = sourceQueue.shuffled()
+            currentIndex = nil
+            return
+        }
+
+        if sourceQueue.isEmpty {
+            sourceQueue = queue
+        }
+
+        let upcomingSongs = sourceQueue
+            .filter { $0.id != currentSong.id }
             .shuffled()
 
         queue = [currentSong] + upcomingSongs
         currentIndex = 0
+    }
+
+    private func restoreSourceQueueOrder() {
+        guard !sourceQueue.isEmpty else { return }
+
+        if let currentSong, !sourceQueue.contains(where: { $0.id == currentSong.id }) {
+            sourceQueue.insert(currentSong, at: 0)
+        }
+
+        queue = sourceQueue
+        currentIndex = currentSong.flatMap { currentSong in
+            queue.firstIndex { $0.id == currentSong.id }
+        }
+    }
+
+    private func startNextQueueCycle() {
+        guard let currentSong else {
+            finishPlayback()
+            return
+        }
+
+        if isShuffleEnabled {
+            var nextCycle = (sourceQueue.isEmpty ? queue : sourceQueue).shuffled()
+            if nextCycle.count > 1,
+               nextCycle.first?.id == currentSong.id,
+               let differentSongIndex = nextCycle.firstIndex(where: { $0.id != currentSong.id }) {
+                nextCycle.swapAt(0, differentSongIndex)
+            }
+            queue = nextCycle
+        } else if !sourceQueue.isEmpty {
+            queue = sourceQueue
+        }
+
+        guard let firstSong = queue.first else {
+            finishPlayback()
+            return
+        }
+
+        currentIndex = 0
+        start(song: firstSong)
+    }
+
+    private func configureQueue(startingWith song: Song, sourceSongs: [Song], shuffled: Bool) {
+        sourceQueue = queueIncludingCurrentSong(song, songs: sourceSongs)
+
+        if shuffled {
+            queue = [song] + sourceQueue.filter { $0.id != song.id }.shuffled()
+            currentIndex = 0
+        } else {
+            queue = sourceQueue
+            currentIndex = queue.firstIndex { $0.id == song.id }
+        }
+    }
+
+    private func queueIncludingCurrentSong(_ song: Song, songs: [Song]) -> [Song] {
+        guard !songs.contains(where: { $0.id == song.id }) else { return songs }
+        return [song] + songs
+    }
+
+    private func appendToSourceQueueIfNeeded(_ song: Song) {
+        guard !sourceQueue.contains(where: { $0.id == song.id }) else { return }
+        sourceQueue.append(song)
+    }
+
+    private func insertIntoSourceQueueAfterCurrentIfNeeded(_ song: Song) {
+        guard !sourceQueue.contains(where: { $0.id == song.id }) else { return }
+
+        guard let currentSong,
+              let sourceIndex = sourceQueue.firstIndex(where: { $0.id == currentSong.id })
+        else {
+            sourceQueue.append(song)
+            return
+        }
+
+        sourceQueue.insert(song, at: min(sourceIndex + 1, sourceQueue.count))
     }
 
     private func finishPlayback() {
@@ -613,6 +725,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             currentSongPath: currentSong.path,
             currentTime: currentTime,
             queue: queue.map { PlaybackSession.QueueItem(id: $0.id, path: $0.path) },
+            sourceQueue: sourceQueue.map { PlaybackSession.QueueItem(id: $0.id, path: $0.path) },
             currentIndex: currentIndex ?? queue.firstIndex(where: { $0.id == currentSong.id }),
             isShuffleEnabled: isShuffleEnabled,
             isRepeatEnabled: isRepeatEnabled
@@ -660,6 +773,7 @@ private struct PlaybackSession: Codable {
     let currentSongPath: String
     let currentTime: TimeInterval
     let queue: [QueueItem]
+    let sourceQueue: [QueueItem]?
     let currentIndex: Int?
     let isShuffleEnabled: Bool
     let isRepeatEnabled: Bool

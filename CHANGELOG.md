@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - None.
 
 ### Fixed
+- Fixed automatic track advancement, shuffle order restoration, repeated shuffle cycles, and clearing the upcoming queue.
 - Fixed artist artwork transitions clipping the moving avatar to only the start and end circles.
 - Fixed selected song rows using low-contrast white text in the light theme.
 - Fixed Settings window resizing, scroll coverage, and top scroll edge behavior.

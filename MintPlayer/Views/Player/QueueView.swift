@@ -22,7 +22,7 @@ struct QueueView: View {
                             Section(settings.text(.history)) {
                                 ForEach(Array(historySongs.enumerated()), id: \.offset) { index, song in
                                     queueRow(song: song, isCurrent: false) {
-                                        audioPlayer.play(song: song)
+                                        audioPlayer.play(song: song, in: [song])
                                     }
                                     .id("history-\(index)-\(song.id)")
                                     .listRowBackground(Color.clear)
@@ -42,7 +42,7 @@ struct QueueView: View {
                             Section(settings.text(.upNext)) {
                                 ForEach(upNextSongs, id: \.id) { song in
                                     queueRow(song: song, isCurrent: false) {
-                                        audioPlayer.play(song: song, in: audioPlayer.queue)
+                                        audioPlayer.play(song: song)
                                     }
                                     .contextMenu {
                                         Button(role: .destructive) {
@@ -123,7 +123,7 @@ struct QueueView: View {
                     .symbolRenderingMode(.hierarchical)
             }
             .buttonStyle(.borderless)
-            .disabled(audioPlayer.queue.isEmpty)
+            .disabled(upNextSongs.isEmpty)
             .help(settings.text(.clearQueue))
 
             Button(action: { isVisible = false }) {
