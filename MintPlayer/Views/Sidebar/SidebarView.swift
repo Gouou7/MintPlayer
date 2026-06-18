@@ -24,11 +24,10 @@ struct SidebarView: View {
                         } label: {
                             SidebarRow(
                                 title: item.title(language: settings.effectiveLanguage),
-                                systemImage: item.systemImage,
-                                isSelected: selection == item.selection
+                                systemImage: item.systemImage
                             )
                         }
-                        .buttonStyle(MintRowButtonStyle(isSelected: selection == item.selection))
+                        .buttonStyle(MintSidebarRowButtonStyle(isSelected: selection == item.selection))
                     }
                     .onMove(perform: moveLibraryItems)
                 }
@@ -46,11 +45,10 @@ struct SidebarView: View {
                                 } label: {
                                     SidebarRow(
                                         title: playlist.name,
-                                        systemImage: "music.note.list",
-                                        isSelected: selection == .playlist(playlist.id)
+                                        systemImage: "music.note.list"
                                     )
                                 }
-                                .buttonStyle(MintRowButtonStyle(isSelected: selection == .playlist(playlist.id), isHighlighted: isDropTargeted))
+                                .buttonStyle(MintSidebarRowButtonStyle(isSelected: selection == .playlist(playlist.id), isHighlighted: isDropTargeted))
                                 .contextMenu {
                                     Button {
                                         editPlaylist(playlist)
@@ -103,11 +101,10 @@ struct SidebarView: View {
                                 } label: {
                                     SidebarRow(
                                         title: source.name,
-                                        systemImage: "folder.fill",
-                                        isSelected: selection == .folder(source.id)
+                                        systemImage: "folder.fill"
                                     )
                                 }
-                                .buttonStyle(MintRowButtonStyle(isSelected: selection == .folder(source.id)))
+                                .buttonStyle(MintSidebarRowButtonStyle(isSelected: selection == .folder(source.id)))
                                 .contextMenu {
                                     Button {
                                         folderPendingDeletion = source

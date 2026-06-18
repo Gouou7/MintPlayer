@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- None.
+
+### Changed
+- None.
+
+### Deprecated
+- None.
+
+### Removed
+- None.
+
+### Fixed
+- None.
+
+### Security
+- None.
+
+## [0.8.0] - 2026-06-18
+
+### Added
 - Added continuous artwork transitions between album and artist grids and their detail pages.
 - Added an optional full-screen lyrics blur effect with a Settings toggle.
 - Added remembered window size and placement for the lyrics and Settings windows.
@@ -19,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed the sidebar Folders section to Library and refined its add-button color and hover area.
 - Updated Library settings rows to show the library name, path, last scan time, and blocked songs more compactly.
 - Hid album and artist toolbar search fields while detail pages are open.
+- Updated sidebar highlighting so icons use the theme color only while the window is active, with a neutral selected-row background.
 
 ### Deprecated
 - None.
