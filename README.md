@@ -19,9 +19,12 @@ Mint Player is a native macOS music player for managing and playing a local musi
 
 ## Screenshots
 
-![Mint Player main window](docs/images/MintPlayer0.3.0Main.png)
+![Mint Player main window](docs/images/MintPlayer0.8.0Main.png)
 
-![Mint Player lyrics window](docs/images/MintPlayer0.3.0FullScreen.png)
+![Mint Player sidebar window](docs/images/MintPlayer0.8.0MainSidebar.png)
+
+![Mint Player lyrics window](docs/images/MintPlayer0.8.0MainLyric.png)
+
 
 ## Requirements
 
