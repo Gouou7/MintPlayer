@@ -120,18 +120,12 @@ struct NativeSongTableView: NSViewRepresentable {
 
     private func configureBackground(for style: Style, tableView: NSTableView, scrollView: NSScrollView) {
         switch style {
-        case .detailSongs:
+        case .detailed, .compactFolder, .detailSongs:
             tableView.backgroundColor = .clear
             scrollView.drawsBackground = false
             scrollView.backgroundColor = .clear
             scrollView.contentView.drawsBackground = false
             scrollView.contentView.backgroundColor = .clear
-        case .detailed, .compactFolder:
-            tableView.backgroundColor = NativeSongTableColors.backgroundColor
-            scrollView.drawsBackground = true
-            scrollView.backgroundColor = NativeSongTableColors.backgroundColor
-            scrollView.contentView.drawsBackground = true
-            scrollView.contentView.backgroundColor = NativeSongTableColors.backgroundColor
         }
     }
 }
@@ -173,17 +167,110 @@ private final class InteractiveSongTableHeaderView: NSTableHeaderView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NativeSongTableColors.backgroundColor.setFill()
+        drawBackground(in: dirtyRect)
+        drawHeaderCells(in: dirtyRect)
+        drawBottomSeparator()
+    }
+
+    private func drawBackground(in dirtyRect: NSRect) {
+        NSColor.windowBackgroundColor.setFill()
         dirtyRect.fill()
-        super.draw(dirtyRect)
+    }
+
+    private func drawHeaderCells(in dirtyRect: NSRect) {
+        guard let tableView else { return }
+
+        for columnIndex in 0..<tableView.numberOfColumns {
+            let columnRect = headerRect(ofColumn: columnIndex)
+            guard columnRect.intersects(dirtyRect) else { continue }
+
+            let column = tableView.tableColumns[columnIndex]
+            column.headerCell.draw(withFrame: columnRect, in: self)
+
+            if isColumnSorted(column, in: tableView) {
+                drawSortIndicator(in: columnRect)
+            }
+        }
+    }
+
+    private func isColumnSorted(_ column: NSTableColumn, in tableView: NSTableView) -> Bool {
+        guard let sortedKey = tableView.sortDescriptors.first?.key,
+              let columnKey = column.sortDescriptorPrototype?.key
+        else { return false }
+
+        return sortedKey == columnKey
+    }
+
+    private func drawSortIndicator(in columnRect: NSRect) {
+        guard columnRect.width > NativeSongTableMetrics.headerSortIndicatorWidth else { return }
+
+        let indicatorSize: CGFloat = 8
+        let rect = NSRect(
+            x: columnRect.maxX - NativeSongTableMetrics.headerTextInset - indicatorSize,
+            y: columnRect.midY - indicatorSize / 2,
+            width: indicatorSize,
+            height: indicatorSize
+        )
+        let path = NSBezierPath()
+
+        if isSortedAscending {
+            path.move(to: NSPoint(x: rect.minX + 1, y: rect.maxY - 2))
+            path.line(to: NSPoint(x: rect.midX, y: rect.minY + 2))
+            path.line(to: NSPoint(x: rect.maxX - 1, y: rect.maxY - 2))
+        } else {
+            path.move(to: NSPoint(x: rect.minX + 1, y: rect.minY + 2))
+            path.line(to: NSPoint(x: rect.midX, y: rect.maxY - 2))
+            path.line(to: NSPoint(x: rect.maxX - 1, y: rect.minY + 2))
+        }
+
+        NSColor.secondaryLabelColor.withAlphaComponent(0.72).setStroke()
+        path.lineWidth = 1.6
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.stroke()
+    }
+
+    private var isSortedAscending: Bool {
+        tableView?.sortDescriptors.first?.ascending ?? true
+    }
+
+    private func drawBottomSeparator() {
+        let y = isFlipped ? bounds.maxY - 1 : bounds.minY
+        let rect = NSRect(x: bounds.minX, y: y, width: bounds.width, height: 1)
+        NSColor.separatorColor.withAlphaComponent(0.12).setFill()
+        rect.fill()
     }
 }
 
-private final class OpaqueSongTableHeaderCell: NSTableHeaderCell {
+private final class TransparentSongTableHeaderCell: NSTableHeaderCell {
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
-        NativeSongTableColors.backgroundColor.setFill()
-        cellFrame.fill()
-        drawInterior(withFrame: cellFrame.insetBy(dx: 6, dy: 0), in: controlView)
+        let title = stringValue
+        guard !title.isEmpty else { return }
+
+        let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = alignment
+        paragraphStyle.lineBreakMode = .byTruncatingTail
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: paragraphStyle
+        ]
+        let attributedTitle = NSAttributedString(string: title, attributes: attributes)
+        let textSize = attributedTitle.size()
+        let horizontalInset = min(
+            NativeSongTableMetrics.headerTextInset,
+            max(4, floor(cellFrame.width * 0.12))
+        )
+        let textRect = NSRect(
+            x: cellFrame.minX + horizontalInset,
+            y: cellFrame.midY - ceil(textSize.height) / 2,
+            width: max(0, cellFrame.width - horizontalInset * 2),
+            height: ceil(textSize.height)
+        )
+
+        attributedTitle.draw(in: textRect)
     }
 }
 
@@ -225,15 +312,6 @@ private final class InsetSongScrollView: NSScrollView {
     }
 }
 
-private enum NativeSongTableColors {
-    static let backgroundColor = NSColor(name: nil) { appearance in
-        let match = appearance.bestMatch(from: [.darkAqua, .aqua])
-        return match == .darkAqua
-            ? NSColor(calibratedRed: 0.105, green: 0.101, blue: 0.097, alpha: 1)
-            : .white
-    }
-}
-
 private extension NSEdgeInsets {
     func isApproximatelyEqual(to other: NSEdgeInsets) -> Bool {
         abs(top - other.top) < 0.5 &&
@@ -267,6 +345,9 @@ private enum NativeSongTableMetrics {
     static let detailedArtistMinWidth: CGFloat = 44
     static let detailSongMinWidth: CGFloat = 64
     static let detailIndexWidth: CGFloat = 28
+    static let headerHeight: CGFloat = 26
+    static let headerTextInset: CGFloat = 10
+    static let headerSortIndicatorWidth: CGFloat = 22
     static let maxHeaderColumnWidthRatio: CGFloat = 0.5
 }
 
@@ -294,7 +375,9 @@ extension NativeSongTableView {
             tableView.rowHeight = style.rowHeight
 
             if style.showsHeader {
-                let headerView = InteractiveSongTableHeaderView()
+                let headerView = InteractiveSongTableHeaderView(
+                    frame: NSRect(x: 0, y: 0, width: 0, height: NativeSongTableMetrics.headerHeight)
+                )
                 headerView.menuProvider = self
                 tableView.headerView = headerView
             } else {
@@ -500,6 +583,7 @@ extension NativeSongTableView {
             guard !isApplyingSortDescriptors else { return }
             guard let descriptor = tableView.sortDescriptors.first else { return }
             let order: SortOrder = descriptor.ascending ? .forward : .reverse
+            tableView.headerView?.needsDisplay = true
 
             switch descriptor.key {
             case "title":
@@ -532,6 +616,7 @@ extension NativeSongTableView {
             guard tableView.sortDescriptors.first != descriptor else { return }
             isApplyingSortDescriptors = true
             tableView.sortDescriptors = [descriptor]
+            tableView.headerView?.needsDisplay = true
             isApplyingSortDescriptors = false
         }
 
@@ -676,7 +761,9 @@ extension NativeSongTableView {
         private func addColumn(_ id: NativeSongColumn, title: String, width: CGFloat, minWidth: CGFloat, sortKey: String? = nil) {
             guard let tableView else { return }
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id.rawValue))
-            column.headerCell = OpaqueSongTableHeaderCell(textCell: title)
+            let headerCell = TransparentSongTableHeaderCell(textCell: title)
+            headerCell.alignment = headerAlignment(for: id)
+            column.headerCell = headerCell
             column.minWidth = minWidth
             column.maxWidth = max(minWidth, headerColumnMaxWidth())
             column.width = min(column.maxWidth, max(minWidth, savedColumnWidth(for: id, style: parent.style) ?? width))
@@ -692,6 +779,15 @@ extension NativeSongTableView {
             }
 
             tableView.addTableColumn(column)
+        }
+
+        private func headerAlignment(for id: NativeSongColumn) -> NSTextAlignment {
+            switch id {
+            case .favorite, .playCount, .index:
+                return .center
+            default:
+                return .left
+            }
         }
 
         private func column(_ id: NativeSongColumn) -> NSTableColumn? {

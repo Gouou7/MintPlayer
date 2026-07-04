@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - None.
 
 ### Changed
-- None.
+- Updated the Songs and Favorites table background to use the native macOS window background.
+- Refined the Songs and Favorites table header with a lower native-colored surface, centered labels, and higher-contrast sort indicators.
 
 ### Deprecated
 - None.

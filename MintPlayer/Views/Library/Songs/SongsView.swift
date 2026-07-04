@@ -219,10 +219,5 @@ struct SongsView: View {
 }
 
 private enum NativeSongBackgroundColor {
-    static let value = NSColor(name: nil) { appearance in
-        let match = appearance.bestMatch(from: [.darkAqua, .aqua])
-        return match == .darkAqua
-            ? NSColor(calibratedRed: 0.105, green: 0.101, blue: 0.097, alpha: 1)
-            : .white
-    }
+    static let value = NSColor.windowBackgroundColor
 }
