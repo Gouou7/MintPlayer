@@ -27,7 +27,7 @@ struct NativeToolbarSearchField: NSViewRepresentable {
         searchField.target = context.coordinator
         searchField.action = #selector(Coordinator.searchFieldDidChange(_:))
         searchField.delegate = context.coordinator
-        searchField.sendsSearchStringImmediately = true
+        searchField.sendsSearchStringImmediately = false
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.widthAnchor.constraint(equalToConstant: 245).isActive = true
         return searchField
@@ -36,25 +36,66 @@ struct NativeToolbarSearchField: NSViewRepresentable {
     func updateNSView(_ nsView: NSSearchField, context: Context) {
         context.coordinator.text = $text
         nsView.placeholderString = prompt
-        if nsView.stringValue != text {
+        if !context.coordinator.isEditing, nsView.stringValue != text {
             nsView.stringValue = text
         }
     }
 
     final class Coordinator: NSObject, NSSearchFieldDelegate {
+        private static let searchDelay: TimeInterval = 0.25
+
         var text: Binding<String>
+        var isEditing = false
+        private var pendingSearch: DispatchWorkItem?
 
         init(text: Binding<String>) {
             self.text = text
         }
 
         @objc func searchFieldDidChange(_ sender: NSSearchField) {
-            text.wrappedValue = sender.stringValue
+            commitSearchText(from: sender)
         }
 
         func controlTextDidChange(_ notification: Notification) {
             guard let searchField = notification.object as? NSSearchField else { return }
+            guard !hasMarkedText(in: searchField) else { return }
+
+            scheduleSearchTextCommit(from: searchField)
+        }
+
+        func controlTextDidBeginEditing(_ notification: Notification) {
+            isEditing = true
+        }
+
+        func controlTextDidEndEditing(_ notification: Notification) {
+            guard let searchField = notification.object as? NSSearchField else { return }
+            defer { isEditing = false }
+            guard !hasMarkedText(in: searchField) else { return }
+
+            commitSearchText(from: searchField)
+        }
+
+        private func scheduleSearchTextCommit(from searchField: NSSearchField) {
+            pendingSearch?.cancel()
+
+            let searchText = searchField.stringValue
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.text.wrappedValue = searchText
+            }
+            pendingSearch = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.searchDelay, execute: workItem)
+        }
+
+        private func commitSearchText(from searchField: NSSearchField) {
+            pendingSearch?.cancel()
+            pendingSearch = nil
             text.wrappedValue = searchField.stringValue
+        }
+
+        private func hasMarkedText(in searchField: NSSearchField) -> Bool {
+            guard let editor = searchField.currentEditor() as? NSTextView else { return false }
+            return editor.hasMarkedText()
         }
     }
 }

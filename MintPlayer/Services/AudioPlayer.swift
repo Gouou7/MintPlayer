@@ -84,9 +84,14 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 随机播放指定歌曲列表，并同步播放器随机状态
     func shuffle(songs: [Song]) {
-        guard let firstSong = songs.randomElement() else { return }
+        guard !songs.isEmpty else { return }
+
         isShuffleEnabled = true
-        configureQueue(startingWith: firstSong, sourceSongs: songs, shuffled: true)
+        sourceQueue = songs
+        queue = freshlyShuffled(songs, avoiding: queue)
+        currentIndex = 0
+
+        guard let firstSong = queue.first else { return }
         start(song: firstSong)
     }
 
@@ -512,6 +517,22 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             queue = sourceQueue
             currentIndex = queue.firstIndex { $0.id == song.id }
         }
+    }
+
+    private func freshlyShuffled(_ songs: [Song], avoiding previousQueue: [Song]) -> [Song] {
+        guard songs.count > 1 else { return songs }
+
+        let previousOrder = previousQueue.map(\.id)
+        var generator = SystemRandomNumberGenerator()
+        var shuffledSongs = songs
+        shuffledSongs.shuffle(using: &generator)
+
+        if shuffledSongs.map(\.id) == previousOrder {
+            let swapIndex = Int.random(in: 1..<shuffledSongs.count, using: &generator)
+            shuffledSongs.swapAt(0, swapIndex)
+        }
+
+        return shuffledSongs
     }
 
     private func queueIncludingCurrentSong(_ song: Song, songs: [Song]) -> [Song] {
