@@ -21,39 +21,6 @@ struct ArtistsView: View {
         }
     }
 
-    private var activeSearchText: Binding<String> {
-        Binding(
-            get: {
-                if selectedAlbum != nil {
-                    return albumSearchText
-                }
-                if selectedArtist != nil {
-                    return artistSearchText
-                }
-                return searchText
-            },
-            set: { value in
-                if selectedAlbum != nil {
-                    albumSearchText = value
-                } else if selectedArtist != nil {
-                    artistSearchText = value
-                } else {
-                    searchText = value
-                }
-            }
-        )
-    }
-
-    private var searchPrompt: String {
-        if selectedAlbum != nil {
-            return settings.text(.searchInAlbum)
-        }
-        if selectedArtist != nil {
-            return settings.text(.searchInArtist)
-        }
-        return settings.text(.searchArtists)
-    }
-
     var body: some View {
         ZStack(alignment: .top) {
             content
@@ -61,7 +28,10 @@ struct ArtistsView: View {
         .toolbar {
             if selectedArtist == nil && selectedAlbum == nil {
                 ToolbarItem(placement: .primaryAction) {
-                    NativeToolbarSearchField(text: activeSearchText, prompt: searchPrompt)
+                    NativeToolbarSearchField(
+                        text: $searchText,
+                        prompt: settings.text(.searchArtists)
+                    )
                 }
             }
         }

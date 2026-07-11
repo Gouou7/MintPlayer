@@ -41,6 +41,10 @@ struct NativeToolbarSearchField: NSViewRepresentable {
         }
     }
 
+    static func dismantleNSView(_ nsView: NSSearchField, coordinator: Coordinator) {
+        coordinator.cancelPendingSearch()
+    }
+
     final class Coordinator: NSObject, NSSearchFieldDelegate {
         private static let searchDelay: TimeInterval = 0.25
 
@@ -79,17 +83,21 @@ struct NativeToolbarSearchField: NSViewRepresentable {
             pendingSearch?.cancel()
 
             let searchText = searchField.stringValue
-            let workItem = DispatchWorkItem { [weak self] in
-                guard let self else { return }
-                self.text.wrappedValue = searchText
+            let targetText = text
+            let workItem = DispatchWorkItem {
+                targetText.wrappedValue = searchText
             }
             pendingSearch = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.searchDelay, execute: workItem)
         }
 
-        private func commitSearchText(from searchField: NSSearchField) {
+        func cancelPendingSearch() {
             pendingSearch?.cancel()
             pendingSearch = nil
+        }
+
+        private func commitSearchText(from searchField: NSSearchField) {
+            cancelPendingSearch()
             text.wrappedValue = searchField.stringValue
         }
 

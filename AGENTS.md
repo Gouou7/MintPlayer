@@ -205,10 +205,17 @@ Release builds use `Mint Player.app` and the release Application Support/prefere
 
 ### Native Search Field Layout
 
-- **Problem**: Replacing `NSSearchFieldCell` or manually changing the field editor can make placeholder text, edited placeholder text, and typed text use different vertical positions.
-- **Cause**: `NSSearchField` has separate native drawing/editing paths for the placeholder, editor, search icon, clear button, and focus ring.
-- **Avoid**: Custom search-field cells or manual editor insets for toolbar search fields unless there is a proven native-control bug.
-- **Use**: Plain `NSSearchField` in `NSViewRepresentable`, with only binding, delegate/action, prompt, and width configuration when possible.
+- **Problem**: Replacing `NSSearchFieldCell` or manually changing the field editor can misalign text. Publishing every text change can also treat input method marked text as a completed query, interrupting Chinese composition and repeatedly filtering large libraries.
+- **Cause**: `NSSearchField` has separate native drawing/editing paths, while `controlTextDidChange` also fires during input method composition.
+- **Avoid**: Custom search-field cells, manual editor insets, immediate search-string delivery, or writing marked text into SwiftUI search state.
+- **Use**: Keep a plain `NSSearchField` in `NSViewRepresentable`; ignore changes while its editor has marked text, debounce completed edits against the binding active when the edit occurred, cancel pending work when dismantled, commit immediately on submit or end editing, and do not overwrite the field from stale binding state while it is being edited. Keep list-level and detail-level search state in separate bindings.
+
+### Shuffle Queue Generation
+
+- **Problem**: Repeatedly invoking Shuffle for the same list can appear deterministic when a valid random permutation happens to match the current queue.
+- **Cause**: A random shuffle is allowed to return the previous ordering, especially for small song lists.
+- **Avoid**: Assuming every call to `shuffled()` necessarily produces a visibly different order.
+- **Use**: Generate a fresh queue with `SystemRandomNumberGenerator` and, when there is more than one song, change the permutation if it exactly matches the current queue.
 
 ### Window Restoration
 

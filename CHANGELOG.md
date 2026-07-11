@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - None.
 
 ### Fixed
-- None.
+- Fixed toolbar searches treating Chinese input method marked text as completed queries, interrupting composition, repeatedly filtering results, or leaking a list query into the selected artist or album detail page.
+- Fixed consecutive shuffle actions being allowed to produce the same queue order for the same song list.
 
 ### Security
 - None.

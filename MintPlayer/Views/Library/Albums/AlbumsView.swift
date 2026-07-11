@@ -4,6 +4,7 @@ struct AlbumsView: View {
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
     @State private var searchText = ""
+    @State private var albumSearchText = ""
     @State private var selectedAlbum: AlbumSummary?
     @Namespace private var albumArtworkTransitionNamespace
 
@@ -24,11 +25,12 @@ struct AlbumsView: View {
             if let selectedAlbum {
                 AlbumDetailView(
                     album: selectedAlbum,
-                    searchText: $searchText,
+                    searchText: $albumSearchText,
                     artworkTransitionNamespace: albumArtworkTransitionNamespace,
                     artworkTransitionID: selectedAlbum.id
                 ) {
                     withAnimation(.smooth(duration: 0.32)) {
+                        albumSearchText = ""
                         self.selectedAlbum = nil
                     }
                 }
@@ -59,6 +61,7 @@ struct AlbumsView: View {
                     ForEach(filteredAlbums, id: \.id) { album in
                         Button {
                             withAnimation(.smooth(duration: 0.32)) {
+                                albumSearchText = ""
                                 selectedAlbum = album
                             }
                         } label: {
