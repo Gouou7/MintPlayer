@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- None.
+
+### Changed
+- None.
+
+### Deprecated
+- None.
+
+### Removed
+- None.
+
+### Fixed
+- None.
+
+### Security
+- None.
+
+## [0.10.0] - 2026-07-20
+
+### Added
 - Added a configurable embedded lyrics page that slides over the main window while retaining the existing separate lyrics window.
 
 ### Changed
