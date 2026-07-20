@@ -11,11 +11,11 @@ Mint Player is a native macOS music player for managing and playing a local musi
 - Songs, Albums, Artists, Favorites, playlists, and library-folder views.
 - Native song tables with selection, sorting, column customization, context menus, drag support, and double-click playback.
 - Album and artist browsing with artwork thumbnails and animated artwork transitions into detail pages.
-- Standalone lyrics window with synced local `.lrc` lyrics, smooth scrolling, optional inactive-line blur, and remembered window size.
+- Embedded full-window or standalone lyrics presentation with synced local `.lrc` lyrics, smooth scrolling, optional inactive-line blur, and remembered standalone window size.
 - Play queue, shuffle, repeat, previous/next controls, playback restoration, and Dock menu controls.
 - Favorites, blocked songs, qualified play-count tracking, and persisted library state.
 - System media integration through Now Playing and remote media controls.
-- Settings for theme, language, lyrics blur, library folders, rescanning, and blocked-song management.
+- Settings for theme, language, lyrics presentation, lyrics blur, library folders, rescanning, and blocked-song management.
 
 ## Screenshots
 
@@ -48,7 +48,9 @@ Rescanning a library folder updates metadata and artwork for the indexed files. 
 
 ## Lyrics
 
-Mint Player supports local `.lrc` lyrics. The standalone lyrics window follows playback, highlights the active line, and can seek when lyrics are tapped. Inactive lyric blur can be turned on or off in Settings.
+Mint Player supports local `.lrc` lyrics. Lyrics follow playback, highlight the active line, and can seek when a lyric is clicked. In Settings, choose whether clicking the player artwork opens lyrics as an immersive overlay inside the main window or in the existing standalone window.
+
+The embedded lyrics page slides over the entire library interface while preserving the current sidebar, selection, scrolling, and detail-navigation state underneath. Close it with the toolbar button or `Esc`. The standalone mode remains resizable and remembers its window size and placement. Inactive lyric blur can be turned on or off independently.
 
 ## Build
 

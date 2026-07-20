@@ -4,11 +4,13 @@ import SwiftUI
 class SettingsManager: ObservableObject {
     @Published var theme: ThemeMode = .dark
     @Published var language: AppLanguage = .system
+    @Published var lyricsPresentationMode: LyricsPresentationMode = .embedded
     @Published var lyricsBlurEnabled = true
 
     private let userDefaults = UserDefaults.standard
     private let themeKey = AppConfiguration.userDefaultsKey("settings.theme")
     private let languageKey = AppConfiguration.userDefaultsKey("settings.language")
+    private let lyricsPresentationModeKey = AppConfiguration.userDefaultsKey("settings.lyrics.presentationMode")
     private let lyricsBlurEnabledKey = AppConfiguration.userDefaultsKey("settings.lyrics.blurEnabled")
 
     init() {
@@ -23,6 +25,10 @@ class SettingsManager: ObservableObject {
         if let languageString = userDefaults.string(forKey: languageKey), let savedLanguage = AppLanguage(rawValue: languageString) {
             language = savedLanguage
         }
+        if let modeString = userDefaults.string(forKey: lyricsPresentationModeKey),
+           let savedMode = LyricsPresentationMode(rawValue: modeString) {
+            lyricsPresentationMode = savedMode
+        }
         if userDefaults.object(forKey: lyricsBlurEnabledKey) != nil {
             lyricsBlurEnabled = userDefaults.bool(forKey: lyricsBlurEnabledKey)
         }
@@ -32,6 +38,7 @@ class SettingsManager: ObservableObject {
     func saveSettings() {
         userDefaults.set(theme.rawValue, forKey: themeKey)
         userDefaults.set(language.rawValue, forKey: languageKey)
+        userDefaults.set(lyricsPresentationMode.rawValue, forKey: lyricsPresentationModeKey)
         userDefaults.set(lyricsBlurEnabled, forKey: lyricsBlurEnabledKey)
     }
 
@@ -43,6 +50,11 @@ class SettingsManager: ObservableObject {
 
     func updateLanguage(_ newLanguage: AppLanguage) {
         language = newLanguage
+        saveSettings()
+    }
+
+    func updateLyricsPresentationMode(_ newMode: LyricsPresentationMode) {
+        lyricsPresentationMode = newMode
         saveSettings()
     }
 
@@ -75,6 +87,11 @@ class SettingsManager: ObservableObject {
     }
 }
 
+enum LyricsPresentationMode: String, CaseIterable {
+    case embedded
+    case separateWindow
+}
+
 enum AppLanguage: String, CaseIterable {
     case system = "System"
     case english = "English"
@@ -102,6 +119,10 @@ enum L10n {
         case languageDescription
         case playbackPage
         case lyrics
+        case lyricsPresentation
+        case lyricsPresentationDescription
+        case embeddedLyrics
+        case separateLyricsWindow
         case lyricsBlur
         case lyricsBlurEffect
         case lyricsBlurDescription
@@ -247,6 +268,10 @@ enum L10n {
         .languageDescription: "Choose the language used by Mint Player text.",
         .playbackPage: "Playback Page",
         .lyrics: "Lyrics",
+        .lyricsPresentation: "Lyrics Presentation",
+        .lyricsPresentationDescription: "Choose whether lyrics open inside the main window or in a separate window.",
+        .embeddedLyrics: "Inside Main Window",
+        .separateLyricsWindow: "Separate Window",
         .lyricsBlur: "Blur inactive lyrics",
         .lyricsBlurEffect: "Lyrics Blur Effect",
         .lyricsBlurDescription: "Slightly blur lyrics farther from the current line.",
@@ -387,6 +412,10 @@ enum L10n {
         .languageDescription: "选择 Mint Player 界面文本使用的语言。",
         .playbackPage: "播放页面",
         .lyrics: "歌词",
+        .lyricsPresentation: "歌词打开方式",
+        .lyricsPresentationDescription: "选择在主窗口内显示歌词，或使用独立歌词窗口。",
+        .embeddedLyrics: "主窗口内嵌",
+        .separateLyricsWindow: "独立窗口",
         .lyricsBlur: "模糊非当前歌词",
         .lyricsBlurEffect: "歌词模糊效果",
         .lyricsBlurDescription: "对远离当前行的歌词添加轻微模糊。",

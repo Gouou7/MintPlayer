@@ -3,6 +3,7 @@ import SwiftUI
 struct AlbumsView: View {
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
+    @Environment(\.isPlayerOverlayPresented) private var isPlayerOverlayPresented
     @State private var searchText = ""
     @State private var albumSearchText = ""
     @State private var selectedAlbum: AlbumSummary?
@@ -42,7 +43,7 @@ struct AlbumsView: View {
 
         }
         .toolbar {
-            if selectedAlbum == nil {
+            if selectedAlbum == nil && !isPlayerOverlayPresented {
                 ToolbarItem(placement: .primaryAction) {
                     NativeToolbarSearchField(
                         text: $searchText,
@@ -121,6 +122,7 @@ struct AlbumDetailView: View {
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
+    @Environment(\.isPlayerOverlayPresented) private var isPlayerOverlayPresented
 
     let album: AlbumSummary
     @Binding var searchText: String
@@ -167,11 +169,13 @@ struct AlbumDetailView: View {
             refreshVisibleSongs()
         }
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button(action: onBack) {
-                    Label(backButtonTitle, systemImage: "chevron.left")
+            if !isPlayerOverlayPresented {
+                ToolbarItem(placement: .navigation) {
+                    Button(action: onBack) {
+                        Label(backButtonTitle, systemImage: "chevron.left")
+                    }
+                    .labelStyle(.iconOnly)
                 }
-                .labelStyle(.iconOnly)
             }
         }
     }

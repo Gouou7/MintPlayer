@@ -7,6 +7,7 @@ struct LibrarySettingsView: View {
 
     @State private var selectedTheme = ThemeMode.dark
     @State private var selectedLanguage = AppLanguage.system
+    @State private var selectedLyricsPresentationMode = LyricsPresentationMode.embedded
     @State private var lyricsBlurEnabled = true
     @State private var showFolderPicker = false
     @State private var newLibraryPath = ""
@@ -29,6 +30,7 @@ struct LibrarySettingsView: View {
         .onAppear {
             selectedTheme = settings.theme
             selectedLanguage = settings.language
+            selectedLyricsPresentationMode = settings.lyricsPresentationMode
             lyricsBlurEnabled = settings.lyricsBlurEnabled
         }
         .onChange(of: selectedTheme) { _, newTheme in
@@ -36,6 +38,9 @@ struct LibrarySettingsView: View {
         }
         .onChange(of: selectedLanguage) { _, newLanguage in
             settings.updateLanguage(newLanguage)
+        }
+        .onChange(of: selectedLyricsPresentationMode) { _, newMode in
+            settings.updateLyricsPresentationMode(newMode)
         }
         .onChange(of: lyricsBlurEnabled) { _, isEnabled in
             settings.updateLyricsBlurEnabled(isEnabled)
@@ -100,6 +105,17 @@ struct LibrarySettingsView: View {
 
     private var playbackSettings: some View {
         Section(settings.text(.playbackPage)) {
+            SettingsPickerRow(
+                title: settings.text(.lyricsPresentation),
+                description: settings.text(.lyricsPresentationDescription),
+                selection: $selectedLyricsPresentationMode
+            ) {
+                ForEach(LyricsPresentationMode.allCases, id: \.self) { mode in
+                    Text(lyricsPresentationModeTitle(mode))
+                        .tag(mode)
+                }
+            }
+
             SettingsToggleRow(
                 title: settings.text(.lyricsBlurEffect),
                 description: settings.text(.lyricsBlurDescription),
@@ -323,6 +339,15 @@ struct LibrarySettingsView: View {
             return "English"
         case .chinese:
             return settings.effectiveLanguage == .chinese ? "中文简体" : "Simplified Chinese"
+        }
+    }
+
+    private func lyricsPresentationModeTitle(_ mode: LyricsPresentationMode) -> String {
+        switch mode {
+        case .embedded:
+            return settings.text(.embeddedLyrics)
+        case .separateWindow:
+            return settings.text(.separateLyricsWindow)
         }
     }
 }

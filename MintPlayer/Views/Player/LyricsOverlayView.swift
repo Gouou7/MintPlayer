@@ -940,6 +940,25 @@ private struct LyricsInfoStateView: View {
     }
 }
 
+struct EmbeddedLyricsPresentationLayer: View {
+    let song: Song
+    let isVisible: Bool
+    let reducesMotion: Bool
+    let onClose: () -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            LyricsOverlayView(song: song, onClose: onClose)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .compositingGroup()
+                .offset(y: reducesMotion || isVisible ? 0 : geometry.size.height)
+                .opacity(reducesMotion ? (isVisible ? 1 : 0) : 1)
+        }
+        .clipped()
+        .ignoresSafeArea(.container, edges: .top)
+    }
+}
+
 struct LyricsWindowView: View {
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var settings: SettingsManager

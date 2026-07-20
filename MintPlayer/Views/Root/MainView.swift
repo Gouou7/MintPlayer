@@ -5,6 +5,7 @@ struct MainView: View {
     private static let sidebarCollapsedDefaultsKey = AppConfiguration.userDefaultsKey("sidebar.isCollapsed")
 
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
@@ -13,33 +14,62 @@ struct MainView: View {
     @State private var selection: LibrarySelection = .songs
     @State private var columnVisibility: NavigationSplitViewVisibility = UserDefaults.standard.bool(forKey: Self.sidebarCollapsedDefaultsKey) ? .detailOnly : .all
     @State private var didRestorePlaybackSession = false
+    @State private var isLyricsMounted = false
+    @State private var isLyricsVisible = false
+    @State private var lyricsPresentationGeneration = 0
 
     private let playerBarWidth: CGFloat = 648
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 204, ideal: 260, max: 300)
-        } detail: {
-            ZStack(alignment: .bottom) {
-                contentView
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                SidebarView(selection: $selection)
+                    .navigationSplitViewColumnWidth(min: 204, ideal: 260, max: 300)
+                    .toolbar(removing: isLyricsMounted ? .sidebarToggle : nil)
+            } detail: {
+                ZStack(alignment: .bottom) {
+                    contentView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                PlayerBarView {
-                    if audioPlayer.currentSong != nil {
-                        openLyricsWindow()
+                    PlayerBarView {
+                        showLyrics()
                     }
+                    .frame(width: playerBarWidth)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.bottom, 20)
                 }
-                .frame(width: playerBarWidth)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.bottom, 20)
+            }
+            .navigationTitle(isLyricsMounted ? "" : currentTitle)
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .disabled(isLyricsMounted)
+            .accessibilityHidden(isLyricsMounted)
+
+            if isLyricsMounted, let currentSong = audioPlayer.currentSong {
+                EmbeddedLyricsPresentationLayer(
+                    song: currentSong,
+                    isVisible: isLyricsVisible,
+                    reducesMotion: accessibilityReduceMotion
+                ) {
+                    dismissEmbeddedLyrics()
+                }
+                .zIndex(1)
             }
         }
-        .navigationTitle(currentTitle)
-        .scrollEdgeEffectStyle(.soft, for: .top)
-        .toolbar(removing: .sidebarToggle)
+        .environment(\.isPlayerOverlayPresented, isLyricsMounted)
+        .toolbarBackgroundVisibility(isLyricsMounted ? .hidden : .automatic, for: .windowToolbar)
         .toolbar {
-            if isSidebarCollapsed {
+            if isLyricsMounted {
+                ToolbarSpacer(.flexible)
+
+                ToolbarItem(id: "embeddedLyrics.close", placement: .automatic) {
+                    Button(action: dismissEmbeddedLyrics) {
+                        Label(settings.text(.close), systemImage: "chevron.down")
+                    }
+                    .labelStyle(.iconOnly)
+                    .help(settings.text(.close))
+                    .accessibilityLabel(settings.text(.close))
+                }
+            } else if isSidebarCollapsed {
                 ToolbarItem(placement: .principal) {
                     CollapsedSidebarNavigationPicker(selection: $selection)
                 }
@@ -47,7 +77,7 @@ struct MainView: View {
         }
         .frame(minWidth: 980, minHeight: 600)
         .background {
-            SidebarToolbarToggleRemover()
+            MainWindowLyricsChromeConfigurator(isPresented: isLyricsMounted)
                 .frame(width: 0, height: 0)
             PlaybackSpaceKeyHandler()
                 .frame(width: 0, height: 0)
@@ -74,6 +104,11 @@ struct MainView: View {
         .onChange(of: musicLibrary.songs) { _, _ in
             restorePlaybackSessionIfNeeded()
         }
+        .onChange(of: audioPlayer.currentSong?.id) { _, songID in
+            if songID == nil, isLyricsMounted {
+                dismissEmbeddedLyrics()
+            }
+        }
         .onDisappear {
             audioPlayer.onPlaybackCounted = nil
         }
@@ -85,6 +120,10 @@ struct MainView: View {
 
     private var preferredColumnVisibility: NavigationSplitViewVisibility {
         isSidebarCollapsedStored ? .detailOnly : .all
+    }
+
+    private var lyricsPresentationAnimation: Animation {
+        .easeInOut(duration: accessibilityReduceMotion ? 0.16 : 0.38)
     }
 
     private var currentTitle: String {
@@ -159,7 +198,9 @@ struct MainView: View {
         didRestorePlaybackSession = true
     }
 
-    private func openLyricsWindow() {
+    private func showLyrics() {
+        guard audioPlayer.currentSong != nil else { return }
+
         if let lyricsWindow = NSApp.windows.first(where: { window in
             window.identifier?.rawValue == "mintPlayer.lyricsWindow" || window.title == "Lyrics"
         }) {
@@ -168,7 +209,162 @@ struct MainView: View {
             return
         }
 
-        openWindow(id: "lyrics")
+        switch settings.lyricsPresentationMode {
+        case .embedded:
+            presentEmbeddedLyrics()
+        case .separateWindow:
+            openWindow(id: "lyrics")
+        }
+    }
+
+    private func presentEmbeddedLyrics() {
+        guard !isLyricsMounted else { return }
+
+        lyricsPresentationGeneration += 1
+        let generation = lyricsPresentationGeneration
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isLyricsVisible = false
+            isLyricsMounted = true
+        }
+
+        DispatchQueue.main.async {
+            DispatchQueue.main.async {
+                guard isLyricsMounted, lyricsPresentationGeneration == generation else { return }
+                withAnimation(lyricsPresentationAnimation) {
+                    isLyricsVisible = true
+                }
+            }
+        }
+    }
+
+    private func dismissEmbeddedLyrics() {
+        guard isLyricsMounted else { return }
+
+        lyricsPresentationGeneration += 1
+        let generation = lyricsPresentationGeneration
+        guard isLyricsVisible else {
+            isLyricsMounted = false
+            return
+        }
+
+        withAnimation(lyricsPresentationAnimation, completionCriteria: .logicallyComplete) {
+            isLyricsVisible = false
+        } completion: {
+            guard lyricsPresentationGeneration == generation, !isLyricsVisible else { return }
+            isLyricsMounted = false
+        }
+    }
+}
+
+private struct MainWindowLyricsChromeConfigurator: NSViewRepresentable {
+    let isPresented: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> HostView {
+        let view = HostView()
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateNSView(_ nsView: HostView, context: Context) {
+        nsView.coordinator = context.coordinator
+        context.coordinator.configureSoon(from: nsView, isPresented: isPresented)
+    }
+
+    static func dismantleNSView(_ nsView: HostView, coordinator: Coordinator) {
+        coordinator.restoreWindow()
+    }
+
+    final class HostView: NSView {
+        weak var coordinator: Coordinator?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            coordinator?.configureSoon(from: self)
+        }
+
+        override func viewWillMove(toWindow newWindow: NSWindow?) {
+            if newWindow == nil {
+                coordinator?.restoreWindow()
+            }
+            super.viewWillMove(toWindow: newWindow)
+        }
+    }
+
+    final class Coordinator {
+        private weak var configuredWindow: NSWindow?
+        private var requestedPresentation = false
+        private var originalUsesFullSizeContentView = false
+        private var originalTitlebarAppearsTransparent = false
+        private var originalTitleVisibility = NSWindow.TitleVisibility.visible
+        private var originalTitlebarSeparatorStyle = NSTitlebarSeparatorStyle.automatic
+
+        func configureSoon(from view: NSView, isPresented: Bool? = nil) {
+            if let isPresented {
+                requestedPresentation = isPresented
+            }
+
+            DispatchQueue.main.async { [weak self, weak view] in
+                guard let self, let view else { return }
+                self.configureWindow(from: view)
+            }
+        }
+
+        func restoreWindow() {
+            guard let window = configuredWindow else { return }
+
+            if originalUsesFullSizeContentView {
+                window.styleMask.insert(.fullSizeContentView)
+            } else {
+                window.styleMask.remove(.fullSizeContentView)
+            }
+            window.titlebarAppearsTransparent = originalTitlebarAppearsTransparent
+            window.titleVisibility = originalTitleVisibility
+            window.titlebarSeparatorStyle = originalTitlebarSeparatorStyle
+            configuredWindow = nil
+        }
+
+        private func configureWindow(from view: NSView) {
+            guard let window = view.window else {
+                restoreWindow()
+                return
+            }
+
+            if configuredWindow !== window {
+                restoreWindow()
+                configuredWindow = window
+                originalUsesFullSizeContentView = window.styleMask.contains(.fullSizeContentView)
+                originalTitlebarAppearsTransparent = window.titlebarAppearsTransparent
+                originalTitleVisibility = window.titleVisibility
+                originalTitlebarSeparatorStyle = window.titlebarSeparatorStyle
+            }
+
+            if requestedPresentation {
+                window.styleMask.insert(.fullSizeContentView)
+                window.titlebarAppearsTransparent = true
+                window.titleVisibility = .hidden
+                window.titlebarSeparatorStyle = .none
+            } else {
+                restorePresentationState(on: window)
+            }
+        }
+
+        private func restorePresentationState(on window: NSWindow) {
+            if originalUsesFullSizeContentView {
+                window.styleMask.insert(.fullSizeContentView)
+            } else {
+                window.styleMask.remove(.fullSizeContentView)
+            }
+            window.titlebarAppearsTransparent = originalTitlebarAppearsTransparent
+            window.titleVisibility = originalTitleVisibility
+            window.titlebarSeparatorStyle = originalTitlebarSeparatorStyle
+        }
     }
 }
 
@@ -291,55 +487,6 @@ private extension LibrarySidebarItem {
             self = .artists
         case .playlist, .folder:
             return nil
-        }
-    }
-}
-
-private struct SidebarToolbarToggleRemover: NSViewRepresentable {
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    func makeNSView(context: Context) -> HostView {
-        let view = HostView()
-        view.coordinator = context.coordinator
-        return view
-    }
-
-    func updateNSView(_ nsView: HostView, context: Context) {
-        nsView.coordinator = context.coordinator
-        context.coordinator.removeSoon(from: nsView)
-    }
-
-    final class HostView: NSView {
-        weak var coordinator: Coordinator?
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            coordinator?.removeSoon(from: self)
-        }
-    }
-
-    final class Coordinator {
-        func removeSoon(from view: NSView) {
-            DispatchQueue.main.async { [weak view] in
-                guard let view else { return }
-                self.removeSidebarToggle(from: view.window?.toolbar)
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak view] in
-                guard let view else { return }
-                self.removeSidebarToggle(from: view.window?.toolbar)
-            }
-        }
-
-        private func removeSidebarToggle(from toolbar: NSToolbar?) {
-            guard let toolbar else { return }
-            let toggleIdentifier = NSToolbarItem.Identifier.toggleSidebar
-
-            while let index = toolbar.items.firstIndex(where: { $0.itemIdentifier == toggleIdentifier }) {
-                toolbar.removeItem(at: index)
-            }
         }
     }
 }

@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- None.
+- Added a configurable embedded lyrics page that slides over the main window while retaining the existing separate lyrics window.
 
 ### Changed
 - Updated the Songs and Favorites table background to use the native macOS window background.

@@ -224,13 +224,19 @@ struct PlayerBarView: View {
     }
 
     private func artwork(for song: Song) -> some View {
-        Button(action: onArtworkClick) {
+        Button(action: presentLyrics) {
             ArtworkImage(path: song.coverPath, cornerRadius: 8)
                 .frame(width: artworkSize, height: artworkSize)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(MintContentButtonStyle(cornerRadius: 8, hoverOutset: 0))
         .help(settings.text(.showLyrics))
+    }
+
+    private func presentLyrics() {
+        isQueuePresented = false
+        isVolumePresented = false
+        onArtworkClick()
     }
 
     private func toggleCurrentSongFavorite() {

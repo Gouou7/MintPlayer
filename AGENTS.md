@@ -40,6 +40,7 @@ MintPlayer/
 │       ├── Settings/     # Settings window and library management UI
 │       └── Shared/       # Theme, search, artwork, native tables, empty states, controls
 ├── MintPlayer.xcodeproj/ # Only build entry point
+├── docs/                 # Screenshots and focused implementation/maintenance notes
 ├── README.md             # English user/developer overview
 ├── README_zh.md          # Chinese translation of README.md
 ├── CHANGELOG.md          # Keep a Changelog release notes
@@ -56,6 +57,8 @@ MintPlayer/
 `AudioPlayer` wraps `AVAudioPlayer`, queue state, shuffle/repeat behavior, playback restoration, play-count qualification, volume, fade in/out, and Now Playing updates. Playback count is based on actual listened duration, not clicks.
 
 SwiftUI owns high-level view state and layout. AppKit is used only where native macOS behavior is required: `NSTableView`, `NSSearchField`, `NSWindow`, file import, event monitoring, drag/drop boundaries, and deterministic lyrics scrolling.
+
+Lyrics support two presentation containers around the same `LyricsOverlayView`: the existing standalone window and an embedded main-window overlay. The embedded container keeps the library `NavigationSplitView` mounted underneath, isolates its interaction, and owns only presentation animation and temporary main-window chrome changes. Read `docs/内嵌歌词实现说明.md` and `docs/内嵌歌词实现经验.md` before changing this boundary.
 
 ## Data Flow
 
@@ -109,6 +112,12 @@ SwiftUI owns high-level view state and layout. AppKit is used only where native 
 - Full-screen lyrics scrolling uses a narrow AppKit `NSScrollView` bridge for deterministic animated offsets. SwiftUI remains the source of truth for lyric content and highlighting.
 - Full-screen lyrics artwork and blurred backgrounds should crossfade directly between old and new images. Do not clear to black or an empty frame during normal track changes.
 - Songs without artwork should show the gray placeholder artwork and gray lyrics background, never a previous song's artwork.
+- Embedded lyrics must keep the underlying library mounted so sidebar state, scrolling, table selection, and album/artist navigation survive dismissal. Disable and accessibility-hide the library while the overlay is mounted instead of replacing it.
+- Animate embedded lyrics with separate mounted and visible states. Apply movement or reduced-motion opacity to one fixed-size composited shell containing the complete lyrics surface; do not give its background, artwork, scrolling content, or controls independent page transitions.
+- Remove the default sidebar toggle dynamically from the `SidebarView` that owns it: use `.toolbar(removing: isLyricsMounted ? .sidebarToggle : nil)`. Applying permanent removal breaks normal sidebar control, while disabling the split view only grays the button.
+- Keep the native window toolbar mounted during embedded lyrics. Hiding the whole toolbar moves the traffic lights. Temporarily make the titlebar transparent through the focused `NSWindow` bridge and restore every captured window property on dismissal or teardown.
+- On macOS 26, keep the embedded lyrics close action at the toolbar tail with `ToolbarSpacer(.flexible)` followed by an `.automatic` toolbar item. `.topBarTrailing` is unavailable on macOS, and `.secondaryAction` may be placed near the center.
+- Library search and detail-navigation toolbar items must honor the `isPlayerOverlayPresented` environment value so they do not appear above embedded lyrics.
 
 ## Build, Run, Test, And Lint
 
@@ -163,9 +172,9 @@ Release builds use `Mint Player.app` and the release Application Support/prefere
 - **Playback**: double-click playback, play/pause fade, seek, stop, previous/next, natural completion, shuffle, repeat, volume, session restoration, Now Playing, Dock menu actions.
 - **Tables**: click, Shift selection, Command selection, double-click, context menu, trailing actions, column resize, column visibility, sorting, drag to playlist/Finder.
 - **Albums and Artists**: grid responsiveness, detail navigation, artwork matched transitions, search, playback buttons, return animations.
-- **Lyrics**: `.lrc` parsing, highlighted line timing, smooth scrolling, tap-to-seek, inactive-line blur toggle, missing artwork placeholder, artwork/background crossfade, remembered window size.
-- **Settings**: theme, language, lyrics blur, library folder layout, rescan, delete confirmation, blocked-song list, resizing, scroll coverage, top scroll edge effect.
-- **Layout**: narrow windows, hidden sidebar mode, toolbar tab bar, sidebar width, floating player bar hit testing, search field placement.
+- **Lyrics**: both presentation settings, embedded open/close and `Esc`, complete-surface animation, reduced motion, repeated toggles, track changes while open, `.lrc` parsing, highlighted line timing, smooth scrolling, tap-to-seek, inactive-line blur, missing artwork, artwork/background crossfade, and standalone window restoration.
+- **Settings**: theme, language, lyrics presentation, lyrics blur, library folder layout, rescan, delete confirmation, blocked-song list, resizing, scroll coverage, top scroll edge effect.
+- **Layout**: narrow windows, sidebar shown/hidden before opening embedded lyrics, sidebar toggle restoration after closing lyrics, stable traffic-light positions, trailing lyrics close button, toolbar tab bar, sidebar width, floating player bar hit testing, and search field placement.
 
 ## Git Workflow
 
@@ -245,6 +254,20 @@ Release builds use `Mint Player.app` and the release Application Support/prefere
 - **Avoid**: Renaming persisted fields, changing IDs, or replacing merge logic casually.
 - **Use**: Preserve persistent fields during rescans and add explicit migrations when schema changes are required.
 
+### Embedded Lyrics Presentation And Toolbar Ownership
+
+- **Problem**: A conditional `.move` transition can make only part of the lyrics page slide, default sidebar controls can remain above the overlay, and hiding the complete toolbar can move the window traffic lights.
+- **Cause**: Async artwork/background content and AppKit lyric scrolling do not necessarily enter the render tree together; the sidebar toggle is owned by the sidebar column of `NavigationSplitView`; the native titlebar and toolbar share window chrome.
+- **Avoid**: Independent child transitions, conditionally replacing the library view, removing `.toggleSidebar` through AppKit, permanently applying `.toolbar(removing: .sidebarToggle)`, hiding the entire window toolbar, or adding a replacement titlebar accessory button.
+- **Use**: Mount the complete lyrics shell offscreen before animating it, keep the library mounted but noninteractive, remove the default sidebar item dynamically on `SidebarView`, hide page-specific toolbar items through `isPlayerOverlayPresented`, preserve the native toolbar, and restore captured `NSWindow` titlebar properties after dismissal.
+
+### macOS Toolbar Trailing Placement
+
+- **Problem**: Toolbar placements that sound trailing on other Apple platforms either fail to compile or appear near the center on macOS.
+- **Cause**: `.topBarTrailing` is unavailable on macOS, while semantic placements such as `.secondaryAction` let the system choose a section rather than pinning an edge.
+- **Avoid**: Assuming toolbar placement names have identical availability or geometry across Apple platforms.
+- **Use**: On the macOS 26 deployment target, place `ToolbarSpacer(.flexible)` before an `.automatic` item when an action must remain at the toolbar tail, then verify both compilation and sidebar-expanded/collapsed layouts.
+
 ## Architecture Decisions
 
 ### Xcode Project As Build Entry
@@ -266,6 +289,10 @@ The app indexes user-selected folders and keeps app metadata separately. It must
 ### Drill-In Artist Navigation
 
 Artists use a drill-in structure rather than a permanent multi-column layout. This preserves space for responsive grids and detail pages and keeps the main navigation consistent with Albums.
+
+### Shared Lyrics Content With Separate Presentation Containers
+
+Both lyrics modes reuse `LyricsOverlayView` for loading, scrolling, highlighting, artwork/background transitions, seeking, and playback controls. Presentation-specific behavior belongs in the standalone window or embedded shell. Do not fork the lyrics content implementation between modes.
 
 ## Agent Memory
 
@@ -296,3 +323,10 @@ Artists use a drill-in structure rather than a permanent multi-column layout. Th
 - **Problem**: Native `NSSearchField` draws placeholder and edited text through different internal paths.
 - **Decision**: Keep toolbar search fields plain and native; hide them on album/artist detail pages rather than repurposing them for detail-level search.
 - **Impact**: Do not replace `NSSearchFieldCell` or manually tune field-editor insets without a strong platform-specific reason.
+
+#### 2026-07-20
+
+- **Background**: Lyrics needed an Apple Music-style main-window presentation while preserving the standalone lyrics window and native `NavigationSplitView` behavior.
+- **Problem**: Ordinary conditional transitions animated complex lyrics children inconsistently, and toolbar ownership caused sidebar controls or unstable window chrome above the overlay.
+- **Decision**: Reuse `LyricsOverlayView` in a mounted/visible embedded shell, keep the library mounted but isolated, remove the sidebar default item at its owning sidebar view, preserve the native toolbar, and use a narrow reversible `NSWindow` chrome bridge.
+- **Impact**: Future full-window lyrics changes must preserve the two-state presentation lifecycle, library state retention, toolbar ownership boundaries, reduced-motion behavior, and standalone-window compatibility.
