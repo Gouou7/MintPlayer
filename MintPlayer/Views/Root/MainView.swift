@@ -69,6 +69,7 @@ struct MainView: View {
                             Label(settings.text(.close), systemImage: "chevron.down")
                         }
                         .labelStyle(.iconOnly)
+                        .environment(\.colorScheme, .dark)
                         .help(settings.text(.close))
                         .accessibilityLabel(settings.text(.close))
                     }

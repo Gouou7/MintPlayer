@@ -27,7 +27,7 @@ struct MintPlayerApp: App {
                 .environmentObject(audioPlayer)
                 .environmentObject(settings)
                 .tint(MintTheme.accent)
-                .preferredColorScheme(settings.preferredColorScheme)
+                .preferredColorScheme(.dark)
                 .toolbar(removing: .title)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         }

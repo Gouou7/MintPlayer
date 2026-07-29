@@ -966,6 +966,7 @@ struct EmbeddedLyricsPresentationLayer: View {
         }
         .clipped()
         .ignoresSafeArea(.container, edges: .top)
+        .environment(\.colorScheme, .dark)
     }
 }
 
@@ -1000,7 +1001,6 @@ struct LyricsWindowView: View {
                 }
                 .environmentObject(audioPlayer)
                 .environmentObject(settings)
-                .preferredColorScheme(settings.preferredColorScheme)
             } else {
                 EmptyLyricsWindowView {
                     dismissWindow(id: "lyrics")
