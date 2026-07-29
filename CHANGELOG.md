@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Replaced the static light app icon with an adaptive Icon Composer icon that supports Default and Dark appearances on macOS.
+
+### Fixed
+- Fixed missing macOS application category metadata that caused Xcode to warn during builds.
+
 ## [0.11.0] - 2026-07-29
 
 ### Added

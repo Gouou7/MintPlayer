@@ -96,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ))
         let isPlaying = audioPlayer?.isPlaying == true
         menu.addItem(menuItem(
-            title: isPlaying ? "⏸ 暂停" : "▶️ 播放",
+            title: isPlaying ? "⏸️ 暂停" : "▶️ 播放",
             symbolName: isPlaying ? "pause.fill" : "play.fill",
             action: #selector(togglePlayback),
             isEnabled: audioPlayer?.currentSong != nil
