@@ -21,7 +21,7 @@ MintPlayer/
 ├── README.md             # English user/developer overview
 ├── README_zh.md          # Chinese translation of README.md
 ├── CHANGELOG.md          # Keep a Changelog release notes
-├── VERSION               # Current release version
+├── Scripts/              # Build-time Git version embedding
 └── AGENTS.md             # Concise agent rules and documentation entry point
 ```
 
@@ -115,4 +115,12 @@ Authorization requirements for commits, tags, pushes, pull requests, and commit-
 
 Versions follow Semantic Versioning. `CHANGELOG.md` follows Keep a Changelog and keeps `Unreleased` at the top. Move user-facing `Unreleased` entries into a dated release section only when preparing a release.
 
-`VERSION`, Xcode `MARKETING_VERSION`, release headings in `CHANGELOG.md`, and Git tags must match for a release.
+Git tags matching `vMAJOR.MINOR.PATCH` are the only release version source. Every build runs `Scripts/embed-git-version.sh`, which generates the target's `Info.plist` in DerivedData, strips the leading `v`, and writes the release version to `CFBundleShortVersionString`. Debug builds use the most recent matching tag reachable from the commit; Release builds require the current commit itself to have a matching tag. The script writes the Git commit count to `CFBundleVersion` and an app-facing version to `MintDisplayVersion`: Release uses `MAJOR.MINOR.PATCH`, while Debug uses `MAJOR.MINOR.PATCH-COMMIT-debug` with a seven-character commit hash. The About view reads `MintDisplayVersion`. Xcode's checked-in `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` values are template placeholders and must not be maintained manually.
+
+To prepare a release:
+
+1. Move the relevant `Unreleased` entries into a dated `CHANGELOG.md` section named for the new version and commit the change.
+2. Create a Git tag such as `v0.11.0` on that release commit.
+3. Build or archive the tagged commit. A Release build from an untagged commit, or any build without a reachable semantic version tag, fails instead of producing an incorrectly versioned app.
+
+The release heading and Git tag must match. Source archives without Git metadata cannot derive a version and are not supported as release build inputs.

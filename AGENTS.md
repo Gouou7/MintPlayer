@@ -29,7 +29,8 @@ Use the focused project documents instead of expanding this file:
 - Do not write to `README.md` without explicit permission. When it changes, keep `README_zh.md` synchronized.
 - Do not change the version or write changes into an existing released section of `CHANGELOG.md` unless explicitly requested.
 - Record user-facing unreleased changes under `Unreleased`; do not add version-only or ordinary documentation-maintenance entries.
-- Keep `VERSION`, Xcode `MARKETING_VERSION`, release headings in `CHANGELOG.md`, and Git tags aligned when preparing a release.
+- Git tags matching `vMAJOR.MINOR.PATCH` are the only release version source. Do not manually update Xcode version placeholders.
+- Keep release headings in `CHANGELOG.md` aligned with Git tags when preparing a release.
 
 ## Git Safety
 

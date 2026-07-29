@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - None.
 
 ### Changed
+- Changed application versioning to derive release versions from Git tags and include the commit hash in Debug version displays.
 - Reorganized maintainer guidance into focused architecture, development, UI, and implementation documents, with a concise agent instruction entry point.
 
 ### Deprecated

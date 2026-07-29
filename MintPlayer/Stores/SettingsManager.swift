@@ -83,7 +83,7 @@ class SettingsManager: ObservableObject {
     }
 
     var versionText: String {
-        String(format: text(.version), AppConfiguration.versionTag)
+        String(format: text(.version), AppConfiguration.displayVersion)
     }
 }
 
