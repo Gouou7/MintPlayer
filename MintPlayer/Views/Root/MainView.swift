@@ -16,6 +16,7 @@ struct MainView: View {
     @State private var didRestorePlaybackSession = false
     @State private var isLyricsMounted = false
     @State private var isLyricsVisible = false
+    @State private var isLyricsImmersiveFullScreen = false
     @State private var lyricsPresentationGeneration = 0
 
     private let playerBarWidth: CGFloat = 648
@@ -48,7 +49,8 @@ struct MainView: View {
                 EmbeddedLyricsPresentationLayer(
                     song: currentSong,
                     isVisible: isLyricsVisible,
-                    reducesMotion: accessibilityReduceMotion
+                    reducesMotion: accessibilityReduceMotion,
+                    showsImmersiveControls: isLyricsImmersiveFullScreen
                 ) {
                     dismissEmbeddedLyrics()
                 }
@@ -59,15 +61,17 @@ struct MainView: View {
         .toolbarBackgroundVisibility(isLyricsMounted ? .hidden : .automatic, for: .windowToolbar)
         .toolbar {
             if isLyricsMounted {
-                ToolbarSpacer(.flexible)
+                if !isLyricsImmersiveFullScreen {
+                    ToolbarSpacer(.flexible)
 
-                ToolbarItem(id: "embeddedLyrics.close", placement: .automatic) {
-                    Button(action: dismissEmbeddedLyrics) {
-                        Label(settings.text(.close), systemImage: "chevron.down")
+                    ToolbarItem(id: "embeddedLyrics.close", placement: .automatic) {
+                        Button(action: dismissEmbeddedLyrics) {
+                            Label(settings.text(.close), systemImage: "chevron.down")
+                        }
+                        .labelStyle(.iconOnly)
+                        .help(settings.text(.close))
+                        .accessibilityLabel(settings.text(.close))
                     }
-                    .labelStyle(.iconOnly)
-                    .help(settings.text(.close))
-                    .accessibilityLabel(settings.text(.close))
                 }
             } else if isSidebarCollapsed {
                 ToolbarItem(placement: .principal) {
@@ -77,7 +81,10 @@ struct MainView: View {
         }
         .frame(minWidth: 980, minHeight: 600)
         .background {
-            MainWindowLyricsChromeConfigurator(isPresented: isLyricsMounted)
+            MainWindowLyricsChromeConfigurator(
+                isPresented: isLyricsMounted,
+                isImmersiveFullScreen: $isLyricsImmersiveFullScreen
+            )
                 .frame(width: 0, height: 0)
             PlaybackSpaceKeyHandler()
                 .frame(width: 0, height: 0)
@@ -261,9 +268,10 @@ struct MainView: View {
 
 private struct MainWindowLyricsChromeConfigurator: NSViewRepresentable {
     let isPresented: Bool
+    @Binding var isImmersiveFullScreen: Bool
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(isImmersiveFullScreen: $isImmersiveFullScreen)
     }
 
     func makeNSView(context: Context) -> HostView {
@@ -274,6 +282,7 @@ private struct MainWindowLyricsChromeConfigurator: NSViewRepresentable {
 
     func updateNSView(_ nsView: HostView, context: Context) {
         nsView.coordinator = context.coordinator
+        context.coordinator.updateImmersiveBinding($isImmersiveFullScreen)
         context.coordinator.configureSoon(from: nsView, isPresented: isPresented)
     }
 
@@ -300,10 +309,23 @@ private struct MainWindowLyricsChromeConfigurator: NSViewRepresentable {
     final class Coordinator {
         private weak var configuredWindow: NSWindow?
         private var requestedPresentation = false
-        private var originalUsesFullSizeContentView = false
-        private var originalTitlebarAppearsTransparent = false
-        private var originalTitleVisibility = NSWindow.TitleVisibility.visible
-        private var originalTitlebarSeparatorStyle = NSTitlebarSeparatorStyle.automatic
+        private var isWindowFullScreen = false
+        private var originalWindowState: WindowState?
+        private var fullScreenObservers: [NSObjectProtocol] = []
+        private var immersiveBinding: Binding<Bool>
+        private var lastPublishedImmersiveState = false
+
+        init(isImmersiveFullScreen: Binding<Bool>) {
+            immersiveBinding = isImmersiveFullScreen
+        }
+
+        deinit {
+            removeFullScreenObservers()
+        }
+
+        func updateImmersiveBinding(_ binding: Binding<Bool>) {
+            immersiveBinding = binding
+        }
 
         func configureSoon(from view: NSView, isPresented: Bool? = nil) {
             if let isPresented {
@@ -317,17 +339,13 @@ private struct MainWindowLyricsChromeConfigurator: NSViewRepresentable {
         }
 
         func restoreWindow() {
-            guard let window = configuredWindow else { return }
-
-            if originalUsesFullSizeContentView {
-                window.styleMask.insert(.fullSizeContentView)
-            } else {
-                window.styleMask.remove(.fullSizeContentView)
+            if let window = configuredWindow {
+                restorePresentationState(on: window)
             }
-            window.titlebarAppearsTransparent = originalTitlebarAppearsTransparent
-            window.titleVisibility = originalTitleVisibility
-            window.titlebarSeparatorStyle = originalTitlebarSeparatorStyle
+            originalWindowState = nil
+            removeFullScreenObservers()
             configuredWindow = nil
+            publishImmersiveState(false)
         }
 
         private func configureWindow(from view: NSView) {
@@ -339,31 +357,116 @@ private struct MainWindowLyricsChromeConfigurator: NSViewRepresentable {
             if configuredWindow !== window {
                 restoreWindow()
                 configuredWindow = window
-                originalUsesFullSizeContentView = window.styleMask.contains(.fullSizeContentView)
-                originalTitlebarAppearsTransparent = window.titlebarAppearsTransparent
-                originalTitleVisibility = window.titleVisibility
-                originalTitlebarSeparatorStyle = window.titlebarSeparatorStyle
+                isWindowFullScreen = window.styleMask.contains(.fullScreen)
+                observeFullScreenChanges(for: window)
             }
 
             if requestedPresentation {
-                window.styleMask.insert(.fullSizeContentView)
-                window.titlebarAppearsTransparent = true
-                window.titleVisibility = .hidden
-                window.titlebarSeparatorStyle = .none
+                if originalWindowState == nil {
+                    originalWindowState = WindowState(window: window)
+                }
+                applyLyricsPresentation(to: window)
             } else {
                 restorePresentationState(on: window)
+                originalWindowState = nil
+            }
+
+            publishImmersiveState(requestedPresentation && isWindowFullScreen)
+        }
+
+        private func applyLyricsPresentation(to window: NSWindow) {
+            window.styleMask.insert(.fullSizeContentView)
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.titlebarSeparatorStyle = .none
+
+            if isWindowFullScreen {
+                window.toolbar?.isVisible = false
+            } else if let toolbarIsVisible = originalWindowState?.toolbarIsVisible {
+                window.toolbar?.isVisible = toolbarIsVisible
             }
         }
 
         private func restorePresentationState(on window: NSWindow) {
-            if originalUsesFullSizeContentView {
+            guard let originalWindowState else { return }
+
+            if originalWindowState.usesFullSizeContentView {
                 window.styleMask.insert(.fullSizeContentView)
             } else {
                 window.styleMask.remove(.fullSizeContentView)
             }
-            window.titlebarAppearsTransparent = originalTitlebarAppearsTransparent
-            window.titleVisibility = originalTitleVisibility
-            window.titlebarSeparatorStyle = originalTitlebarSeparatorStyle
+            window.titlebarAppearsTransparent = originalWindowState.titlebarAppearsTransparent
+            window.titleVisibility = originalWindowState.titleVisibility
+            window.titlebarSeparatorStyle = originalWindowState.titlebarSeparatorStyle
+            if let toolbarIsVisible = originalWindowState.toolbarIsVisible {
+                window.toolbar?.isVisible = toolbarIsVisible
+            }
+        }
+
+        private func observeFullScreenChanges(for window: NSWindow) {
+            removeFullScreenObservers()
+
+            let center = NotificationCenter.default
+            let notifications: [(NSNotification.Name, Bool)] = [
+                (NSWindow.willEnterFullScreenNotification, true),
+                (NSWindow.didEnterFullScreenNotification, true),
+                (NSWindow.willExitFullScreenNotification, false),
+                (NSWindow.didExitFullScreenNotification, false)
+            ]
+
+            fullScreenObservers = notifications.map { name, isFullScreen in
+                center.addObserver(forName: name, object: window, queue: .main) { [weak self, weak window] _ in
+                    guard let self, let window, self.configuredWindow === window else { return }
+                    self.handleFullScreenChange(isFullScreen, for: window)
+                }
+            }
+        }
+
+        private func handleFullScreenChange(_ isFullScreen: Bool, for window: NSWindow) {
+            isWindowFullScreen = isFullScreen
+
+            if requestedPresentation {
+                applyLyricsPresentation(to: window)
+            }
+            publishImmersiveState(requestedPresentation && isFullScreen)
+
+            DispatchQueue.main.async { [weak self, weak window] in
+                guard let self, let window, self.configuredWindow === window else { return }
+                if self.requestedPresentation {
+                    self.applyLyricsPresentation(to: window)
+                }
+            }
+        }
+
+        private func publishImmersiveState(_ isImmersive: Bool) {
+            guard lastPublishedImmersiveState != isImmersive else { return }
+            lastPublishedImmersiveState = isImmersive
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.immersiveBinding.wrappedValue != isImmersive else { return }
+                self.immersiveBinding.wrappedValue = isImmersive
+            }
+        }
+
+        private func removeFullScreenObservers() {
+            fullScreenObservers.forEach(NotificationCenter.default.removeObserver)
+            fullScreenObservers = []
+        }
+
+        private struct WindowState {
+            let usesFullSizeContentView: Bool
+            let titlebarAppearsTransparent: Bool
+            let titleVisibility: NSWindow.TitleVisibility
+            let titlebarSeparatorStyle: NSTitlebarSeparatorStyle
+            let toolbarIsVisible: Bool?
+
+            init(window: NSWindow) {
+                usesFullSizeContentView = window.styleMask.contains(.fullSizeContentView)
+                titlebarAppearsTransparent = window.titlebarAppearsTransparent
+                titleVisibility = window.titleVisibility
+                titlebarSeparatorStyle = window.titlebarSeparatorStyle
+                toolbarIsVisible = window.toolbar?.isVisible
+            }
         }
     }
 }

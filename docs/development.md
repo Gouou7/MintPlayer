@@ -98,9 +98,9 @@ Release builds use `Mint Player.app` and the release Application Support and pre
 - **Playback**: double-click playback, play/pause fade, seek, stop, previous/next, natural completion, shuffle, repeat, volume, session restoration, Now Playing, and Dock menu actions.
 - **Tables**: click, Shift selection, Command selection, double-click, context menu, trailing actions, column resize, column visibility, sorting, and drag to playlist or Finder.
 - **Albums and Artists**: grid responsiveness, detail navigation, artwork matched transitions, search, playback buttons, and return animations.
-- **Lyrics**: both presentation settings, embedded open/close and `Esc`, complete-surface animation, reduced motion, repeated toggles, track changes while open, `.lrc` parsing, highlighted-line timing, smooth scrolling, tap-to-seek, inactive-line blur, missing artwork, artwork/background crossfade, and standalone-window restoration.
+- **Lyrics**: both presentation settings, embedded open/close and `Esc`, complete-surface animation, reduced motion, repeated toggles, repeated green-button full-screen entry and exit, full top-edge coverage in full screen, track changes while open, `.lrc` parsing, highlighted-line timing, smooth scrolling, tap-to-seek, inactive-line blur, missing artwork, artwork/background crossfade, and standalone-window restoration.
 - **Settings**: theme, language, lyrics presentation, lyrics blur, library-folder layout, rescan, delete confirmation, blocked-song list, resizing, scroll coverage, and top scroll-edge effect.
-- **Layout**: narrow windows, sidebar shown or hidden before opening embedded lyrics, sidebar-toggle restoration after closing lyrics, stable traffic-light positions, trailing lyrics close button, toolbar tab bar, sidebar width, floating player-bar hit testing, and search-field placement.
+- **Layout**: narrow windows, sidebar shown or hidden before opening embedded lyrics, sidebar-toggle restoration after closing lyrics, stable traffic-light positions, windowed trailing lyrics close button, immersive full-screen lyrics close button, toolbar restoration after leaving lyrics, toolbar tab bar, sidebar width, floating player-bar hit testing, and search-field placement.
 
 ## Git Workflow
 

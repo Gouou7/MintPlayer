@@ -64,13 +64,13 @@ These notes capture recurring Mint Player failure modes and the established impl
 
 ## Embedded Lyrics Presentation And Toolbar Ownership
 
-**Symptoms:** Only part of the lyrics page animates, default sidebar controls remain above the overlay, toolbar items leak through, or window traffic lights move.
+**Symptoms:** Only part of the lyrics page animates, default sidebar controls remain above the overlay, toolbar items leak through, window traffic lights move, or full screen leaves an uncovered toolbar strip above the lyrics surface.
 
-**Cause:** Asynchronous artwork/background content and AppKit lyric scrolling do not necessarily enter the render tree together. The sidebar toggle belongs to the sidebar column of `NavigationSplitView`, and the native titlebar and toolbar share window chrome.
+**Cause:** Asynchronous artwork/background content and AppKit lyric scrolling do not necessarily enter the render tree together. The sidebar toggle belongs to the sidebar column of `NavigationSplitView`, and the native titlebar and toolbar share window chrome. During a system full-screen transition, AppKit can recompute the native toolbar's content-layout reservation after SwiftUI has laid out the embedded lyrics surface.
 
-**Avoid:** Independent child transitions, conditionally replacing the library view, removing `.toggleSidebar` through AppKit, permanently applying `.toolbar(removing: .sidebarToggle)`, hiding the entire window toolbar, or adding a replacement titlebar accessory button.
+**Avoid:** Independent child transitions, conditionally replacing the library view, removing `.toggleSidebar` through AppKit, permanently applying `.toolbar(removing: .sidebarToggle)`, removing or replacing the native toolbar, or depending on its close item while full-screen lyrics are active.
 
-**Use:** Mount the complete fixed-size lyrics shell offscreen before animating it. Keep the library mounted but noninteractive, remove the default sidebar item dynamically at `SidebarView`, hide page-specific toolbar items through `isPlayerOverlayPresented`, preserve the native toolbar, and restore captured `NSWindow` titlebar properties after dismissal.
+**Use:** Mount the complete fixed-size lyrics shell offscreen before animating it. Keep the library mounted but noninteractive, remove the default sidebar item dynamically at `SidebarView`, and hide page-specific toolbar items through `isPlayerOverlayPresented`. Preserve the native toolbar for normal and windowed presentation. While embedded lyrics are full screen, temporarily hide the retained toolbar through the focused `NSWindow` bridge, fill the complete content area, and use a lyrics-owned immersive close control. Reapply the full-screen state on AppKit transition notifications and restore all captured titlebar and toolbar properties on exit or dismissal.
 
 ## macOS Toolbar Trailing Placement
 

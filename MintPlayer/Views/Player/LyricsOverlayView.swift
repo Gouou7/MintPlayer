@@ -155,10 +155,11 @@ struct LyricsOverlayView: View {
             } label: {
                 Image(systemName: "backward.fill")
                     .font(.system(size: 27, weight: .semibold))
-                    .frame(width: 34, height: 34)
+                    .frame(width: 58, height: 58)
+                    .contentShape(Circle())
                     .symbolEffect(.wiggle, value: previousButtonWiggleID)
             }
-            .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 46, height: 46)))
+            .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 58, height: 58)))
             .help(settings.text(.previous))
 
             Spacer(minLength: 24)
@@ -181,10 +182,11 @@ struct LyricsOverlayView: View {
             } label: {
                 Image(systemName: "forward.fill")
                     .font(.system(size: 27, weight: .semibold))
-                    .frame(width: 34, height: 34)
+                    .frame(width: 58, height: 58)
+                    .contentShape(Circle())
                     .symbolEffect(.wiggle, value: nextButtonWiggleID)
             }
-            .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 46, height: 46)))
+            .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 58, height: 58)))
             .help(settings.text(.next))
 
             Spacer(minLength: 24)
@@ -944,18 +946,44 @@ struct EmbeddedLyricsPresentationLayer: View {
     let song: Song
     let isVisible: Bool
     let reducesMotion: Bool
+    let showsImmersiveControls: Bool
     let onClose: () -> Void
 
     var body: some View {
         GeometryReader { geometry in
             LyricsOverlayView(song: song, onClose: onClose)
                 .frame(width: geometry.size.width, height: geometry.size.height)
+                .overlay(alignment: .topTrailing) {
+                    if showsImmersiveControls {
+                        ImmersiveLyricsControls(onClose: onClose)
+                            .padding(.top, 20)
+                            .padding(.trailing, 24)
+                    }
+                }
                 .compositingGroup()
                 .offset(y: reducesMotion || isVisible ? 0 : geometry.size.height)
                 .opacity(reducesMotion ? (isVisible ? 1 : 0) : 1)
         }
         .clipped()
         .ignoresSafeArea(.container, edges: .top)
+    }
+}
+
+private struct ImmersiveLyricsControls: View {
+    @EnvironmentObject private var settings: SettingsManager
+    let onClose: () -> Void
+
+    var body: some View {
+        Button(action: onClose) {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
+        }
+        .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 36, height: 36)))
+        .modifier(CircleGlassButtonSurface())
+        .help(settings.text(.close))
+        .accessibilityLabel(settings.text(.close))
     }
 }
 

@@ -30,9 +30,10 @@
 - Use separate mounted and visible states. Apply movement, or reduced-motion opacity, to one fixed-size composited shell containing the complete lyrics surface.
 - Do not give the background, artwork, scrolling content, or controls independent page transitions.
 - Remove the default sidebar toggle dynamically from the `SidebarView` that owns it with `.toolbar(removing: isLyricsMounted ? .sidebarToggle : nil)`. Permanent removal breaks normal sidebar control, while disabling the split view only grays the button.
-- Keep the native window toolbar mounted. Hiding the whole toolbar moves the traffic lights.
+- Keep the native window toolbar mounted for the normal main interface and windowed lyrics presentation. Do not remove or replace it.
 - Temporarily make the titlebar transparent through the focused `NSWindow` bridge, and restore every captured window property on dismissal or teardown.
-- On macOS 26, keep the embedded lyrics close action at the toolbar tail with `ToolbarSpacer(.flexible)` followed by an `.automatic` toolbar item. `.topBarTrailing` is unavailable on macOS, and `.secondaryAction` may be placed near the center.
+- When embedded lyrics enter full screen, let the focused `NSWindow` bridge temporarily hide the retained toolbar so the lyrics surface fills the complete window. Use the lyrics-owned immersive control layer for closing, then restore toolbar visibility as full screen or lyrics presentation ends.
+- On macOS 26, keep the windowed embedded-lyrics close action at the toolbar tail with `ToolbarSpacer(.flexible)` followed by an `.automatic` toolbar item. `.topBarTrailing` is unavailable on macOS, and `.secondaryAction` may be placed near the center.
 - Library search and detail-navigation toolbar items must honor `isPlayerOverlayPresented` so they do not appear above embedded lyrics.
 
 See [Architecture](architecture.md) for the presentation boundary and [Implementation Notes](implementation-notes.md) for the failure modes behind these constraints.

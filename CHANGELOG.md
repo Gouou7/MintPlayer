@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - None.
 
 ### Fixed
-- None.
+- Fixed embedded lyrics sometimes leaving an uncovered toolbar strip at the top after the main window entered full screen.
+- Fixed the full-screen lyrics close button only responding on its chevron or lacking hover feedback, and expanded the previous and next track hover targets.
 
 ### Security
 - None.
