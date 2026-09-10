@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Updated library backgrounds to follow the system's wallpaper tinting, with native song table headers that keep scrolling content separate.
+- Switched sidebar row selection to the native list appearance and behavior.
+- Changed the player bar progress and volume sliders to grayscale, made the progress thumb solid on hover, and marked favorites with a monochrome filled heart.
 
 ### Fixed
 - Limited sidebar resizing to 204–300 points so it cannot grow too wide and crowd the library content.
+- Kept the volume popover and slider layout stable as the speaker icon changes during volume adjustment.
 
 ## [0.11.2] - 2026-07-29
 

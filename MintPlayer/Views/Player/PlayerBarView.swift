@@ -139,7 +139,6 @@ struct PlayerBarView: View {
         HStack(spacing: 14) {
             PlayerIconButton(
                 systemName: currentSongIsFavorite ? "heart.fill" : "heart",
-                isActive: currentSongIsFavorite,
                 isDisabled: audioPlayer.currentSong == nil
             ) {
                 toggleCurrentSongFavorite()
@@ -168,7 +167,7 @@ struct PlayerBarView: View {
             .help(settings.text(.volume))
             .popover(isPresented: $isVolumePresented, arrowEdge: .bottom) {
                 volumeControl
-                    .frame(width: 220)
+                    .frame(width: 220, height: 24)
                     .padding(14)
             }
         }
@@ -193,6 +192,7 @@ struct PlayerBarView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.secondary)
+                .frame(width: 28, height: 24)
 
             Slider(
                 value: Binding(
@@ -202,6 +202,9 @@ struct PlayerBarView: View {
                 in: 0...1
             )
             .controlSize(.small)
+            .tint(.gray)
+            .accentColor(.gray)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -390,6 +393,7 @@ private struct PlayerBarIconButtonStyle: ButtonStyle {
 }
 
 private struct HoverProgressSlider: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Binding var value: TimeInterval
     let range: ClosedRange<TimeInterval>
     let isEnabled: Bool
@@ -414,17 +418,13 @@ private struct HoverProgressSlider: View {
                     .frame(height: trackHeight)
 
                 Capsule()
-                    .fill(MintTheme.accent)
+                    .fill(Color.primary.opacity(0.65))
                     .frame(width: max(progressWidth, progress > 0 ? trackHeight : 0), height: trackHeight)
 
                 Circle()
-                    .fill(MintTheme.accent)
+                    .fill(colorScheme == .dark ? Color.white : Color.black)
                     .frame(width: knobDiameter, height: knobDiameter)
                     .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
-                    .overlay {
-                        Circle()
-                            .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
-                    }
                     .position(x: progressWidth, y: hitHeight / 2)
                     .opacity(showsKnob ? 1 : 0)
             }

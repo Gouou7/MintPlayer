@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct SidebarRow: View {
     let title: String
@@ -29,48 +28,5 @@ struct SidebarRow: View {
 
     private var iconColor: Color {
         controlActiveState == .inactive ? .secondary : MintTheme.accent
-    }
-}
-
-struct MintSidebarRowButtonStyle: ButtonStyle {
-    var isSelected = false
-    var isHighlighted = false
-    var cornerRadius = MintTheme.selectedRowCornerRadius
-
-    func makeBody(configuration: Configuration) -> Body {
-        Body(
-            configuration: configuration,
-            isSelected: isSelected,
-            isHighlighted: isHighlighted,
-            cornerRadius: cornerRadius
-        )
-    }
-
-    struct Body: View {
-        let configuration: Configuration
-        let isSelected: Bool
-        let isHighlighted: Bool
-        let cornerRadius: CGFloat
-        @State private var isHovered = false
-
-        private var shape: RoundedRectangle {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        }
-
-        var body: some View {
-            configuration.label
-                .background {
-                    if isSelected {
-                        shape.fill(Color(nsColor: .unemphasizedSelectedContentBackgroundColor))
-                    } else if configuration.isPressed {
-                        shape.fill(MintTheme.pressedFill)
-                    } else if isHovered || isHighlighted {
-                        shape.fill(MintTheme.hoverFill)
-                    }
-                }
-                .opacity(configuration.isPressed ? 0.86 : 1)
-                .contentShape(shape)
-                .onHover { isHovered = $0 }
-        }
     }
 }

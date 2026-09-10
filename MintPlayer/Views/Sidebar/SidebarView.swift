@@ -18,22 +18,17 @@ struct SidebarView: View {
     @State private var playlistEditorDraft: PlaylistEditorDraft?
     @State private var playlistPendingDeletion: Playlist?
     @State private var folderPendingDeletion: MusicLibrarySource?
-    @State private var dropTargetedPlaylistID: Playlist.ID?
 
     var body: some View {
         VStack(spacing: 0) {
-            List {
+            List(selection: listSelection) {
                 Section {
                     ForEach(orderedLibraryItems, id: \.self) { item in
-                        Button {
-                            selection = item.selection
-                        } label: {
-                            SidebarRow(
-                                title: item.title(language: settings.effectiveLanguage),
-                                systemImage: item.systemImage
-                            )
-                        }
-                        .buttonStyle(MintSidebarRowButtonStyle(isSelected: selection == item.selection))
+                        SidebarRow(
+                            title: item.title(language: settings.effectiveLanguage),
+                            systemImage: item.systemImage
+                        )
+                        .tag(item.selection)
                     }
                     .onMove(perform: moveLibraryItems)
                 }
@@ -44,17 +39,11 @@ struct SidebarView: View {
                             emptyRow(settings.text(.noPlaylists))
                         } else {
                             ForEach(musicLibrary.playlists, id: \.id) { playlist in
-                                let isDropTargeted = dropTargetedPlaylistID == playlist.id
-
-                                Button {
-                                    selection = .playlist(playlist.id)
-                                } label: {
-                                    SidebarRow(
-                                        title: playlist.name,
-                                        systemImage: "music.note.list"
-                                    )
-                                }
-                                .buttonStyle(MintSidebarRowButtonStyle(isSelected: selection == .playlist(playlist.id), isHighlighted: isDropTargeted))
+                                SidebarRow(
+                                    title: playlist.name,
+                                    systemImage: "music.note.list"
+                                )
+                                .tag(LibrarySelection.playlist(playlist.id))
                                 .contextMenu {
                                     Button {
                                         editPlaylist(playlist)
@@ -75,7 +64,7 @@ struct SidebarView: View {
                                         musicLibrary: musicLibrary
                                     )
                                 }
-                                .onDrop(of: SongDragPayload.acceptedContentTypes, isTargeted: dropTargetBinding(for: playlist.id)) { providers in
+                                .onDrop(of: SongDragPayload.acceptedContentTypes, isTargeted: nil) { providers in
                                     SongDragPayload.loadSongs(from: providers, musicLibrary: musicLibrary) { songs in
                                         musicLibrary.addSongsToPlaylist(songs, playlistId: playlist.id)
                                     }
@@ -102,15 +91,11 @@ struct SidebarView: View {
                             emptyRow(settings.text(.noFolders))
                         } else {
                             ForEach(musicLibrary.librarySources, id: \.id) { source in
-                                Button {
-                                    selection = .folder(source.id)
-                                } label: {
-                                    SidebarRow(
-                                        title: source.name,
-                                        systemImage: "folder.fill"
-                                    )
-                                }
-                                .buttonStyle(MintSidebarRowButtonStyle(isSelected: selection == .folder(source.id)))
+                                SidebarRow(
+                                    title: source.name,
+                                    systemImage: "folder.fill"
+                                )
+                                .tag(LibrarySelection.folder(source.id))
                                 .contextMenu {
                                     Button {
                                         folderPendingDeletion = source
@@ -221,6 +206,17 @@ struct SidebarView: View {
         return [.favorites] + movableItems
     }
 
+    private var listSelection: Binding<LibrarySelection?> {
+        Binding(
+            get: { selection },
+            set: { newSelection in
+                if let newSelection {
+                    selection = newSelection
+                }
+            }
+        )
+    }
+
     private var playlistDeletionConfirmationBinding: Binding<Bool> {
         Binding(
             get: { playlistPendingDeletion != nil },
@@ -249,19 +245,6 @@ struct SidebarView: View {
             .foregroundStyle(.secondary)
             .padding(.leading, 36)
             .padding(.vertical, 7)
-    }
-
-    private func dropTargetBinding(for playlistId: Playlist.ID) -> Binding<Bool> {
-        Binding(
-            get: { dropTargetedPlaylistID == playlistId },
-            set: { isTargeted in
-                if isTargeted {
-                    dropTargetedPlaylistID = playlistId
-                } else if dropTargetedPlaylistID == playlistId {
-                    dropTargetedPlaylistID = nil
-                }
-            }
-        )
     }
 
     private func importFolder() {
