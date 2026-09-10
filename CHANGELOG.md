@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Updated library backgrounds and song table headers to follow the system's wallpaper tinting.
 
+### Fixed
+- Limited sidebar resizing to 204–300 points so it cannot grow too wide and crowd the library content.
+
 ## [0.11.2] - 2026-07-29
 
 ### Changed

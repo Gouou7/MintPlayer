@@ -25,7 +25,11 @@ struct MainView: View {
         ZStack {
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 SidebarView(selection: $selection)
-                    .navigationSplitViewColumnWidth(min: 204, ideal: 260, max: 300)
+                    .navigationSplitViewColumnWidth(
+                        min: SidebarWidth.minimum,
+                        ideal: SidebarWidth.ideal,
+                        max: SidebarWidth.maximum
+                    )
                     .toolbar(removing: isLyricsMounted ? .sidebarToggle : nil)
             } detail: {
                 ZStack(alignment: .bottom) {

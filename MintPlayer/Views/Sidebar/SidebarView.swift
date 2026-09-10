@@ -1,6 +1,12 @@
 import SwiftUI
 import AppKit
 
+enum SidebarWidth {
+    static let minimum: CGFloat = 204
+    static let ideal: CGFloat = 260
+    static let maximum: CGFloat = 300
+}
+
 struct SidebarView: View {
     @Binding var selection: LibrarySelection
     @EnvironmentObject private var musicLibrary: MusicLibrary
@@ -132,7 +138,11 @@ struct SidebarView: View {
 
             footer
         }
-        .frame(minWidth: 204)
+        .frame(minWidth: SidebarWidth.minimum)
+        .background {
+            SidebarWidthConfigurator()
+                .frame(width: 0, height: 0)
+        }
         .sheet(item: $playlistEditorDraft) { draft in
             PlaylistEditorSheet(
                 draft: draft,
@@ -314,6 +324,76 @@ struct SidebarView: View {
         musicLibrary.removeLibrarySource(id: source.id)
         if selection == .folder(source.id) {
             selection = .songs
+        }
+    }
+}
+
+private struct SidebarWidthConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> HostView {
+        HostView()
+    }
+
+    func updateNSView(_ nsView: HostView, context: Context) {
+        nsView.configureWidth()
+    }
+
+    static func dismantleNSView(_ nsView: HostView, coordinator: ()) {
+        nsView.restoreWidth()
+    }
+
+    final class HostView: NSView {
+        private weak var configuredItem: NSSplitViewItem?
+        private var originalMinimum: CGFloat = NSSplitViewItem.unspecifiedDimension
+        private var originalMaximum: CGFloat = NSSplitViewItem.unspecifiedDimension
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            configureWidth()
+        }
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            configureWidth()
+        }
+
+        override func layout() {
+            super.layout()
+            configureWidth()
+        }
+
+        func configureWidth() {
+            var ancestor = superview
+            while let view = ancestor {
+                if let splitView = view as? NSSplitView,
+                   let controller = splitView.delegate as? NSSplitViewController,
+                   let item = controller.splitViewItems.first(where: {
+                       $0.behavior == .sidebar && isDescendant(of: $0.viewController.view)
+                   }) {
+                    if configuredItem !== item {
+                        restoreWidth()
+                        configuredItem = item
+                        originalMinimum = item.minimumThickness
+                        originalMaximum = item.maximumThickness
+                    }
+
+                    // SwiftUI column widths are preferences; AppKit enforces divider limits.
+                    if item.minimumThickness != SidebarWidth.minimum {
+                        item.minimumThickness = SidebarWidth.minimum
+                    }
+                    if item.maximumThickness != SidebarWidth.maximum {
+                        item.maximumThickness = SidebarWidth.maximum
+                    }
+                    return
+                }
+                ancestor = view.superview
+            }
+        }
+
+        func restoreWidth() {
+            guard let item = configuredItem else { return }
+            configuredItem = nil
+            item.minimumThickness = originalMinimum
+            item.maximumThickness = originalMaximum
         }
     }
 }
