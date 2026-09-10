@@ -87,7 +87,6 @@ struct SongsView: View {
             .padding(.top, 28)
             .padding(.bottom, 0)
         }
-        .background(Color(nsColor: NativeSongBackgroundColor.value))
         .toolbar {
             if !isPlayerOverlayPresented {
                 ToolbarItem(placement: .primaryAction) {
@@ -216,8 +215,4 @@ struct SongsView: View {
     private func shuffleDisplayedSongs() {
         audioPlayer.shuffle(songs: displayedSongs)
     }
-}
-
-private enum NativeSongBackgroundColor {
-    static let value = NSColor.windowBackgroundColor
 }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Updated library backgrounds and song table headers to follow the system's wallpaper tinting.
+
 ## [0.11.2] - 2026-07-29
 
 ### Changed

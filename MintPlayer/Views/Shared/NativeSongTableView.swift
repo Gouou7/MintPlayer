@@ -159,7 +159,7 @@ private final class InteractiveSongTableHeaderView: NSTableHeaderView {
     }
 
     override var isOpaque: Bool {
-        true
+        false
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -167,14 +167,9 @@ private final class InteractiveSongTableHeaderView: NSTableHeaderView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        drawBackground(in: dirtyRect)
+        // Share the library's wallpaper-tinted window background through the header.
         drawHeaderCells(in: dirtyRect)
         drawBottomSeparator()
-    }
-
-    private func drawBackground(in dirtyRect: NSRect) {
-        NSColor.windowBackgroundColor.setFill()
-        dirtyRect.fill()
     }
 
     private func drawHeaderCells(in dirtyRect: NSRect) {

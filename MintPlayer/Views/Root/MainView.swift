@@ -39,6 +39,7 @@ struct MainView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.bottom, 20)
                 }
+                .background(.windowBackground)
             }
             .navigationTitle(isLyricsMounted ? "" : currentTitle)
             .scrollEdgeEffectStyle(.soft, for: .top)
