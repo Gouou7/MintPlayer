@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+
+## [0.13.1] - 2026-09-11
+
+### Changed
+- Updated accent colors and selection styling across the sidebar, song and artist lists, playback controls, and queue to better match the native macOS appearance.
+
 ## [0.13.0] - 2026-09-11
 
 ### Added
