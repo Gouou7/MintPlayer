@@ -14,7 +14,6 @@ struct MintPlayerApp: App {
                 .environmentObject(audioPlayer)
                 .environmentObject(musicLibrary)
                 .environmentObject(settings)
-                .tint(MintTheme.accent)
                 .preferredColorScheme(settings.preferredColorScheme)
                 .onAppear {
                     appDelegate.configure(audioPlayer: audioPlayer, musicLibrary: musicLibrary)
@@ -29,7 +28,6 @@ struct MintPlayerApp: App {
             LyricsWindowView()
                 .environmentObject(audioPlayer)
                 .environmentObject(settings)
-                .tint(MintTheme.accent)
                 .preferredColorScheme(.dark)
                 .toolbar(removing: .title)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
@@ -58,7 +56,6 @@ struct MintPlayerApp: App {
                 .environmentObject(audioPlayer)
                 .environmentObject(musicLibrary)
                 .environmentObject(settings)
-                .tint(MintTheme.accent)
                 .preferredColorScheme(settings.preferredColorScheme)
         }
         .defaultWindowPlacement { _, context in

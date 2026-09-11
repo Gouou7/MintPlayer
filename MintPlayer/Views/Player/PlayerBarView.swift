@@ -385,7 +385,7 @@ private struct PlayerBarIconButtonStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .foregroundStyle(isActive ? MintTheme.accent : inactiveColor)
+                .foregroundStyle(isActive ? Color.accentColor : inactiveColor)
                 .background {
                     if configuration.isPressed {
                         Circle().fill(MintTheme.pressedFill)

@@ -518,11 +518,6 @@ extension NativeSongTableView {
             parent.songs.count
         }
 
-        func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
-            let verticalInset: CGFloat = parent.style == .compactFolder ? 2 : 3
-            return MintTableRowView(verticalInset: verticalInset)
-        }
-
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
             guard parent.songs.indices.contains(row), let column = tableColumn.flatMap({ NativeSongColumn(rawValue: $0.identifier.rawValue) }) else {
                 return nil
@@ -1398,7 +1393,7 @@ private struct FavoriteCell: View {
                 .foregroundStyle(.primary)
                 .frame(width: 24, height: 24)
         }
-        .buttonStyle(MintPlainIconButtonStyle(isActive: isFavorite))
+        .buttonStyle(MintPlainIconButtonStyle())
         .frame(maxWidth: .infinity, minHeight: 24, alignment: .center)
     }
 }

@@ -156,7 +156,7 @@ struct QueueView: View {
         Button(action: action) {
             queueRowContent(song: song, isCurrent: isCurrent)
         }
-        .buttonStyle(MintRowButtonStyle(isSelected: isCurrent))
+        .buttonStyle(.plain)
     }
 
     private func queueRowContent(song: Song, isCurrent: Bool) -> some View {
@@ -164,7 +164,7 @@ struct QueueView: View {
             Image(systemName: isCurrent ? "speaker.wave.2.fill" : "music.note")
                 .font(.system(size: 20, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(isCurrent ? MintTheme.accent : Color.secondary)
+                .foregroundStyle(isCurrent ? Color.accentColor : Color.secondary)
                 .frame(width: 26)
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title).lineLimit(1)

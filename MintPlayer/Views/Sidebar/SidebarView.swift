@@ -26,8 +26,10 @@ struct SidebarView: View {
                     ForEach(orderedLibraryItems, id: \.self) { item in
                         SidebarRow(
                             title: item.title(language: settings.effectiveLanguage),
-                            systemImage: item.systemImage
+                            systemImage: item.systemImage,
+                            isSelected: selection == item.selection
                         )
+                        .listRowBackground(Color.clear)
                         .tag(item.selection)
                     }
                     .onMove(perform: moveLibraryItems)
@@ -41,8 +43,10 @@ struct SidebarView: View {
                             ForEach(musicLibrary.playlists, id: \.id) { playlist in
                                 SidebarRow(
                                     title: playlist.name,
-                                    systemImage: "music.note.list"
+                                    systemImage: "music.note.list",
+                                    isSelected: selection == .playlist(playlist.id)
                                 )
+                                .listRowBackground(Color.clear)
                                 .tag(LibrarySelection.playlist(playlist.id))
                                 .contextMenu {
                                     Button {
@@ -93,8 +97,10 @@ struct SidebarView: View {
                             ForEach(musicLibrary.librarySources, id: \.id) { source in
                                 SidebarRow(
                                     title: source.name,
-                                    systemImage: "folder.fill"
+                                    systemImage: "folder.fill",
+                                    isSelected: selection == .folder(source.id)
                                 )
+                                .listRowBackground(Color.clear)
                                 .tag(LibrarySelection.folder(source.id))
                                 .contextMenu {
                                     Button {
@@ -118,14 +124,14 @@ struct SidebarView: View {
                 }
             }
             .listStyle(.sidebar)
-            .tint(MintTheme.accent)
-            .accentColor(MintTheme.accent)
 
             footer
         }
         .frame(minWidth: SidebarWidth.minimum)
         .background {
             SidebarWidthConfigurator()
+                .frame(width: 0, height: 0)
+            SidebarSelectionConfigurator()
                 .frame(width: 0, height: 0)
         }
         .sheet(item: $playlistEditorDraft) { draft in
@@ -377,6 +383,81 @@ private struct SidebarWidthConfigurator: NSViewRepresentable {
             configuredItem = nil
             item.minimumThickness = originalMinimum
             item.maximumThickness = originalMaximum
+        }
+    }
+}
+
+private struct SidebarSelectionConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> HostView {
+        HostView()
+    }
+
+    func updateNSView(_ nsView: HostView, context: Context) {
+        nsView.disableNativeSelectionHighlight()
+    }
+
+    static func dismantleNSView(_ nsView: HostView, coordinator: ()) {
+        nsView.restoreNativeSelectionHighlight()
+    }
+
+    final class HostView: NSView {
+        private weak var configuredTableView: NSTableView?
+        private var originalSelectionHighlightStyle: NSTableView.SelectionHighlightStyle?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            disableNativeSelectionHighlight()
+        }
+
+        override func layout() {
+            super.layout()
+            disableNativeSelectionHighlight()
+        }
+
+        func disableNativeSelectionHighlight() {
+            guard let tableView = nearestSourceList() else { return }
+
+            if configuredTableView !== tableView {
+                restoreNativeSelectionHighlight()
+                configuredTableView = tableView
+                originalSelectionHighlightStyle = tableView.selectionHighlightStyle
+            }
+
+            // Source-list selection uses the app accent; the SwiftUI row draws the Finder-style gray state.
+            if tableView.selectionHighlightStyle != .none {
+                tableView.selectionHighlightStyle = .none
+            }
+        }
+
+        func restoreNativeSelectionHighlight() {
+            guard let configuredTableView, let originalSelectionHighlightStyle else { return }
+            configuredTableView.selectionHighlightStyle = originalSelectionHighlightStyle
+            self.configuredTableView = nil
+            self.originalSelectionHighlightStyle = nil
+        }
+
+        private func nearestSourceList() -> NSTableView? {
+            var ancestor = superview
+            while let view = ancestor {
+                if let tableView = findSourceList(in: view) {
+                    return tableView
+                }
+                ancestor = view.superview
+            }
+            return nil
+        }
+
+        private func findSourceList(in view: NSView) -> NSTableView? {
+            if let tableView = view as? NSTableView, tableView.effectiveStyle == .sourceList {
+                return tableView
+            }
+
+            for subview in view.subviews {
+                if let tableView = findSourceList(in: subview) {
+                    return tableView
+                }
+            }
+            return nil
         }
     }
 }

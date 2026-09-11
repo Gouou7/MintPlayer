@@ -221,7 +221,7 @@ struct AlbumDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Text(album.artist)
                 .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(MintTheme.accent)
+                .foregroundStyle(Color.accentColor)
                 .lineLimit(1)
                 .truncationMode(.tail)
 

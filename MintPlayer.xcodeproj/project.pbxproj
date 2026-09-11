@@ -52,6 +52,7 @@
 		00000000000000000000012D /* MintPlayer/Views/Shared/ListPlaybackControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022E /* MintPlayer/Views/Shared/ListPlaybackControls.swift */; };
 		00000000000000000000012E /* MintPlayer/Services/LibraryPersistenceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022F /* MintPlayer/Services/LibraryPersistenceStore.swift */; };
 		00000000000000000000012F /* MintPlayer/App/AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000230 /* MintPlayer/App/AppConfiguration.swift */; };
+		7A1100012F00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7A1100022F00000000000001 /* Assets.xcassets */; };
 		6B8086182F99168000930F3F /* MintPlayer.icon in Resources */ = {isa = PBXBuildFile; fileRef = 6B8086172F99168000930F3F /* MintPlayer.icon */; };
 /* End PBXBuildFile section */
 
@@ -104,6 +105,7 @@
 		000000000000000000000230 /* MintPlayer/App/AppConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/App/AppConfiguration.swift; sourceTree = "<group>"; };
 		000000000000000000000301 /* Mint Player Debug.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Mint Player Debug.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6B8086172F99168000930F3F /* MintPlayer.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = MintPlayer.icon; path = MintPlayer/Icons/MintPlayer.icon; sourceTree = "<group>"; };
+		7A1100022F00000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = MintPlayer/Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,6 +135,7 @@
 				000000000000000000000506 /* Stores */,
 				000000000000000000000507 /* Services */,
 				000000000000000000000508 /* Views */,
+				7A1100022F00000000000001 /* Assets.xcassets */,
 				6B8086172F99168000930F3F /* MintPlayer.icon */,
 			);
 			name = MintPlayer;
@@ -358,6 +361,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7A1100012F00000000000001 /* Assets.xcassets in Resources */,
 				6B8086182F99168000930F3F /* MintPlayer.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -450,6 +454,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = MintPlayer;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -523,6 +528,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = MintPlayer;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";

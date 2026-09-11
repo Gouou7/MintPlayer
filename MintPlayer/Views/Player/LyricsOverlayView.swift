@@ -675,7 +675,7 @@ private struct PlaybackToggleButtonStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .foregroundStyle(isActive ? MintTheme.accent : Color.secondary)
+                .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
                 .frame(width: hoverSize, height: hoverSize)
                 .opacity(configuration.isPressed ? 0.78 : 1)
                 .contentShape(Circle())
@@ -1241,7 +1241,6 @@ private struct EmptyLyricsWindowView: View {
 
                 Button(settings.text(.close), action: onClose)
                     .buttonStyle(.borderedProminent)
-                    .tint(MintTheme.accent)
             }
         }
         .onAppear {
