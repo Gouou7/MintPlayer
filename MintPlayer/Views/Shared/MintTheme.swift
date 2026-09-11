@@ -2,6 +2,14 @@ import SwiftUI
 import AppKit
 
 enum MintTheme {
+    // Share an opaque surface across SwiftUI content and AppKit table headers.
+    static let contentBackgroundNSColor = NSColor(name: nil) { appearance in
+        let match = appearance.bestMatch(from: [.darkAqua, .aqua])
+        return NSColor(hex: match == .darkAqua ? 0x202428 : 0xF5F5F5)
+    }
+
+    static let contentBackground = Color(nsColor: contentBackgroundNSColor)
+
     static let accentNSColor = NSColor(name: nil) { appearance in
         let match = appearance.bestMatch(from: [.darkAqua, .aqua])
         return NSColor(hex: match == .darkAqua ? 0xAAFFC7 : 0x67C090)

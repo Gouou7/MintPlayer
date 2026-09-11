@@ -153,10 +153,129 @@ private final class InteractiveSongTableView: NSTableView {
 
 private final class InteractiveSongTableHeaderView: NSTableHeaderView {
     weak var menuProvider: SongTableHeaderMenuProvider?
+    private var hoverTrackingArea: NSTrackingArea?
+    private(set) var hoveredColumn = -1
 
-    // Keep AppKit's header background, labels, and sort indicators intact.
+    override var isOpaque: Bool { true }
+    override var allowsVibrancy: Bool { false }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let trackingArea = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        hoverTrackingArea = trackingArea
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        updateHoveredColumn(with: event)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        updateHoveredColumn(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        hoveredColumn = -1
+        needsDisplay = true
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        // AppKit still owns mouse tracking; omit its material and border drawing.
+        MintTheme.contentBackgroundNSColor.setFill()
+        bounds.fill()
+
+        guard let tableView else { return }
+        for index in tableView.tableColumns.indices where index != draggedColumn {
+            let rect = headerRect(ofColumn: index)
+            guard rect.intersects(dirtyRect) else { continue }
+            tableView.tableColumns[index].headerCell.draw(withFrame: rect, in: self)
+        }
+
+        if tableView.tableColumns.indices.contains(draggedColumn) {
+            let rect = headerRect(ofColumn: draggedColumn).offsetBy(dx: draggedDistance, dy: 0)
+            tableView.tableColumns[draggedColumn].headerCell.draw(withFrame: rect, in: self)
+        }
+    }
+
+    private func updateHoveredColumn(with event: NSEvent) {
+        let column = column(at: convert(event.locationInWindow, from: nil))
+        guard hoveredColumn != column else { return }
+        hoveredColumn = column
+        needsDisplay = true
+    }
+
     override func menu(for event: NSEvent) -> NSMenu? {
         menuProvider?.columnVisibilityMenu()
+    }
+}
+
+private final class FlatSongTableHeaderCell: NSTableHeaderCell {
+    override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
+        MintTheme.contentBackgroundNSColor.setFill()
+        cellFrame.fill()
+
+        let headerView = controlView as? InteractiveSongTableHeaderView
+        let tableView = headerView?.tableView
+        let columnIndex = tableView?.tableColumns.firstIndex { $0.headerCell === self }
+        let column = columnIndex.flatMap { tableView?.tableColumns[$0] }
+        let sortDescriptor = tableView?.sortDescriptors.first
+        let isSorted = column?.sortDescriptorPrototype?.key != nil &&
+            column?.sortDescriptorPrototype?.key == sortDescriptor?.key
+
+        if isHighlighted {
+            NSColor.labelColor.withAlphaComponent(0.05).setFill()
+            cellFrame.fill()
+        }
+
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = alignment
+        paragraphStyle.lineBreakMode = .byTruncatingTail
+        let title = NSAttributedString(string: stringValue, attributes: [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .medium),
+            .foregroundColor: isSorted ? NSColor.labelColor : NSColor.secondaryLabelColor,
+            .paragraphStyle: paragraphStyle
+        ])
+        var titleRect = cellFrame.insetBy(dx: 10, dy: 0)
+        if isSorted {
+            let indicatorRect = sortIndicatorRect(forBounds: cellFrame)
+            titleRect.size.width = max(0, min(titleRect.maxX, indicatorRect.minX - 4) - titleRect.minX)
+        }
+        titleRect.size.width = max(0, titleRect.width)
+        titleRect.size.height = min(cellFrame.height, ceil(title.size().height))
+        titleRect.origin.y = cellFrame.midY - titleRect.height / 2
+        title.draw(in: titleRect)
+
+        if isSorted, let sortDescriptor {
+            drawSortIndicator(withFrame: cellFrame, in: controlView, ascending: sortDescriptor.ascending, priority: 0)
+        }
+
+        if let columnIndex, let headerView,
+           headerView.hoveredColumn == columnIndex || headerView.resizedColumn == columnIndex {
+            let pixel = 1 / (controlView.window?.backingScaleFactor ?? 2)
+            NSColor.labelColor.withAlphaComponent(0.12).setFill()
+            NSRect(x: cellFrame.maxX - pixel, y: cellFrame.minY + 6, width: pixel, height: max(0, cellFrame.height - 12)).fill()
+        }
+    }
+
+    override func highlight(_ flag: Bool, withFrame cellFrame: NSRect, in controlView: NSView) {
+        isHighlighted = flag
+        draw(withFrame: cellFrame, in: controlView)
     }
 }
 
@@ -264,6 +383,7 @@ extension NativeSongTableView {
                 )
                 headerView.menuProvider = self
                 tableView.headerView = headerView
+                tableView.cornerView = nil
             } else {
                 tableView.headerView = nil
             }
@@ -645,6 +765,7 @@ extension NativeSongTableView {
         private func addColumn(_ id: NativeSongColumn, title: String, width: CGFloat, minWidth: CGFloat, sortKey: String? = nil) {
             guard let tableView else { return }
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id.rawValue))
+            column.headerCell = FlatSongTableHeaderCell(textCell: title)
             column.title = title
             column.headerCell.alignment = headerAlignment(for: id)
             column.minWidth = minWidth
