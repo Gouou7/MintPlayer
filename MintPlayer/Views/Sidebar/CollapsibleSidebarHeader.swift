@@ -10,37 +10,53 @@ struct CollapsibleSidebarHeader: View {
     @State private var isHovering = false
     
     var body: some View {
-        HStack(spacing: 6) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .textCase(.none)
-            
-            Spacer(minLength: 16)
-            
-            if let addSystemImage, let addAction {
-                Button(action: addAction) {
-                    Image(systemName: addSystemImage)
-                        .font(.system(size: 11, weight: .bold))
-                        .frame(width: 24, height: 22)
-                }
-                .buttonStyle(MintPlainIconButtonStyle(inactiveForeground: .secondary, hoverSize: CGSize(width: 26, height: 22)))
-                .help(addHelp ?? "")
-                .opacity(isHovering ? 1 : 0)
-            }
-            
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .bold))
-                .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                .opacity(isHovering ? 1 : 0)
-        }
-        .foregroundStyle(.secondary)
-        .padding(.trailing, 18)
-        .contentShape(Rectangle())
-        .onTapGesture {
+        Button {
             withAnimation(.easeInOut(duration: 0.16)) {
                 isExpanded.toggle()
             }
+        } label: {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .textCase(.none)
+
+                Spacer(minLength: 16)
+
+                if addSystemImage != nil, addAction != nil {
+                    Color.clear
+                        .frame(width: 24, height: 22)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .opacity(isHovering ? 1 : 0)
+            }
+            .contentShape(Rectangle())
         }
+        // A native button consumes the click without focusing the enclosing list.
+        .buttonStyle(.plain)
+        .overlay(alignment: .trailing) {
+            if let addSystemImage, let addAction {
+                HStack(spacing: 6) {
+                    Button(action: addAction) {
+                        Image(systemName: addSystemImage)
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 24, height: 22)
+                    }
+                    .buttonStyle(MintPlainIconButtonStyle(inactiveForeground: .secondary, hoverSize: CGSize(width: 26, height: 22)))
+                    .help(addHelp ?? "")
+                    .opacity(isHovering ? 1 : 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .hidden()
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+        .foregroundStyle(.secondary)
+        .padding(.trailing, 18)
         .onHover { isHovering = $0 }
     }
 }
