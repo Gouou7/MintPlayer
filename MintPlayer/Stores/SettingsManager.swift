@@ -6,6 +6,12 @@ class SettingsManager: ObservableObject {
     @Published var language: AppLanguage = .system
     @Published var lyricsPresentationMode: LyricsPresentationMode = .embedded
     @Published var lyricsBlurEnabled = true
+    @Published private(set) var lyricsFilePaths: [String: String] = [:]
+    @Published private(set) var lyricsTimingOffsets: [String: Double] = [:]
+    @Published private(set) var lyricsEncodings: [String: String] = [:]
+    private let lyricsFilesKey = AppConfiguration.userDefaultsKey("settings.lyrics.files")
+    private let lyricsEncodingsKey = AppConfiguration.userDefaultsKey("settings.lyrics.encodings")
+    private let lyricsOffsetsKey = AppConfiguration.userDefaultsKey("settings.lyrics.offsets")
 
     private let userDefaults = UserDefaults.standard
     private let themeKey = AppConfiguration.userDefaultsKey("settings.theme")
@@ -19,6 +25,9 @@ class SettingsManager: ObservableObject {
 
     // 加载设置
     private func loadSettings() {
+        lyricsEncodings = userDefaults.dictionary(forKey: lyricsEncodingsKey) as? [String: String] ?? [:]
+        lyricsFilePaths = userDefaults.dictionary(forKey: lyricsFilesKey) as? [String: String] ?? [:]
+        lyricsTimingOffsets = userDefaults.dictionary(forKey: lyricsOffsetsKey) as? [String: Double] ?? [:]
         if let themeString = userDefaults.string(forKey: themeKey), let savedTheme = ThemeMode(rawValue: themeString) {
             theme = savedTheme
         }
@@ -61,6 +70,35 @@ class SettingsManager: ObservableObject {
     func updateLyricsBlurEnabled(_ isEnabled: Bool) {
         lyricsBlurEnabled = isEnabled
         saveSettings()
+    }
+
+    func lyricsEncoding(for song: Song) -> LyricsTextEncoding {
+        lyricsEncodings[song.path].flatMap(LyricsTextEncoding.init(rawValue:)) ?? .automatic
+    }
+
+    func updateLyricsEncoding(_ encoding: LyricsTextEncoding, for song: Song) {
+        lyricsEncodings[song.path] = encoding == .automatic ? nil : encoding.rawValue
+        userDefaults.set(lyricsEncodings, forKey: lyricsEncodingsKey)
+    }
+
+    func lyricsFileURL(for song: Song) -> URL? {
+        lyricsFilePaths[song.path].map { URL(fileURLWithPath: $0) }
+    }
+
+    func updateLyricsFile(_ url: URL?, for song: Song) {
+        lyricsFilePaths[song.path] = url?.path
+        userDefaults.set(lyricsFilePaths, forKey: lyricsFilesKey)
+    }
+
+    func lyricsTimingOffset(for song: Song) -> TimeInterval {
+        let value = lyricsTimingOffsets[song.path] ?? 0
+        return value.isFinite ? min(max(value, -60), 60) : 0
+    }
+
+    func updateLyricsTimingOffset(_ offset: TimeInterval, for song: Song) {
+        guard offset.isFinite else { return }
+        lyricsTimingOffsets[song.path] = offset == 0 ? nil : min(max(offset, -60), 60)
+        userDefaults.set(lyricsTimingOffsets, forKey: lyricsOffsetsKey)
     }
 
     var preferredColorScheme: ColorScheme? {
@@ -110,6 +148,61 @@ enum AppLanguage: String, CaseIterable {
 
 enum L10n {
     enum Key: String {
+        case lyricsEncoding
+        case automaticEncoding
+        case utf8Encoding
+        case utf16Encoding
+        case gb18030Encoding
+        case big5Encoding
+
+        case retry
+        case scanningFiles
+        case importingFiles
+        case folderUnavailable
+        case folderScanFailed
+        case scanFailureCount
+        case unsupportedAudio
+        case saveStatsFailed
+        case loadLibraryFailed
+        case saveLibraryFailed
+        case databaseOpenFailed
+        case databaseOperationFailed
+        case unsupportedDatabase
+        case databaseUnavailable
+        case unknownError
+        case playbackFailed
+        case audioFileMissing
+        case audioFileUnreadable
+        case audioDecodeFailed
+        case undoClearQueue
+        case removeSelectedQueue
+        case playbackMenu
+        case playPause
+        case focusSearch
+        case playbackPosition
+        case positionValue
+        case addMusicFolder
+        case chooseLyricsFile
+        case lyricsOptions
+        case useMatchingLyrics
+        case lyricsTiming
+        case lyricsEarlier
+        case lyricsLater
+        case resetLyricsTiming
+        case lyricsTimingValue
+        case lyricsEncodingFailed
+        case lyricsParsingFailed
+        case selectedLyricsMissing
+        case noAlbumsYet
+        case lyricsLoading
+        case lyricsReload
+        case lyricsFileReadFailed
+        case noFavoriteSongs
+        case favoriteSongsHint
+        case emptyPlaylist
+        case emptyPlaylistHint
+        case showDetails
+
         case general
         case appearance
         case interfaceTheme
@@ -253,12 +346,72 @@ enum L10n {
         case unknownGenre
     }
 
+    static func current(_ key: Key, _ arguments: CVarArg...) -> String {
+        let storedLanguage = UserDefaults.standard.string(forKey: AppConfiguration.userDefaultsKey("settings.language"))
+        let language = (storedLanguage.flatMap(AppLanguage.init(rawValue:)) ?? .system).resolved
+        let format = text(key, language: language)
+        return arguments.isEmpty ? format : String(format: format, arguments: arguments)
+    }
+
     static func text(_ key: Key, language: AppLanguage) -> String {
         let table = language == .chinese ? zh : en
         return table[key] ?? en[key] ?? key.rawValue
     }
 
     private static let en: [Key: String] = [
+        .lyricsEncoding: "Text Encoding",
+        .automaticEncoding: "Automatic",
+        .utf8Encoding: "UTF-8",
+        .utf16Encoding: "UTF-16",
+        .gb18030Encoding: "GB18030 / GBK",
+        .big5Encoding: "Big5",
+        .retry: "Retry",
+        .scanningFiles: "Scanning · %d files processed",
+        .importingFiles: "Importing · %d files processed",
+        .folderUnavailable: "Folder offline or scan incomplete",
+        .folderScanFailed: "Could not scan “%@”: %@. Existing songs have been kept.",
+        .scanFailureCount: "%d files could not be imported or refreshed.",
+        .unsupportedAudio: "Unsupported audio file type.",
+        .saveStatsFailed: "Could not save play counts: %@",
+        .loadLibraryFailed: "Could not load the library: %@",
+        .saveLibraryFailed: "Could not save the library: %@",
+        .databaseOpenFailed: "Could not open the library database: %@",
+        .databaseOperationFailed: "Database operation failed: %@",
+        .unsupportedDatabase: "This database version is not supported. The existing database has been kept.",
+        .databaseUnavailable: "The library database is unavailable.",
+        .unknownError: "Unknown error",
+        .playbackFailed: "Could not play “%@”: %@",
+        .audioFileMissing: "The audio file is missing. Reconnect its drive or rescan its folder.",
+        .audioFileUnreadable: "The audio file cannot be read. Check folder permissions.",
+        .audioDecodeFailed: "The audio file could not be decoded or playback could not start.",
+        .undoClearQueue: "Undo Clear Queue",
+        .removeSelectedQueue: "Remove Selected Songs",
+        .playbackMenu: "Playback",
+        .playPause: "Play/Pause",
+        .focusSearch: "Search Library",
+        .playbackPosition: "Playback Position",
+        .positionValue: "%@ of %@",
+        .addMusicFolder: "Add Music Folder…",
+        .chooseLyricsFile: "Choose Lyrics File…",
+        .lyricsOptions: "Lyrics Options",
+        .useMatchingLyrics: "Use Matching Lyrics File",
+        .lyricsTiming: "Lyrics Timing",
+        .lyricsEarlier: "Show 0.5 Seconds Earlier",
+        .lyricsLater: "Show 0.5 Seconds Later",
+        .resetLyricsTiming: "Reset Timing",
+        .lyricsTimingValue: "Adjustment: %+.1f s",
+        .lyricsEncodingFailed: "The lyrics file encoding could not be read.",
+        .lyricsParsingFailed: "The lyrics timeline could not be parsed.",
+        .selectedLyricsMissing: "The selected lyrics file “%@” is missing. Choose it again or use the matching file.",
+        .noAlbumsYet: "No albums yet",
+        .lyricsLoading: "Loading lyrics…",
+        .lyricsReload: "Reload Lyrics",
+        .lyricsFileReadFailed: "Could not read the lyrics file: %@",
+        .noFavoriteSongs: "No favorite songs yet",
+        .favoriteSongsHint: "Use the heart button on a song to add it here.",
+        .emptyPlaylist: "This playlist is empty",
+        .emptyPlaylistHint: "Drag songs from your library to this playlist in the sidebar.",
+        .showDetails: "Show Details",
         .general: "General",
         .appearance: "Appearance",
         .interfaceTheme: "Interface Theme",
@@ -403,6 +556,59 @@ enum L10n {
     ]
 
     private static let zh: [Key: String] = [
+        .lyricsEncoding: "文本编码",
+        .automaticEncoding: "自动",
+        .utf8Encoding: "UTF-8",
+        .utf16Encoding: "UTF-16",
+        .gb18030Encoding: "GB18030 / GBK",
+        .big5Encoding: "Big5",
+        .retry: "重试",
+        .scanningFiles: "正在扫描 · 已处理 %d 个文件",
+        .importingFiles: "正在导入 · 已处理 %d 个文件",
+        .folderUnavailable: "文件夹离线或扫描未完成",
+        .folderScanFailed: "无法扫描“%@”：%@。已保留原有歌曲。",
+        .scanFailureCount: "%d 个文件未能导入或更新。",
+        .unsupportedAudio: "不支持的音频文件类型。",
+        .saveStatsFailed: "无法保存播放统计：%@",
+        .loadLibraryFailed: "无法加载资料库：%@",
+        .saveLibraryFailed: "无法保存资料库：%@",
+        .databaseOpenFailed: "无法打开资料库数据库：%@",
+        .databaseOperationFailed: "数据库操作失败：%@",
+        .unsupportedDatabase: "不支持此数据库版本，已保留现有数据库。",
+        .databaseUnavailable: "资料库数据库不可用。",
+        .unknownError: "未知错误",
+        .playbackFailed: "无法播放“%@”：%@",
+        .audioFileMissing: "找不到音频文件。请重新连接磁盘或扫描文件夹。",
+        .audioFileUnreadable: "无法读取音频文件，请检查文件夹权限。",
+        .audioDecodeFailed: "无法解码音频文件或启动播放。",
+        .undoClearQueue: "撤销清空队列",
+        .removeSelectedQueue: "移除所选歌曲",
+        .playbackMenu: "播放控制",
+        .playPause: "播放／暂停",
+        .focusSearch: "搜索资料库",
+        .playbackPosition: "播放进度",
+        .positionValue: "%@，共 %@",
+        .addMusicFolder: "添加音乐文件夹…",
+        .chooseLyricsFile: "选择歌词文件…",
+        .lyricsOptions: "歌词选项",
+        .useMatchingLyrics: "使用同名歌词文件",
+        .lyricsTiming: "歌词时间校准",
+        .lyricsEarlier: "提前 0.5 秒显示",
+        .lyricsLater: "延后 0.5 秒显示",
+        .resetLyricsTiming: "重置时间校准",
+        .lyricsTimingValue: "校准：%+.1f 秒",
+        .lyricsEncodingFailed: "无法读取歌词文件编码。",
+        .lyricsParsingFailed: "无法解析歌词时间轴。",
+        .selectedLyricsMissing: "找不到选定的歌词文件“%@”。请重新选择或使用同名歌词文件。",
+        .noAlbumsYet: "还没有专辑",
+        .lyricsLoading: "正在加载歌词…",
+        .lyricsReload: "重新加载歌词",
+        .lyricsFileReadFailed: "无法读取歌词文件：%@",
+        .noFavoriteSongs: "还没有喜欢的歌曲",
+        .favoriteSongsHint: "点击歌曲的心形按钮，将它加入喜欢的音乐。",
+        .emptyPlaylist: "此播放列表为空",
+        .emptyPlaylistHint: "将资料库中的歌曲拖到侧栏中的此播放列表。",
+        .showDetails: "查看详情",
         .general: "通用",
         .appearance: "外观",
         .interfaceTheme: "界面主题",

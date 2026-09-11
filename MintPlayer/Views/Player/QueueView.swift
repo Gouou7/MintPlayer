@@ -4,6 +4,7 @@ struct QueueView: View {
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var settings: SettingsManager
     @Binding var isVisible: Bool
+    @State private var selectedSongIDs = Set<Song.ID>()
 
     init(isVisible: Binding<Bool> = .constant(true)) {
         _isVisible = isVisible
@@ -17,12 +18,12 @@ struct QueueView: View {
                 EmptyStateView(title: settings.text(.queueEmpty), systemImage: "list.bullet.rectangle")
             } else {
                 ScrollViewReader { proxy in
-                    List {
+                    List(selection: $selectedSongIDs) {
                         if !historySongs.isEmpty {
                             Section(settings.text(.history)) {
                                 ForEach(Array(historySongs.enumerated()), id: \.offset) { index, song in
                                     queueRow(song: song, isCurrent: false) {
-                                        audioPlayer.play(song: song, in: [song])
+                                        audioPlayer.replayHistorySong(song)
                                     }
                                     .id("history-\(index)-\(song.id)")
                                     .listRowBackground(Color.clear)
@@ -41,20 +42,26 @@ struct QueueView: View {
                         if !upNextSongs.isEmpty {
                             Section(settings.text(.upNext)) {
                                 ForEach(upNextSongs, id: \.id) { song in
-                                    queueRow(song: song, isCurrent: false) {
-                                        audioPlayer.play(song: song)
-                                    }
-                                    .contextMenu {
-                                        Button(role: .destructive) {
-                                            audioPlayer.removeFromQueue(songId: song.id)
-                                        } label: {
-                                            Text(settings.text(.removeFromQueue))
+                                    queueRowContent(song: song, isCurrent: false)
+                                        .tag(song.id)
+                                        .onTapGesture(count: 2) { audioPlayer.play(song: song) }
+                                        .contextMenu {
+                                            Button(settings.text(.play)) { audioPlayer.play(song: song) }
+                                            Button(role: .destructive) {
+                                                audioPlayer.removeUpcomingSongs(withIDs: selectedSongIDs.contains(song.id) ? selectedSongIDs : [song.id])
+                                            } label: {
+                                                Text(settings.text(.removeFromQueue))
+                                            }
                                         }
-                                    }
-                                    .listRowBackground(Color.clear)
+                                        .listRowBackground(Color.clear)
                                 }
+                                .onMove(perform: audioPlayer.moveUpcomingSongs)
                             }
                         }
+                    }
+                    .onDeleteCommand { audioPlayer.removeUpcomingSongs(withIDs: selectedSongIDs) }
+                    .onChange(of: audioPlayer.queue) { _, _ in
+                        selectedSongIDs.formIntersection(Set(upNextSongs.map(\.id)))
                     }
                     .listStyle(.sidebar)
                     .scrollContentBackground(.hidden)
@@ -62,6 +69,7 @@ struct QueueView: View {
                         scrollToCurrentSong(with: proxy)
                     }
                     .onChange(of: audioPlayer.currentSong?.id) {
+                        selectedSongIDs.formIntersection(Set(upNextSongs.map(\.id)))
                         scrollToCurrentSong(with: proxy)
                     }
                 }
@@ -74,21 +82,11 @@ struct QueueView: View {
     }
 
     private var historySongs: [Song] {
-        Array(audioPlayer.history.reversed())
+        audioPlayer.history
     }
 
     private var upNextSongs: [Song] {
-        guard let currentSong = audioPlayer.currentSong,
-              let currentIndex = audioPlayer.queue.firstIndex(where: { $0.id == currentSong.id }) else {
-            return audioPlayer.queue
-        }
-
-        let nextIndex = currentIndex + 1
-        guard nextIndex < audioPlayer.queue.endIndex else {
-            return []
-        }
-
-        return Array(audioPlayer.queue[nextIndex...])
+        audioPlayer.upcomingSongs
     }
 
     private var currentSongScrollID: String {
@@ -117,6 +115,22 @@ struct QueueView: View {
 
             Spacer()
 
+            if !selectedSongIDs.isEmpty {
+                Button { audioPlayer.removeUpcomingSongs(withIDs: selectedSongIDs) } label: {
+                    Label(settings.text(.removeSelectedQueue), systemImage: "minus.circle")
+                }
+                .labelStyle(.iconOnly)
+                .help(settings.text(.removeSelectedQueue))
+            }
+
+            if audioPlayer.canUndoClearQueue {
+                Button(action: audioPlayer.undoClearQueue) {
+                    Label(settings.text(.undoClearQueue), systemImage: "arrow.uturn.backward")
+                }
+                .labelStyle(.iconOnly)
+                .help(settings.text(.undoClearQueue))
+            }
+
             Button(action: { audioPlayer.clearQueue() }) {
                 Image(systemName: "trash.fill")
                     .font(.system(size: 18, weight: .semibold))
@@ -140,27 +154,29 @@ struct QueueView: View {
 
     private func queueRow(song: Song, isCurrent: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: isCurrent ? "speaker.wave.2.fill" : "music.note")
-                    .font(.system(size: 20, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundColor(isCurrent ? MintTheme.accent : .secondary)
-                    .frame(width: 26)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(song.title)
-                        .lineLimit(1)
-                    Text(song.artist)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+            queueRowContent(song: song, isCurrent: isCurrent)
         }
         .buttonStyle(MintRowButtonStyle(isSelected: isCurrent))
+    }
+
+    private func queueRowContent(song: Song, isCurrent: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: isCurrent ? "speaker.wave.2.fill" : "music.note")
+                .font(.system(size: 20, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(isCurrent ? MintTheme.accent : Color.secondary)
+                .frame(width: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(song.title).lineLimit(1)
+                Text(song.artist)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }

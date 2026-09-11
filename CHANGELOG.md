@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+- Added album track numbers, disc numbers, and album artist metadata, with album playback ordered by disc and track and compilations grouped by album artist.
+- Added import progress, scan and playback error details, and retry actions while keeping folder imports responsive.
+- Added upcoming queue reordering, multi-song removal, and undo for clearing the queue.
+- Added per-song lyrics timing adjustment, custom lyrics file and text encoding selection, and manual reloading.
+- Added playback menu commands, keyboard shortcuts, accessible keyboard-adjustable progress sliders, and folder import buttons in empty library views.
+
+### Fixed
+- Preserved song identities, favorites, play counts, and playlist references during rescans, and retained existing songs when folders or audio files cannot be read.
+- Kept existing databases intact when encountering unsupported versions or read errors.
+- Kept upcoming songs when replaying history, and allowed Play Next to reposition songs already in the queue.
+- Applied LRC offset tags and improved Chinese and UTF-16 lyrics decoding.
+- Localized Dock playback actions and library, playback, and lyrics errors in English and Chinese.
 
 ## [0.12.0] - 2026-09-10
 

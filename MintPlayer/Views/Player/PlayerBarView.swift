@@ -48,10 +48,14 @@ struct PlayerBarView: View {
             ) {
                 audioPlayer.toggleShuffle()
             }
+            .help(settings.text(.shuffle))
+            .accessibilityLabel(settings.text(.shuffle))
             PlayerIconButton(systemName: "backward.fill", symbolEffectValue: previousButtonWiggleID) {
                 previousButtonWiggleID += 1
                 audioPlayer.previous()
             }
+            .help(settings.text(.previous))
+            .accessibilityLabel(settings.text(.previous))
             Button(action: audioPlayer.togglePlayPause) {
                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 24, weight: .semibold))
@@ -60,10 +64,14 @@ struct PlayerBarView: View {
                     .animation(.snappy(duration: 0.18), value: audioPlayer.isPlaying)
             }
             .buttonStyle(MintPlainIconButtonStyle())
+            .help(settings.text(audioPlayer.isPlaying ? .pause : .play))
+            .accessibilityLabel(settings.text(audioPlayer.isPlaying ? .pause : .play))
             PlayerIconButton(systemName: "forward.fill", symbolEffectValue: nextButtonWiggleID) {
                 nextButtonWiggleID += 1
                 audioPlayer.next()
             }
+            .help(settings.text(.next))
+            .accessibilityLabel(settings.text(.next))
             PlayerIconButton(
                 systemName: "repeat",
                 isActive: audioPlayer.isRepeatEnabled,
@@ -71,6 +79,8 @@ struct PlayerBarView: View {
             ) {
                 audioPlayer.toggleRepeat()
             }
+            .help(settings.text(.repeatMode))
+            .accessibilityLabel(settings.text(.repeatMode))
         }
     }
 
@@ -448,6 +458,7 @@ private struct HoverProgressSlider: View {
             )
         }
         .frame(height: hitHeight)
+        .modifier(PlaybackProgressAccessibility(value: $value, range: range, isEnabled: isEnabled))
     }
 
     private var normalizedProgress: CGFloat {
@@ -462,5 +473,49 @@ private struct HoverProgressSlider: View {
         let progress = min(max(locationX / max(width, 1), 0), 1)
         let span = range.upperBound - range.lowerBound
         value = range.lowerBound + TimeInterval(progress) * span
+    }
+}
+
+struct PlaybackProgressAccessibility: ViewModifier {
+    @EnvironmentObject private var settings: SettingsManager
+    @Binding var value: TimeInterval
+    let range: ClosedRange<TimeInterval>
+    var isEnabled = true
+
+    func body(content: Content) -> some View {
+        content
+            .focusable(isEnabled)
+            .onMoveCommand { direction in
+                guard isEnabled else { return }
+                switch direction {
+                case .left, .down: adjust(by: -5)
+                case .right, .up: adjust(by: 5)
+                default: break
+                }
+            }
+            .accessibilityRepresentation {
+                Slider(value: $value, in: range) {
+                    Text(settings.text(.playbackPosition))
+                }
+                .accessibilityValue(String(format: settings.text(.positionValue), timeText(value), timeText(range.upperBound)))
+                .accessibilityAdjustableAction { direction in
+                    guard isEnabled else { return }
+                    switch direction {
+                    case .increment: adjust(by: 5)
+                    case .decrement: adjust(by: -5)
+                    @unknown default: break
+                    }
+                }
+                .disabled(!isEnabled)
+            }
+    }
+
+    private func adjust(by seconds: TimeInterval) {
+        value = min(max(value + seconds, range.lowerBound), range.upperBound)
+    }
+
+    private func timeText(_ time: TimeInterval) -> String {
+        let seconds = time.isFinite ? max(0, Int(time)) : 0
+        return "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
     }
 }

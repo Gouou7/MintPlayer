@@ -15,6 +15,9 @@ struct Song: Identifiable, Codable, Hashable {
     let playCount: Int
     let lastPlayedAt: Date?
     let isFavorite: Bool
+    let trackNumber: Int?
+    let discNumber: Int?
+    let albumArtist: String?
 
     init(
         id: UUID = UUID(),
@@ -30,7 +33,10 @@ struct Song: Identifiable, Codable, Hashable {
         dateAdded: Date = Date(),
         playCount: Int = 0,
         lastPlayedAt: Date? = nil,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        trackNumber: Int? = nil,
+        discNumber: Int? = nil,
+        albumArtist: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -46,10 +52,29 @@ struct Song: Identifiable, Codable, Hashable {
         self.playCount = playCount
         self.lastPlayedAt = lastPlayedAt
         self.isFavorite = isFavorite
+        self.trackNumber = trackNumber
+        self.discNumber = discNumber
+        self.albumArtist = albumArtist
     }
 }
 
 extension Song {
+    var effectiveAlbumArtist: String {
+        let value = albumArtist?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? artist : value
+    }
+
+    static func albumOrder(_ lhs: Song, _ rhs: Song) -> Bool {
+        let leftDisc = lhs.discNumber ?? 1
+        let rightDisc = rhs.discNumber ?? 1
+        if leftDisc != rightDisc { return leftDisc < rightDisc }
+        let leftTrack = lhs.trackNumber ?? Int.max
+        let rightTrack = rhs.trackNumber ?? Int.max
+        if leftTrack != rightTrack { return leftTrack < rightTrack }
+        let order = lhs.title.localizedStandardCompare(rhs.title)
+        return order == .orderedSame ? lhs.path < rhs.path : order == .orderedAscending
+    }
+
     func mergingPersistentFields(from existingSong: Song) -> Song {
         Song(
             id: existingSong.id,
@@ -65,7 +90,10 @@ extension Song {
             dateAdded: existingSong.dateAdded,
             playCount: existingSong.playCount,
             lastPlayedAt: existingSong.lastPlayedAt,
-            isFavorite: existingSong.isFavorite
+            isFavorite: existingSong.isFavorite,
+            trackNumber: trackNumber,
+            discNumber: discNumber,
+            albumArtist: albumArtist
         )
     }
 
@@ -84,7 +112,10 @@ extension Song {
             dateAdded: dateAdded,
             playCount: playCount + 1,
             lastPlayedAt: date,
-            isFavorite: isFavorite
+            isFavorite: isFavorite,
+            trackNumber: trackNumber,
+            discNumber: discNumber,
+            albumArtist: albumArtist
         )
     }
 
@@ -103,7 +134,10 @@ extension Song {
             dateAdded: dateAdded,
             playCount: playCount,
             lastPlayedAt: lastPlayedAt,
-            isFavorite: isFavorite
+            isFavorite: isFavorite,
+            trackNumber: trackNumber,
+            discNumber: discNumber,
+            albumArtist: albumArtist
         )
     }
 
@@ -122,7 +156,10 @@ extension Song {
             dateAdded: dateAdded,
             playCount: playCount,
             lastPlayedAt: lastPlayedAt,
-            isFavorite: isFavorite
+            isFavorite: isFavorite,
+            trackNumber: trackNumber,
+            discNumber: discNumber,
+            albumArtist: albumArtist
         )
     }
 }

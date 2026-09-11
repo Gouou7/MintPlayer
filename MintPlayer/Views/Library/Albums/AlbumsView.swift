@@ -58,6 +58,16 @@ struct AlbumsView: View {
     private var albumGrid: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                if filteredAlbums.isEmpty {
+                    EmptyStateView(
+                        title: searchText.isEmpty ? settings.text(.noAlbumsYet) : settings.text(.noMatchingMusic),
+                        systemImage: "square.stack",
+                        detail: searchText.isEmpty ? settings.text(.importPrompt) : nil,
+                        actionTitle: searchText.isEmpty ? settings.text(.addMusicFolder) : nil,
+                        action: { MusicFolderImporter.present(for: musicLibrary) }
+                    )
+                    .frame(minHeight: 420)
+                }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 22)], spacing: 28) {
                     ForEach(filteredAlbums, id: \.id) { album in
                         Button {
@@ -133,7 +143,7 @@ struct AlbumDetailView: View {
     @State private var albumSongs: [Song] = []
     @State private var visibleSongs: [Song] = []
     @State private var selectedSongIDs = Set<Song.ID>()
-    @State private var songSortOrder = [KeyPathComparator(\Song.title)]
+    @State private var songSortOrder: [KeyPathComparator<Song>] = []
 
     var body: some View {
         ScrollView {
@@ -142,7 +152,7 @@ struct AlbumDetailView: View {
 
                 NativeSongTableView(
                     songs: visibleSongs,
-                    style: .detailSongs(subtitle: .none),
+                    style: .detailSongs(subtitle: albumSongs.contains { $0.artist != album.artist } ? .artist : .none),
                     selectedSongIDs: $selectedSongIDs,
                     sortOrder: $songSortOrder,
                     onPlay: { song, queue in audioPlayer.play(song: song, in: queue) },
@@ -166,6 +176,10 @@ struct AlbumDetailView: View {
             refreshSongs()
         }
         .onChange(of: searchText) {
+            refreshVisibleSongs()
+        }
+        .onChange(of: musicLibrary.songs) {
+            albumSongs = musicLibrary.songs(forAlbum: album)
             refreshVisibleSongs()
         }
         .toolbar {
@@ -249,9 +263,7 @@ struct AlbumDetailView: View {
     }
 
     private func refreshSongs() {
-        albumSongs = musicLibrary.songs(forAlbum: album).sorted {
-            $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
-        }
+        albumSongs = musicLibrary.songs(forAlbum: album)
         selectedSongIDs = []
         refreshVisibleSongs()
     }

@@ -60,7 +60,19 @@ These notes capture recurring Mint Player failure modes and the established impl
 
 **Avoid:** Casually changing persisted IDs, fields, schema, or rescan merge logic.
 
-**Use:** Preserve persistent fields during rescans and add an explicit migration when a schema change is required.
+**Use:** Preserve persistent fields during rescans and add an explicit migration when a schema change is required. Optional track number, disc number, and album artist columns are added transactionally after inspecting `PRAGMA table_info(songs)`. Retain schema version 3 for this additive extension because older releases destructively reset unknown versions. Refuse unsupported schemas and prevent writes after a failed snapshot load; never drop tables to recover from an unknown version.
+
+## Library Scanning And Recovery
+
+Keep metadata extraction on the serial background scan queue and publish progress in batches. Apply completed results on the main thread against the current library snapshot so edits to favorites and play counts made during scanning survive. An enumeration error keeps the entire previous source index; a per-file read error keeps that file's previous record. Only a complete traversal may remove absent tracks. Reconcile playlist entries with the resulting song IDs before saving.
+
+Use a token per source to ignore late results after removal. Repeated scans of an active source are ignored. Folder imports collect their dropped URLs before starting a background import, and filtering against blocked songs and source ownership happens on the main thread.
+
+## Queue Editing And Lyrics Timing
+
+Queue reordering and removal operate on upcoming songs. Keep the source queue synchronized so shuffle toggling and playback restoration retain manual edits. Clearing records a one-step undo snapshot; later queue edits or track navigation invalidate it. Refresh that snapshot against library changes so undo cannot reintroduce removed tracks.
+
+Positive LRC `[offset]` values advance lyrics: subtract the file offset in milliseconds from timestamps, then add the per-song user adjustment in seconds. Negative user adjustments display lyrics earlier. Store custom lyrics paths, encoding choices, and timing adjustments in the app's namespaced preferences. Load and parse lyrics off the main thread and discard results from cancelled view tasks.
 
 ## Embedded Lyrics Presentation And Toolbar Ownership
 

@@ -98,7 +98,9 @@ struct ArtistsView: View {
                     EmptyStateView(
                         title: searchText.isEmpty ? settings.text(.noArtistsYet) : settings.text(.noMatchingArtists),
                         systemImage: "music.mic",
-                        detail: searchText.isEmpty ? settings.text(.importPrompt) : nil
+                        detail: searchText.isEmpty ? settings.text(.importPrompt) : nil,
+                        actionTitle: searchText.isEmpty ? settings.text(.addMusicFolder) : nil,
+                        action: { MusicFolderImporter.present(for: musicLibrary) }
                     )
                     .frame(maxWidth: .infinity, minHeight: 420)
                 } else {

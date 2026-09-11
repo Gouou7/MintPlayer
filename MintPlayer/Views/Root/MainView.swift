@@ -34,6 +34,7 @@ struct MainView: View {
             } detail: {
                 ZStack(alignment: .bottom) {
                     contentView
+                        .safeAreaInset(edge: .top, spacing: 0) { LibraryActivityView() }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     PlayerBarView {
@@ -114,7 +115,8 @@ struct MainView: View {
                 break
             }
         }
-        .onChange(of: musicLibrary.songs) { _, _ in
+        .onChange(of: musicLibrary.songs) { _, songs in
+            audioPlayer.refreshLibrarySongs(songs)
             restorePlaybackSessionIfNeeded()
         }
         .onChange(of: audioPlayer.currentSong?.id) { _, songID in
@@ -150,9 +152,9 @@ struct MainView: View {
         case .favorites:
             return settings.text(.favorites)
         case .playlist(let id):
-            return musicLibrary.playlists.first(where: { $0.id == id })?.name ?? "Playlist"
+            return musicLibrary.playlists.first(where: { $0.id == id })?.name ?? settings.text(.playlists)
         case .folder(let id):
-            return musicLibrary.librarySources.first(where: { $0.id == id })?.name ?? "Folder"
+            return musicLibrary.librarySources.first(where: { $0.id == id })?.name ?? settings.text(.folders)
         }
     }
 

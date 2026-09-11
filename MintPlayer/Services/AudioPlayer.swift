@@ -13,6 +13,8 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published var isRepeatEnabled = false
     @Published private(set) var queue: [Song] = []
     @Published private(set) var history: [Song] = []
+    @Published private(set) var canUndoClearQueue = false
+    private var clearedQueue: (queue: [Song], source: [Song], currentID: Song.ID?)?
 
     private var audioPlayer: AVAudioPlayer?
     private var playbackTimer: Timer?
@@ -52,8 +54,101 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // macOS 中不需要 AVAudioSession，当前直接使用 AVAudioPlayer 播放本地文件。
     }
 
+    var upcomingSongs: [Song] {
+        guard let currentSong, let index = queue.firstIndex(where: { $0.id == currentSong.id }) else { return queue }
+        return Array(queue.dropFirst(index + 1))
+    }
+
+    private func invalidateQueueUndo() {
+        clearedQueue = nil
+        canUndoClearQueue = false
+    }
+
+    func undoClearQueue() {
+        guard let saved = clearedQueue, saved.currentID == currentSong?.id else {
+            invalidateQueueUndo()
+            return
+        }
+        queue = saved.queue
+        sourceQueue = saved.source
+        currentIndex = currentSong.flatMap { song in queue.firstIndex { $0.id == song.id } }
+        invalidateQueueUndo()
+        updateRemoteCommandAvailability()
+        savePlaybackSession()
+    }
+
+    func removeUpcomingSongs(withIDs ids: Set<Song.ID>) {
+        let removable = Set(upcomingSongs.map(\.id)).intersection(ids)
+        guard !removable.isEmpty else { return }
+        invalidateQueueUndo()
+        queue.removeAll { removable.contains($0.id) }
+        sourceQueue.removeAll { removable.contains($0.id) }
+        currentIndex = currentSong.flatMap { song in queue.firstIndex { $0.id == song.id } }
+        updateRemoteCommandAvailability()
+        savePlaybackSession()
+    }
+
+    func moveUpcomingSongs(from offsets: IndexSet, to destination: Int) {
+        var upcoming = upcomingSongs
+        guard !offsets.isEmpty, offsets.allSatisfy({ upcoming.indices.contains($0) }),
+              (0...upcoming.count).contains(destination) else { return }
+        let moved = offsets.map { upcoming[$0] }
+        let insertion = destination - offsets.filter { $0 < destination }.count
+        for index in offsets.reversed() { upcoming.remove(at: index) }
+        upcoming.insert(contentsOf: moved, at: insertion)
+        invalidateQueueUndo()
+        queue = Array(queue.prefix(queue.count - upcoming.count)) + upcoming
+        let upcomingIDs = Set(upcoming.map(\.id))
+        var next = upcoming.makeIterator()
+        sourceQueue = sourceQueue.map { upcomingIDs.contains($0.id) ? (next.next() ?? $0) : $0 }
+        updateRemoteCommandAvailability()
+        savePlaybackSession()
+    }
+
+    func replayHistorySong(_ song: Song) {
+        let upcoming = upcomingSongs.filter { $0.id != song.id }
+        invalidateQueueUndo()
+        queue = [song] + upcoming
+        let upcomingIDs = Set(upcoming.map(\.id))
+        sourceQueue = [song] + sourceQueue.filter { upcomingIDs.contains($0.id) }
+        currentIndex = 0
+        start(song: song)
+    }
+
+    func refreshLibrarySongs(_ songs: [Song]) {
+        let songsByID = Dictionary(uniqueKeysWithValues: songs.map { ($0.id, $0) })
+        let currentID = currentSong?.id
+        let refreshed: (Song) -> Song? = { song in
+            songsByID[song.id] ?? (song.id == currentID ? song : nil)
+        }
+        queue = queue.compactMap(refreshed)
+        sourceQueue = sourceQueue.compactMap(refreshed)
+        history = history.compactMap { songsByID[$0.id] }
+        if let currentID, let updatedSong = songsByID[currentID] { currentSong = updatedSong }
+        currentIndex = queue.firstIndex { $0.id == currentID }
+        if let saved = clearedQueue {
+            let restoredQueue = saved.queue.compactMap(refreshed)
+            let restoredSource = saved.source.compactMap(refreshed)
+            let nextIndex = restoredQueue.firstIndex { $0.id == currentID }.map { $0 + 1 } ?? 0
+            if nextIndex < restoredQueue.count {
+                clearedQueue = (restoredQueue, restoredSource, saved.currentID)
+            } else {
+                invalidateQueueUndo()
+            }
+        }
+        updateRemoteCommandAvailability()
+        savePlaybackSession()
+    }
+
+    func retryPlayback() {
+        guard let currentSong else { return }
+        pendingStartTime = currentTime
+        start(song: currentSong)
+    }
+
     // 播放歌曲
     func play(song: Song) {
+        invalidateQueueUndo()
         if queue.isEmpty {
             queue = [song]
             sourceQueue = [song]
@@ -71,6 +166,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 使用指定队列播放歌曲
     func play(song: Song, in songs: [Song]) {
+        invalidateQueueUndo()
         configureQueue(startingWith: song, sourceSongs: songs, shuffled: isShuffleEnabled)
         start(song: song)
     }
@@ -84,6 +180,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 随机播放指定歌曲列表，并同步播放器随机状态
     func shuffle(songs: [Song]) {
+        invalidateQueueUndo()
         guard !songs.isEmpty else { return }
 
         isShuffleEnabled = true
@@ -97,6 +194,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 更新播放队列
     func setQueue(_ songs: [Song]) {
+        invalidateQueueUndo()
         if let currentSong = currentSong {
             configureQueue(startingWith: currentSong, sourceSongs: songs, shuffled: isShuffleEnabled)
         } else {
@@ -110,8 +208,11 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 下一首播放
     func playNext(_ song: Song) {
-        guard !queue.contains(where: { $0.id == song.id }) else { return }
-
+        invalidateQueueUndo()
+        guard song.id != currentSong?.id else { return }
+        queue.removeAll { $0.id == song.id }
+        sourceQueue.removeAll { $0.id == song.id }
+        currentIndex = currentSong.flatMap { current in queue.firstIndex { $0.id == current.id } }
         let insertIndex = min((currentIndex ?? -1) + 1, queue.count)
         queue.insert(song, at: insertIndex)
         insertIntoSourceQueueAfterCurrentIfNeeded(song)
@@ -124,6 +225,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 加入队列末尾
     func addToQueue(_ song: Song) {
+        invalidateQueueUndo()
         guard !queue.contains(where: { $0.id == song.id }) else { return }
         queue.append(song)
         appendToSourceQueueIfNeeded(song)
@@ -133,6 +235,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 从队列移除
     func removeFromQueue(songId: UUID) {
+        invalidateQueueUndo()
         guard songId != currentSong?.id else { return }
         guard let index = queue.firstIndex(where: { $0.id == songId }) else { return }
         queue.remove(at: index)
@@ -151,6 +254,9 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 清空队列
     func clearQueue() {
+        guard !upcomingSongs.isEmpty else { return }
+        clearedQueue = (queue, sourceQueue, currentSong?.id)
+        canUndoClearQueue = true
         if let currentSong {
             queue = [currentSong]
             sourceQueue = [currentSong]
@@ -209,10 +315,22 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         playbackTimer?.invalidate()
         audioPlayer?.stop()
 
+        duration = song.duration
+        currentTime = min(max(pendingStartTime ?? 0, 0), max(duration, 0))
         // 加载真实的音频文件
         let url = URL(fileURLWithPath: song.path)
         do {
-            audioPlayer = try AVAudioPlayer(contentsOf: url)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                throw PlaybackFailure.fileMissing
+            }
+            guard FileManager.default.isReadableFile(atPath: url.path) else {
+                throw PlaybackFailure.fileUnreadable
+            }
+            audioPlayer = nil
+            let player: AVAudioPlayer
+            do { player = try AVAudioPlayer(contentsOf: url) }
+            catch { throw PlaybackFailure.decodeFailed }
+            audioPlayer = player
             audioPlayer?.delegate = self
             audioPlayer?.volume = volume
             audioPlayer?.prepareToPlay()
@@ -225,7 +343,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             pendingStartTime = nil
 
             // 开始播放
-            audioPlayer?.play()
+            guard player.play() else { throw PlaybackFailure.decodeFailed }
             isPlaying = true
             startPlaybackCounting(for: song, duration: duration)
             updateNowPlayingInfo()
@@ -238,7 +356,9 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             print("Playing: \(song.title) by \(song.artist)")
         } catch {
             print("Error playing song: \(error)")
-            playbackError = "无法播放 \(song.title)：\(error.localizedDescription)"
+            playbackError = L10n.current(.playbackFailed, song.title, error.localizedDescription)
+            audioPlayer = nil
+            pendingStartTime = nil
             isPlaying = false
             playbackCountingSession = nil
             updateNowPlayingInfo()
@@ -271,7 +391,11 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             }
 
             audioPlayer.volume = 0
-            audioPlayer.play()
+            guard audioPlayer.play() else {
+                reportPlaybackFailure()
+                return
+            }
+            playbackError = nil
             audioPlayer.setVolume(volume, fadeDuration: playbackFadeDuration)
             isPlaying = true
             resumePlaybackCounting()
@@ -308,6 +432,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 上一曲
     func previous() {
+        invalidateQueueUndo()
         guard !queue.isEmpty else { return }
 
         if currentTime > 3, let currentSong {
@@ -329,6 +454,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 下一曲
     func next() {
+        invalidateQueueUndo()
         guard !queue.isEmpty else {
             finishPlayback()
             return
@@ -352,6 +478,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 切换随机播放
     func toggleShuffle() {
+        invalidateQueueUndo()
         isShuffleEnabled.toggle()
         if isShuffleEnabled {
             shuffleUpcomingQueue()
@@ -419,13 +546,11 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.audioPlayer === player else { return }
-            self.currentTime = self.duration
-
             guard flag else {
-                self.finishPlayback()
+                self.reportPlaybackFailure()
                 return
             }
-
+            self.currentTime = self.duration
             self.next()
         }
     }
@@ -433,9 +558,22 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.audioPlayer === player else { return }
-            self.playbackError = error.map { "播放失败：\($0.localizedDescription)" } ?? "播放失败"
-            self.finishPlayback()
+            self.reportPlaybackFailure()
         }
+    }
+
+    private func reportPlaybackFailure() {
+        cancelPendingPause()
+        updatePlaybackCounting()
+        playbackTimer?.invalidate()
+        audioPlayer?.stop()
+        audioPlayer = nil
+        isPlaying = false
+        playbackCountingSession = nil
+        playbackError = L10n.current(.playbackFailed, currentSong?.title ?? "", L10n.current(.audioDecodeFailed))
+        updateNowPlayingInfo()
+        updateRemoteCommandAvailability()
+        savePlaybackSession()
     }
 
     private func shuffleUpcomingQueue() {
@@ -798,4 +936,16 @@ private struct PlaybackSession: Codable {
     let currentIndex: Int?
     let isShuffleEnabled: Bool
     let isRepeatEnabled: Bool
+}
+
+private enum PlaybackFailure: LocalizedError {
+    case fileMissing, fileUnreadable, decodeFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .fileMissing: return L10n.current(.audioFileMissing)
+        case .fileUnreadable: return L10n.current(.audioFileUnreadable)
+        case .decodeFailed: return L10n.current(.audioDecodeFailed)
+        }
+    }
 }

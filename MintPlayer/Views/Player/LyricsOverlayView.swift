@@ -4,6 +4,7 @@ import QuartzCore
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import ImageIO
+import UniformTypeIdentifiers
 
 struct LyricsOverlayView: View {
     let song: Song
@@ -13,7 +14,9 @@ struct LyricsOverlayView: View {
     @EnvironmentObject private var settings: SettingsManager
     @Environment(\.colorScheme) private var colorScheme
 
-    @State private var lyricsState: LyricsLoadState = .plainText([])
+    @State private var lyricsState: LyricsLoadState = .loading
+    @State private var loadedLyricsSource: String?
+    @State private var lyricsReloadGeneration = 0
     @State private var previousButtonWiggleID = 0
     @State private var nextButtonWiggleID = 0
 
@@ -38,9 +41,21 @@ struct LyricsOverlayView: View {
             }
         }
         .contentShape(Rectangle())
-        .task(id: song.id) {
-            lyricsState = LyricsService.loadLyrics(for: song)
+        .task(id: lyricsRequest) {
+            let song = song
+            let fileURL = settings.lyricsFileURL(for: song)
+            let offset = settings.lyricsTimingOffset(for: song)
+            let encoding = settings.lyricsEncoding(for: song)
+            let source = song.id.uuidString + (fileURL?.path ?? song.path)
+            if loadedLyricsSource != source { lyricsState = .loading }
+            let result = await Task.detached(priority: .userInitiated) {
+                LyricsService.loadLyrics(for: song, fileURL: fileURL, timingOffset: offset, encoding: encoding)
+            }.value
+            guard !Task.isCancelled else { return }
+            lyricsState = result
+            loadedLyricsSource = source
         }
+        .overlay(alignment: .top) { PlaybackErrorView().padding().frame(maxWidth: 760) }
         .onExitCommand {
             onClose()
         }
@@ -108,8 +123,74 @@ struct LyricsOverlayView: View {
 
             playbackControls
                 .fixedSize(horizontal: false, vertical: true)
+
+            lyricsOptions
         }
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private struct LyricsRequest: Hashable {
+        let songID: Song.ID
+        let path: String
+        let offset: TimeInterval
+        let reloadGeneration: Int
+        let language: AppLanguage
+        let encoding: LyricsTextEncoding
+    }
+
+    private var lyricsRequest: LyricsRequest {
+        LyricsRequest(songID: song.id, path: settings.lyricsFileURL(for: song)?.path ?? song.path,
+                      offset: settings.lyricsTimingOffset(for: song), reloadGeneration: lyricsReloadGeneration,
+                      language: settings.effectiveLanguage, encoding: settings.lyricsEncoding(for: song))
+    }
+
+    private var lyricsOptions: some View {
+        Menu {
+            Button(settings.text(.chooseLyricsFile), action: chooseLyricsFile)
+            Button(settings.text(.lyricsReload)) { lyricsReloadGeneration += 1 }
+            if settings.lyricsFileURL(for: song) != nil {
+                Button(settings.text(.useMatchingLyrics)) { settings.updateLyricsFile(nil, for: song) }
+            }
+            Picker(settings.text(.lyricsEncoding), selection: Binding(
+                get: { settings.lyricsEncoding(for: song) },
+                set: { settings.updateLyricsEncoding($0, for: song) }
+            )) {
+                ForEach(LyricsTextEncoding.allCases, id: \.self) { encoding in
+                    Text(settings.text(encoding.titleKey)).tag(encoding)
+                }
+            }
+            Divider()
+            Text(settings.text(.lyricsTiming))
+            Text(String(format: settings.text(.lyricsTimingValue), settings.lyricsTimingOffset(for: song)))
+            Button(settings.text(.lyricsEarlier)) {
+                settings.updateLyricsTimingOffset(settings.lyricsTimingOffset(for: song) - 0.5, for: song)
+            }
+            .disabled(settings.lyricsTimingOffset(for: song) <= -60)
+            Button(settings.text(.lyricsLater)) {
+                settings.updateLyricsTimingOffset(settings.lyricsTimingOffset(for: song) + 0.5, for: song)
+            }
+            .disabled(settings.lyricsTimingOffset(for: song) >= 60)
+            Button(settings.text(.resetLyricsTiming)) { settings.updateLyricsTimingOffset(0, for: song) }
+                .disabled(settings.lyricsTimingOffset(for: song) == 0)
+        } label: {
+            Label(settings.text(.lyricsOptions), systemImage: "text.badge.gearshape")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    private func chooseLyricsFile() {
+        let selectedSong = song
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [UTType(filenameExtension: "lrc") ?? .plainText, .plainText]
+        panel.prompt = settings.text(.chooseLyricsFile)
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            settings.updateLyricsFile(url, for: selectedSong)
+            lyricsReloadGeneration += 1
+        }
     }
 
     private var progressInfo: some View {
@@ -208,6 +289,9 @@ struct LyricsOverlayView: View {
     @ViewBuilder
     private var lyricsContent: some View {
         switch lyricsState {
+        case .loading:
+            ProgressView(settings.text(.lyricsLoading))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .synced(let lines):
             SyncedLyricsView(lines: lines)
                 .environmentObject(audioPlayer)
@@ -261,7 +345,7 @@ private struct LyricsOverlayLayout {
 
         leftPanelAlignment = .center
         leftPanelOffsetY = min(max(8, size.height * 0.014), 12)
-        self.maximumArtworkSize = min(maximumArtworkSize, leftPanelWidth)
+        self.maximumArtworkSize = min(maximumArtworkSize, leftPanelWidth, max(Self.minimumArtworkSize, size.height - 235 - leftPanelSpacing * 4))
     }
 }
 
@@ -557,6 +641,7 @@ private struct FullscreenProgressSlider: View {
             )
         }
         .frame(height: hitHeight)
+        .modifier(PlaybackProgressAccessibility(value: $value, range: range))
     }
 
     private var normalizedProgress: CGFloat {

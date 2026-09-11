@@ -73,9 +73,11 @@ struct SongsView: View {
 
                 if displayedSongs.isEmpty {
                     EmptyStateView(
-                        title: searchText.isEmpty ? settings.text(.noSongsYet) : settings.text(.noMatchingSongs),
+                        title: emptyStateTitle,
                         systemImage: "music.note.list",
-                        detail: searchText.isEmpty ? settings.text(.importPrompt) : nil
+                        detail: emptyStateDetail,
+                        actionTitle: searchText.isEmpty && scopedSongs == nil ? settings.text(.addMusicFolder) : nil,
+                        action: { MusicFolderImporter.present(for: musicLibrary) }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -156,6 +158,20 @@ struct SongsView: View {
             )
             .padding(.bottom, 2)
         }
+    }
+
+    private var emptyStateTitle: String {
+        if !searchText.isEmpty { return settings.text(.noMatchingSongs) }
+        if playlistId != nil { return settings.text(.emptyPlaylist) }
+        if title == settings.text(.favorites) { return settings.text(.noFavoriteSongs) }
+        return settings.text(.noSongsYet)
+    }
+
+    private var emptyStateDetail: String? {
+        guard searchText.isEmpty else { return nil }
+        if playlistId != nil { return settings.text(.emptyPlaylistHint) }
+        if title == settings.text(.favorites) { return settings.text(.favoriteSongsHint) }
+        return settings.text(.importPrompt)
     }
 
     @ViewBuilder

@@ -12,16 +12,19 @@ final class LibraryPersistenceStore {
     enum StoreError: LocalizedError {
         case databaseOpenFailed(String)
         case statementFailed(String)
+        case unsupportedSchema
         case missingDatabase
 
         var errorDescription: String? {
             switch self {
             case .databaseOpenFailed(let message):
-                return "无法打开资料库数据库：\(message)"
+                return L10n.current(.databaseOpenFailed, message)
             case .statementFailed(let message):
-                return "数据库操作失败：\(message)"
+                return L10n.current(.databaseOperationFailed, message)
+            case .unsupportedSchema:
+                return L10n.current(.unsupportedDatabase)
             case .missingDatabase:
-                return "资料库数据库尚未初始化"
+                return L10n.current(.databaseUnavailable)
             }
         }
     }
@@ -108,10 +111,21 @@ final class LibraryPersistenceStore {
     }
 
     private func createSchema() throws {
-        if try userVersion() != schemaVersion {
-            try resetSchema()
+        let version = try userVersion()
+        guard version == 0 || version == schemaVersion else {
+            throw StoreError.unsupportedSchema
         }
+        try execute("BEGIN IMMEDIATE TRANSACTION")
+        do {
+            try createTablesAndMetadataColumns()
+            try execute("COMMIT")
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
+    }
 
+    private func createTablesAndMetadataColumns() throws {
         try execute(
             """
             CREATE TABLE IF NOT EXISTS songs (
@@ -188,13 +202,20 @@ final class LibraryPersistenceStore {
             """
         )
 
+        // Optional columns extend schema 3 without triggering older releases' destructive version reset.
+        let columns = Set(try readRows("PRAGMA table_info(songs)") { text($0, 1) })
+        for (name, type) in [("trackNumber", "INTEGER"), ("discNumber", "INTEGER"), ("albumArtist", "TEXT")] {
+            if !columns.contains(name) {
+                try execute("ALTER TABLE songs ADD COLUMN \(name) \(type)")
+            }
+        }
         try execute("PRAGMA user_version = \(schemaVersion)")
     }
 
     private func loadSongs() throws -> [Song] {
         try readRows(
             """
-            SELECT id, sourceId, title, artist, album, duration, path, coverPath, genre, year, dateAdded, playCount, lastPlayedAt, isFavorite
+            SELECT id, sourceId, title, artist, album, duration, path, coverPath, genre, year, dateAdded, playCount, lastPlayedAt, isFavorite, trackNumber, discNumber, albumArtist
             FROM songs
             ORDER BY title COLLATE NOCASE ASC
             """
@@ -213,7 +234,10 @@ final class LibraryPersistenceStore {
                 dateAdded: date(statement, 10),
                 playCount: int(statement, 11),
                 lastPlayedAt: optionalDate(statement, 12),
-                isFavorite: bool(statement, 13)
+                isFavorite: bool(statement, 13),
+                trackNumber: optionalInt(statement, 14),
+                discNumber: optionalInt(statement, 15),
+                albumArtist: optionalText(statement, 16)
             )
         }
     }
@@ -267,7 +291,8 @@ final class LibraryPersistenceStore {
         bindText(playlistID.uuidString, to: statement, at: 1)
 
         var entries: [PlaylistSong] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        var result = sqlite3_step(statement)
+        while result == SQLITE_ROW {
             entries.append(
                 PlaylistSong(
                     songId: uuid(statement, 0),
@@ -275,7 +300,9 @@ final class LibraryPersistenceStore {
                     sortOrder: int(statement, 2)
                 )
             )
+            result = sqlite3_step(statement)
         }
+        guard result == SQLITE_DONE else { throw StoreError.statementFailed(databaseErrorMessage) }
         return entries
     }
 
@@ -320,8 +347,8 @@ final class LibraryPersistenceStore {
     private func saveSongs(_ songs: [Song]) throws {
         var statement = try prepare(
             """
-            INSERT INTO songs (id, sourceId, path, title, artist, album, duration, coverPath, genre, year, dateAdded, playCount, lastPlayedAt, isFavorite)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO songs (id, sourceId, path, title, artist, album, duration, coverPath, genre, year, dateAdded, playCount, lastPlayedAt, isFavorite, trackNumber, discNumber, albumArtist)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         )
         defer { sqlite3_finalize(statement) }
@@ -342,6 +369,9 @@ final class LibraryPersistenceStore {
             bindInt(song.playCount, to: statement, at: 12)
             bindOptionalDate(song.lastPlayedAt, to: statement, at: 13)
             bindBool(song.isFavorite, to: statement, at: 14)
+            bindOptionalInt(song.trackNumber, to: statement, at: 15)
+            bindOptionalInt(song.discNumber, to: statement, at: 16)
+            bindOptionalText(song.albumArtist, to: statement, at: 17)
             try stepDone(statement)
         }
     }
@@ -432,15 +462,6 @@ final class LibraryPersistenceStore {
         }.first ?? 0
     }
 
-    private func resetSchema() throws {
-        try execute("DROP TABLE IF EXISTS playlist_songs")
-        try execute("DROP TABLE IF EXISTS playlists")
-        try execute("DROP TABLE IF EXISTS play_history")
-        try execute("DROP TABLE IF EXISTS songs")
-        try execute("DROP TABLE IF EXISTS blocked_songs")
-        try execute("DROP TABLE IF EXISTS library_sources")
-    }
-
     private func normalizedEntries(for playlist: Playlist) -> [PlaylistSong] {
         let entriesByID = Dictionary(uniqueKeysWithValues: playlist.songEntries.map { ($0.songId, $0) })
         return playlist.songs.enumerated().map { index, song in
@@ -471,9 +492,12 @@ final class LibraryPersistenceStore {
         defer { sqlite3_finalize(statement) }
 
         var rows: [T] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        var result = sqlite3_step(statement)
+        while result == SQLITE_ROW {
             rows.append(mapper(statement))
+            result = sqlite3_step(statement)
         }
+        guard result == SQLITE_DONE else { throw StoreError.statementFailed(databaseErrorMessage) }
         return rows
     }
 
@@ -485,7 +509,7 @@ final class LibraryPersistenceStore {
 
     private var databaseErrorMessage: String {
         guard let database, let message = sqlite3_errmsg(database) else {
-            return "未知错误"
+            return L10n.current(.unknownError)
         }
         return String(cString: message)
     }

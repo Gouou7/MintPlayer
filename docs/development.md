@@ -94,12 +94,14 @@ Release builds use `Mint Player.app` and the release Application Support and pre
 
 ## Manual Regression Guide
 
-- **Library**: folder add/remove, duplicate folder prevention, rescan, blocked-song hiding/unblocking, and missing-folder behavior.
-- **Playback**: double-click playback, play/pause fade, seek, stop, previous/next, natural completion, shuffle, repeat, volume, session restoration, Now Playing, and Dock menu actions.
+- **Library**: folder add/remove, duplicate folder prevention, background folder import and progress, failed-import retry, rescans preserving IDs/favorites/play counts/playlists, unreadable files and offline folders preserving existing records, removal during a scan, blocked-song hiding/unblocking, and database read failures preserving stored data.
+- **Playback**: double-click playback, play/pause fade, seek, stop, previous/next, natural completion, shuffle, repeat, volume, session restoration, Now Playing, localized Dock/menu actions, missing-file and decode-error retry, queue multi-selection/reordering/removal/clear undo, history replay preserving upcoming songs, and Play Next repositioning existing songs.
 - **Tables**: click, Shift selection, Command selection, double-click, context menu, trailing actions, column resize, column visibility, sorting, and drag to playlist or Finder.
-- **Albums and Artists**: grid responsiveness, detail navigation, artwork matched transitions, search, playback buttons, and return animations.
+- **Albums and Artists**: grid responsiveness, empty-state import actions, detail navigation, artwork matched transitions, search, playback buttons, return animations, album-artist grouping for compilations, and disc/track ordering with missing metadata.
 - **Lyrics**: both presentation settings, embedded open/close and `Esc`, complete-surface animation, reduced motion, repeated toggles, repeated green-button full-screen entry and exit, full top-edge coverage in full screen, track changes while open, `.lrc` parsing, highlighted-line timing, smooth scrolling, tap-to-seek, inactive-line blur, missing artwork, artwork/background crossfade, and standalone-window restoration.
-- **Settings**: theme, language, lyrics presentation, lyrics blur, library-folder layout, rescan, delete confirmation, blocked-song list, resizing, scroll coverage, and top scroll-edge effect.
+- **Settings**: theme, language, lyrics presentation, lyrics blur, library-folder layout, rescan, delete confirmation, blocked-song list, resizing, scroll coverage, and top scroll-edge effect. Check English and Chinese for new progress, errors, menus, and empty states.
+- **Lyrics files and timing**: positive/negative LRC offsets, per-song earlier/later/reset adjustment, UTF-8/UTF-16/GB18030/Big5 files and encoding overrides, custom file selection and reloading, missing selected files, and rapid track changes while loading.
+- **Keyboard and accessibility**: Command-F targets only the current visible library search, Command-P toggles playback, Command-Left/Right changes tracks, Command-Shift-O adds folders, and both progress sliders support keyboard focus, arrow keys, and VoiceOver adjustment.
 - **Layout**: narrow windows, sidebar shown or hidden before opening embedded lyrics, sidebar-toggle restoration after closing lyrics, stable traffic-light positions, windowed trailing lyrics close button, immersive full-screen lyrics close button, toolbar restoration after leaving lyrics, toolbar tab bar, sidebar width, floating player-bar hit testing, and search-field placement.
 
 ## Git Workflow

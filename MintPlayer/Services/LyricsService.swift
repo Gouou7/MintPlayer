@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 struct LyricLine: Identifiable, Hashable {
     let id = UUID()
@@ -8,28 +9,65 @@ struct LyricLine: Identifiable, Hashable {
 }
 
 enum LyricsLoadState {
+    case loading
     case missing(URL)
     case failed(String)
     case plainText([String])
     case synced([LyricLine])
 }
 
+enum LyricsTextEncoding: String, CaseIterable {
+    case automatic, utf8, utf16, gb18030, big5
+
+    var titleKey: L10n.Key {
+        switch self {
+        case .automatic: return .automaticEncoding
+        case .utf8: return .utf8Encoding
+        case .utf16: return .utf16Encoding
+        case .gb18030: return .gb18030Encoding
+        case .big5: return .big5Encoding
+        }
+    }
+
+    var stringEncoding: String.Encoding? {
+        switch self {
+        case .automatic: return nil
+        case .utf8: return .utf8
+        case .utf16: return .utf16
+        case .gb18030:
+            return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(
+                CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)
+            ))
+        case .big5:
+            return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(
+                CFStringEncoding(CFStringEncodings.big5.rawValue)
+            ))
+        }
+    }
+}
+
 enum LyricsService {
-    static func loadLyrics(for song: Song) -> LyricsLoadState {
-        let lyricsURL = lyricsURL(for: song)
+    static func loadLyrics(for song: Song, fileURL: URL? = nil, timingOffset: TimeInterval = 0, encoding: LyricsTextEncoding = .automatic) -> LyricsLoadState {
+        let lyricsURL = fileURL ?? lyricsURL(for: song)
         guard FileManager.default.fileExists(atPath: lyricsURL.path) else {
-            return .missing(lyricsURL)
+            return fileURL == nil ? .missing(lyricsURL) : .failed(L10n.current(.selectedLyricsMissing, lyricsURL.lastPathComponent))
         }
         
         do {
             let data = try Data(contentsOf: lyricsURL)
-            guard let content = string(from: data) else {
-                return .failed("无法读取歌词文件编码")
+            let decoded: String?
+            if let explicitEncoding = encoding.stringEncoding {
+                decoded = String(data: data, encoding: explicitEncoding)
+            } else {
+                decoded = string(from: data)
+            }
+            guard let content = decoded else {
+                return .failed(L10n.current(.lyricsEncodingFailed))
             }
             
-            return parse(content)
+            return parse(content, timingOffset: timingOffset)
         } catch {
-            return .failed(error.localizedDescription)
+            return .failed(L10n.current(.lyricsFileReadFailed, error.localizedDescription))
         }
     }
     
@@ -40,20 +78,41 @@ enum LyricsService {
     }
     
     private static func string(from data: Data) -> String? {
-        let encodings: [String.Encoding] = [.utf8, .unicode, .utf16, .utf16LittleEndian, .utf16BigEndian, .isoLatin1]
+        let bytes = Array(data.prefix(4))
+        if bytes.starts(with: [0xFF, 0xFE, 0x00, 0x00]) || bytes.starts(with: [0x00, 0x00, 0xFE, 0xFF]) {
+            return String(data: data, encoding: .utf32)
+        }
+        if bytes.starts(with: [0xFF, 0xFE]) || bytes.starts(with: [0xFE, 0xFF]) {
+            return String(data: data, encoding: .utf16)
+        }
+        // LRC timestamps begin with ASCII, which also identifies BOM-less UTF-16 byte order.
+        if bytes.count >= 2, data.count.isMultiple(of: 2) {
+            if bytes[0] == 0 { return String(data: data, encoding: .utf16BigEndian) }
+            if bytes[1] == 0 { return String(data: data, encoding: .utf16LittleEndian) }
+        }
+        if let text = String(data: data, encoding: .utf8) { return text }
+        let encodings = [LyricsTextEncoding.gb18030, .big5].compactMap(\.stringEncoding)
+            + [String.Encoding.windowsCP1252, .isoLatin1]
         for encoding in encodings {
-            if let string = String(data: data, encoding: encoding) {
-                return string
-            }
+            if let text = String(data: data, encoding: encoding) { return text }
         }
         return nil
     }
-    
-    private static func parse(_ content: String) -> LyricsLoadState {
-        let lines = content.components(separatedBy: .newlines)
+
+    private static func parse(_ content: String, timingOffset: TimeInterval) -> LyricsLoadState {
+        let lines = content.replacingOccurrences(of: "\u{FEFF}", with: "").components(separatedBy: .newlines)
+        let offsetRegex = try? NSRegularExpression(pattern: #"^\[offset\s*:\s*([+-]?\d+)\s*\]$"#, options: .caseInsensitive)
+        var fileOffset: TimeInterval = 0
+        for rawLine in lines {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let match = offsetRegex?.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+               let range = Range(match.range(at: 1), in: line), let value = Double(line[range]), value.isFinite {
+                fileOffset = value / 1000
+            }
+        }
         let timestampPattern = #"\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]"#
         guard let timestampRegex = try? NSRegularExpression(pattern: timestampPattern) else {
-            return .failed("歌词时间轴解析失败")
+            return .failed(L10n.current(.lyricsParsingFailed))
         }
         
         var syncedLines: [(line: LyricLine, sourceIndex: Int)] = []
@@ -88,7 +147,7 @@ enum LyricsService {
                 }
                 
                 let rawTime = String(line[rawTimeRange])
-                syncedLines.append((LyricLine(time: time, rawTime: rawTime, text: text), lineIndex))
+                syncedLines.append((LyricLine(time: time - fileOffset + timingOffset, rawTime: rawTime, text: text), lineIndex))
             }
         }
         

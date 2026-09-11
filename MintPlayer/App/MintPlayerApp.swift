@@ -21,8 +21,11 @@ struct MintPlayerApp: App {
                 }
         }
         .windowStyle(.automatic)
+        .commands {
+            PlayerCommands(audioPlayer: audioPlayer, musicLibrary: musicLibrary, settings: settings)
+        }
 
-        WindowGroup("Lyrics", id: "lyrics") {
+        WindowGroup(settings.text(.lyrics), id: "lyrics") {
             LyricsWindowView()
                 .environmentObject(audioPlayer)
                 .environmentObject(settings)
@@ -77,6 +80,48 @@ struct MintPlayerApp: App {
     }
 }
 
+private struct PlayerCommands: Commands {
+    @ObservedObject var audioPlayer: AudioPlayer
+    @ObservedObject var musicLibrary: MusicLibrary
+    @ObservedObject var settings: SettingsManager
+    @FocusedValue(\.librarySearchAction) private var searchAction
+
+    var body: some Commands {
+        CommandGroup(after: .newItem) {
+            Button(settings.text(.addMusicFolder), action: { MusicFolderImporter.present(for: musicLibrary) })
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+        }
+        CommandGroup(after: .textEditing) {
+            Button(settings.text(.focusSearch)) { searchAction?() }
+                .keyboardShortcut("f", modifiers: .command)
+                .disabled(searchAction == nil)
+        }
+        CommandMenu(settings.text(.playbackMenu)) {
+            Button(settings.text(.playPause), action: audioPlayer.togglePlayPause)
+                .keyboardShortcut("p", modifiers: .command)
+                .disabled(audioPlayer.currentSong == nil)
+            Button(settings.text(.previous), action: audioPlayer.previous)
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+                .disabled(audioPlayer.queue.isEmpty)
+            Button(settings.text(.next), action: audioPlayer.next)
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+                .disabled(audioPlayer.queue.isEmpty)
+            Divider()
+            Toggle(settings.text(.shuffle), isOn: Binding(
+                get: { audioPlayer.isShuffleEnabled }, set: { _ in audioPlayer.toggleShuffle() }
+            ))
+            Toggle(settings.text(.repeatMode), isOn: Binding(
+                get: { audioPlayer.isRepeatEnabled }, set: { _ in audioPlayer.toggleRepeat() }
+            ))
+            Divider()
+            Button(settings.text(.clearQueue), action: audioPlayer.clearQueue)
+                .disabled(audioPlayer.upcomingSongs.isEmpty)
+            Button(settings.text(.undoClearQueue), action: audioPlayer.undoClearQueue)
+                .disabled(!audioPlayer.canUndoClearQueue)
+        }
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var audioPlayer: AudioPlayer?
     private weak var musicLibrary: MusicLibrary?
@@ -89,27 +134,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
         menu.addItem(menuItem(
-            title: "⏪️ 上一曲",
+            title: L10n.current(.previous),
             symbolName: "backward.fill",
             action: #selector(playPrevious),
             isEnabled: canNavigatePlayback
         ))
         let isPlaying = audioPlayer?.isPlaying == true
         menu.addItem(menuItem(
-            title: isPlaying ? "⏸️ 暂停" : "▶️ 播放",
+            title: L10n.current(isPlaying ? .pause : .play),
             symbolName: isPlaying ? "pause.fill" : "play.fill",
             action: #selector(togglePlayback),
             isEnabled: audioPlayer?.currentSong != nil
         ))
         menu.addItem(menuItem(
-            title: "⏩️ 下一曲",
+            title: L10n.current(.next),
             symbolName: "forward.fill",
             action: #selector(playNext),
             isEnabled: canNavigatePlayback
         ))
         menu.addItem(.separator())
         menu.addItem(menuItem(
-            title: "🔀 随机播放",
+            title: L10n.current(.shuffle),
             symbolName: "shuffle",
             action: #selector(shuffleSongs),
             isEnabled: musicLibrary?.songs.isEmpty == false

@@ -12,7 +12,37 @@ extension EnvironmentValues {
     }
 }
 
-struct NativeToolbarSearchField: NSViewRepresentable {
+private struct LibrarySearchActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+extension FocusedValues {
+    var librarySearchAction: (() -> Void)? {
+        get { self[LibrarySearchActionKey.self] }
+        set { self[LibrarySearchActionKey.self] = newValue }
+    }
+}
+
+struct NativeToolbarSearchField: View {
+    @Binding var text: String
+    let prompt: String
+    @Environment(\.isPlayerOverlayPresented) private var isPlayerOverlayPresented
+
+    var body: some View {
+        NativeSearchField(text: $text, prompt: prompt)
+            .focusedSceneValue(\.librarySearchAction, isPlayerOverlayPresented ? nil : NativeSearchField.focusSearchInKeyWindow)
+    }
+}
+
+private struct NativeSearchField: NSViewRepresentable {
+    private static let searchFields = NSHashTable<NSSearchField>.weakObjects()
+
+    static func focusSearchInKeyWindow() {
+        guard let window = NSApp.keyWindow,
+              let field = searchFields.allObjects.first(where: { $0.window === window && !$0.isHiddenOrHasHiddenAncestor && $0.isEnabled }) else { return }
+        field.selectText(nil)
+    }
+
     @Binding var text: String
     let prompt: String
 
@@ -22,6 +52,7 @@ struct NativeToolbarSearchField: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSSearchField {
         let searchField = NSSearchField()
+        Self.searchFields.add(searchField)
         searchField.placeholderString = prompt
         searchField.stringValue = text
         searchField.target = context.coordinator
@@ -43,6 +74,7 @@ struct NativeToolbarSearchField: NSViewRepresentable {
 
     static func dismantleNSView(_ nsView: NSSearchField, coordinator: Coordinator) {
         coordinator.cancelPendingSearch()
+        Self.searchFields.remove(nsView)
     }
 
     final class Coordinator: NSObject, NSSearchFieldDelegate {

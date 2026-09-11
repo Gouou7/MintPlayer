@@ -15,6 +15,13 @@ struct LibrarySettingsView: View {
 
     var body: some View {
         Form {
+            if let message = musicLibrary.lastScanError {
+                Section {
+                    OperationErrorView(message: message, retry: musicLibrary.retryFailedOperations) {
+                        musicLibrary.lastScanError = nil
+                    }
+                }
+            }
             appearanceSettings
             playbackSettings
             librarySettings
@@ -160,7 +167,7 @@ struct LibrarySettingsView: View {
                 Label(settings.text(.rescanAll), systemImage: "arrow.clockwise")
             }
             .buttonStyle(.bordered)
-            .disabled(musicLibrary.librarySources.isEmpty)
+            .disabled(musicLibrary.librarySources.isEmpty || musicLibrary.isScanning)
         }
     }
 
@@ -188,6 +195,15 @@ struct LibrarySettingsView: View {
                         ProgressView()
                             .controlSize(.small)
                     }
+                }
+
+                if source.isScanning {
+                    Text(String(format: settings.text(.scanningFiles), musicLibrary.scanProgress[source.id] ?? 0))
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if let message = musicLibrary.sourceErrors[source.id] {
+                    Label(settings.text(.folderUnavailable), systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                        .help(message)
                 }
 
                 if let lastScanned = source.lastScanned {

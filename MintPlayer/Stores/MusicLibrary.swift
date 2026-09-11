@@ -9,8 +9,17 @@ class MusicLibrary: ObservableObject {
     @Published var librarySources: [MusicLibrarySource] = []
     @Published var blockedSongs: [BlockedSong] = []
     @Published var lastScanError: String?
+    @Published private(set) var scanProgress: [UUID: Int] = [:]
+    @Published private(set) var sourceErrors: [UUID: String] = [:]
+    @Published private(set) var pendingImports = 0
+    @Published private(set) var importedFileCount = 0
+    private let scanQueue = DispatchQueue(label: "MintPlayer.libraryScan", qos: .userInitiated)
+    private var scanTokens: [UUID: UUID] = [:]
+    private var failedImportURLs: [URL] = []
+    private var lastImportError: String?
 
-    private let persistenceStore: LibraryPersistenceStore?
+    private var persistenceStore: LibraryPersistenceStore?
+    private var hasLoadedLibraryState = false
     private let supportedAudioFileExtensions = Set(["mp3", "m4a", "wav", "aac", "flac", "ogg", "aiff", "aif"])
     private let artworkFolderName = "Artwork"
     private var albumSongIDs: [AlbumSummary.ID: [Song.ID]] = [:]
@@ -21,34 +30,100 @@ class MusicLibrary: ObservableObject {
     private var indexBuildGeneration = 0
 
     init() {
-        do {
-            persistenceStore = try LibraryPersistenceStore()
-        } catch {
-            persistenceStore = nil
-            lastScanError = error.localizedDescription
-        }
-
         loadLibraryState()
         rebuildAlbumsAndArtists()
     }
 
-    // 导入音乐文件
-    func importMusic(from urls: [URL]) {
-        var importedSongs: [Song] = []
+    var isScanning: Bool { pendingImports > 0 || librarySources.contains(where: \.isScanning) }
 
-        for url in urls {
-            if isDirectory(url) {
-                importedSongs.append(contentsOf: scanDirectoryForMusic(at: url, sourceId: nil))
-            } else if isSupportedMusicFile(url), let song = createSong(from: url) {
-                importedSongs.append(song)
+    func retryFailedOperations() {
+        lastScanError = nil
+        if !hasLoadedLibraryState {
+            loadLibraryState()
+            rebuildAlbumsAndArtists()
+            return
+        }
+        for source in librarySources where sourceErrors[source.id] != nil {
+            scanLibrarySource(source)
+        }
+        let urls = failedImportURLs
+        failedImportURLs = []
+        if !urls.isEmpty { importMusic(from: urls) }
+        saveLibraryState()
+    }
+
+    private func requireLoadedLibrary() -> Bool {
+        guard hasLoadedLibraryState else {
+            if lastScanError == nil { lastScanError = L10n.current(.databaseUnavailable) }
+            return false
+        }
+        return true
+    }
+
+    // Metadata extraction is serialized off the main thread; only completed results mutate library state.
+    func importMusic(from urls: [URL]) {
+        guard requireLoadedLibrary() else { return }
+        guard !urls.isEmpty else { return }
+        if pendingImports == 0 { importedFileCount = 0 }
+        pendingImports += 1
+        let sourceSnapshot = librarySources
+        scanQueue.async {
+            var importedSongs: [Song] = []
+            var failures: [URL: String] = [:]
+            var processed = 0
+            let progress: (Int) -> Void = { count in
+                let delta = count - processed
+                processed = count
+                DispatchQueue.main.async { self.importedFileCount += delta }
+            }
+            for url in urls {
+                do {
+                    if self.isDirectory(url) {
+                        let baseCount = processed
+                        let result = try self.scanDirectoryForMusic(at: url, sourceId: nil) { progress(baseCount + $0) }
+                        importedSongs += result.songs
+                        failures.merge(result.failures) { _, new in new }
+                    } else if self.isSupportedMusicFile(url) {
+                        defer { progress(processed + 1) }
+                        if let song = try self.createSong(from: url) { importedSongs.append(song) }
+                    } else {
+                        failures[url] = L10n.current(.unsupportedAudio)
+                    }
+                } catch {
+                    failures[url] = error.localizedDescription
+                }
+            }
+            let completedSongs = importedSongs
+            let completedFailures = failures
+            DispatchQueue.main.async {
+                // Ignore results owned by a folder removed while this import was running.
+                let removedSources = sourceSnapshot.filter { old in !self.librarySources.contains { $0.id == old.id } }
+                let visibleSongs = completedSongs.compactMap { song -> Song? in
+                    guard !removedSources.contains(where: { self.isPath(song.path, inside: $0.path) }) else { return nil }
+                    let source = self.source(containing: song.path)
+                    guard !self.isBlocked(path: song.path, sourceId: source?.id) else { return nil }
+                    return song.assigningLibrarySource(source?.id)
+                }
+                self.mergeSongs(visibleSongs)
+                self.pendingImports -= 1
+                let succeededURLs = Set(urls).subtracting(completedFailures.keys)
+                self.failedImportURLs.removeAll { succeededURLs.contains($0) }
+                if !completedFailures.isEmpty {
+                    self.failedImportURLs = Array(Set(self.failedImportURLs + Array(completedFailures.keys)))
+                    let message = Self.failureSummary(completedFailures)
+                    self.lastImportError = message
+                    self.lastScanError = message
+                } else if self.failedImportURLs.isEmpty {
+                    if self.lastScanError == self.lastImportError { self.lastScanError = nil }
+                    self.lastImportError = nil
+                }
             }
         }
-
-        mergeSongs(importedSongs)
     }
 
     // 添加资料库
     func addLibrarySource(name: String, path: String) {
+        guard requireLoadedLibrary() else { return }
         guard !librarySources.contains(where: { standardizedPath($0.path) == standardizedPath(path) }) else {
             return
         }
@@ -66,6 +141,9 @@ class MusicLibrary: ObservableObject {
         if let index = librarySources.firstIndex(where: { $0.id == id }) {
             let source = librarySources[index]
             librarySources.remove(at: index)
+            scanTokens[id] = nil
+            scanProgress[id] = nil
+            sourceErrors[id] = nil
             songs.removeAll { isPath($0.path, inside: source.path) }
             blockedSongs.removeAll { $0.sourceId == source.id }
             playlists = playlists.map { playlist in
@@ -82,74 +160,128 @@ class MusicLibrary: ObservableObject {
         }
     }
 
-    // 重新扫描所有资料库
     func rescanAllLibraries() {
-        songs.removeAll()
-        rebuildAlbumsAndArtists()
-        saveLibraryState()
-
-        for source in librarySources {
-            scanLibrarySource(source)
-        }
+        for source in librarySources { scanLibrarySource(source) }
     }
 
-    // 扫描单个资料库
     func scanLibrarySource(_ source: MusicLibrarySource) {
-        // 更新扫描状态
-        if let index = librarySources.firstIndex(where: { $0.id == source.id }) {
-            var updatedSource = source
-            updatedSource.isScanning = true
-            librarySources[index] = updatedSource
-        }
+        guard requireLoadedLibrary() else { return }
+        guard let index = librarySources.firstIndex(where: { $0.id == source.id }),
+              !librarySources[index].isScanning else { return }
+        let token = UUID()
+        scanTokens[source.id] = token
+        librarySources[index].isScanning = true
+        scanProgress[source.id] = 0
+        if let previousError = sourceErrors[source.id], lastScanError == previousError { lastScanError = nil }
+        sourceErrors[source.id] = nil
 
-        DispatchQueue.global(qos: .background).async {
-            let scannedSongs = self.scanDirectoryForMusic(at: URL(fileURLWithPath: source.path), sourceId: source.id)
-
-            DispatchQueue.main.async {
-                let existingSourceSongs = self.songs.filter { self.isSong($0, from: source) }
-                self.songs.removeAll { self.isPath($0.path, inside: source.path) }
-                self.mergeSongs(scannedSongs, existingSongs: existingSourceSongs, shouldSave: false)
-
-                // 更新扫描状态
-                if let index = self.librarySources.firstIndex(where: { $0.id == source.id }) {
-                    var updatedSource = source
-                    updatedSource.isScanning = false
-                    updatedSource.lastScanned = Date()
-                    self.librarySources[index] = updatedSource
+        scanQueue.async {
+            let result = Result {
+                try self.scanDirectoryForMusic(at: URL(fileURLWithPath: source.path), sourceId: source.id) { count in
+                    DispatchQueue.main.async {
+                        guard self.scanTokens[source.id] == token else { return }
+                        self.scanProgress[source.id] = count
+                    }
                 }
-
-                self.saveLibraryState()
+            }
+            DispatchQueue.main.async {
+                guard self.scanTokens[source.id] == token,
+                      let index = self.librarySources.firstIndex(where: { $0.id == source.id }) else { return }
+                self.scanTokens[source.id] = nil
+                self.librarySources[index].isScanning = false
+                switch result {
+                case .success(let scan):
+                    let existingSongs = self.songs.filter { self.isSong($0, from: source) }
+                    let failedPaths = Set(scan.failures.keys.map { self.standardizedPath($0.path) })
+                    // Keep unreadable tracks and their user data; only a complete traversal can remove absent files.
+                    self.songs.removeAll {
+                        self.isSong($0, from: source) && !failedPaths.contains(self.standardizedPath($0.path))
+                    }
+                    let newSongs = scan.songs.compactMap { song -> Song? in
+                        let owner = self.source(containing: song.path) ?? source
+                        guard !self.isBlocked(path: song.path, sourceId: owner.id) else { return nil }
+                        return song.assigningLibrarySource(owner.id)
+                    }
+                    if newSongs.isEmpty {
+                        self.reconcilePlaylistSongs()
+                        self.rebuildAlbumsAndArtists()
+                    } else {
+                        self.mergeSongs(newSongs, existingSongs: existingSongs, shouldSave: false)
+                    }
+                    self.librarySources[index].lastScanned = Date()
+                    if !scan.failures.isEmpty {
+                        let message = Self.failureSummary(scan.failures)
+                        self.sourceErrors[source.id] = message
+                        self.lastScanError = message
+                    }
+                    self.saveLibraryState()
+                case .failure(let error):
+                    let message = L10n.current(.folderScanFailed, source.name, error.localizedDescription)
+                    self.sourceErrors[source.id] = message
+                    self.lastScanError = message
+                }
             }
         }
     }
 
-    // 扫描目录中的音乐文件
-    private func scanDirectoryForMusic(at directory: URL, sourceId: UUID?) -> [Song] {
+    private struct ScanResult {
+        var songs: [Song] = []
+        var failures: [URL: String] = [:]
+    }
+
+    private func scanDirectoryForMusic(at directory: URL, sourceId: UUID?, progress: (Int) -> Void) throws -> ScanResult {
         let fileManager = FileManager.default
-        let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey]
+        guard try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true,
+              fileManager.isReadableFile(atPath: directory.path) else {
+            throw CocoaError(.fileReadNoPermission)
+        }
+        var traversalError: Error?
         guard let enumerator = fileManager.enumerator(
             at: directory,
-            includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else {
-            return []
-        }
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants],
+            errorHandler: { _, error in
+                traversalError = error
+                return false
+            }
+        ) else { throw CocoaError(.fileReadUnknown) }
 
-        var scannedSongs: [Song] = []
+        var result = ScanResult()
+        var count = 0
         for case let fileURL as URL in enumerator {
-            guard isSupportedMusicFile(fileURL), let song = createSong(from: fileURL, librarySourceId: sourceId) else {
-                continue
+            guard isSupportedMusicFile(fileURL) else { continue }
+            do {
+                guard try fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { continue }
+                if let song = try createSong(from: fileURL, librarySourceId: sourceId) { result.songs.append(song) }
+            } catch {
+                result.failures[fileURL] = error.localizedDescription
             }
-
-            if !isBlocked(path: song.path, sourceId: sourceId) {
-                scannedSongs.append(song)
-            }
+            count += 1
+            if count.isMultiple(of: 25) { progress(count) }
         }
-        return scannedSongs
+        progress(count)
+        if let traversalError { throw traversalError }
+        return result
+    }
+
+    private static func failureSummary(_ failures: [URL: String]) -> String {
+        let details = failures.sorted { $0.key.path < $1.key.path }.prefix(8)
+            .map { "\($0.key.lastPathComponent): \($0.value)" }.joined(separator: "\n")
+        return L10n.current(.scanFailureCount, failures.count) + "\n" + details
+    }
+
+    private func reconcilePlaylistSongs() {
+        let songsByID = Dictionary(uniqueKeysWithValues: songs.map { ($0.id, $0) })
+        for index in playlists.indices {
+            playlists[index].songs = playlists[index].songs.compactMap { songsByID[$0.id] }
+            playlists[index].songEntries = normalizedPlaylistEntries(
+                playlists[index].songEntries.filter { songsByID[$0.songId] != nil }
+            )
+        }
     }
 
     // 从URL创建歌曲对象
-    private func createSong(from url: URL, librarySourceId: UUID? = nil) -> Song? {
+    private func createSong(from url: URL, librarySourceId: UUID? = nil) throws -> Song? {
         guard isSupportedMusicFile(url) else { return nil }
 
         let fileName = url.lastPathComponent
@@ -161,15 +293,13 @@ class MusicLibrary: ObservableObject {
         var genre: String?
         var year: Int?
 
-        // 使用AVAudioFile获取时长
-        do {
-            let audioFile = try AVAudioFile(forReading: url)
-            let sampleRate = audioFile.processingFormat.sampleRate
-            let frameCount = audioFile.length
-            duration = Double(frameCount) / sampleRate
-        } catch {
-            print("Error getting audio duration: \(error)")
+        guard FileManager.default.isReadableFile(atPath: url.path) else {
+            throw CocoaError(.fileReadNoPermission)
         }
+        let audioFile = try AVAudioFile(forReading: url)
+        let sampleRate = audioFile.processingFormat.sampleRate
+        guard sampleRate > 0 else { throw CocoaError(.fileReadCorruptFile) }
+        duration = Double(audioFile.length) / sampleRate
 
         let metadata = metadataItems(for: AVURLAsset(url: url))
         title = stringMetadata(for: [.commonIdentifierTitle], in: metadata) ?? title
@@ -198,7 +328,11 @@ class MusicLibrary: ObservableObject {
             coverPath: coverPath,
             genre: genre,
             year: year,
-            librarySourceId: librarySourceId
+            librarySourceId: librarySourceId,
+            trackNumber: numberMetadata(in: metadata, identifiers: [.iTunesMetadataTrackNumber, .id3MetadataTrackNumber], keys: ["TRCK", "TRACKNUMBER"]),
+            discNumber: numberMetadata(in: metadata, identifiers: [.iTunesMetadataDiscNumber, .id3MetadataPartOfASet], keys: ["TPOS", "DISCNUMBER"]),
+            albumArtist: stringMetadata(for: [.iTunesMetadataAlbumArtist, .id3MetadataBand], in: metadata)
+                ?? stringMetadataValue(in: metadata, keys: ["TPE2", "ALBUMARTIST", "ALBUM ARTIST"])
         )
     }
 
@@ -221,6 +355,7 @@ class MusicLibrary: ObservableObject {
         songs = Array(songsByPath.values).sorted {
             $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
         }
+        reconcilePlaylistSongs()
         rebuildAlbumsAndArtists()
 
         if shouldSave {
@@ -277,7 +412,9 @@ class MusicLibrary: ObservableObject {
     }
 
     func songs(forAlbum album: AlbumSummary) -> [Song] {
-        songs(from: albumSongIDs[album.id] ?? [])
+        // Detail views can refresh before the background summary index has finished rebuilding.
+        songs.filter { Self.albumSummaryID(title: $0.album, artist: $0.effectiveAlbumArtist) == album.id }
+            .sorted(by: Song.albumOrder)
     }
 
     func songs(forArtist artist: ArtistSummary) -> [Song] {
@@ -386,6 +523,7 @@ class MusicLibrary: ObservableObject {
 
     // 创建新播放列表
     func createPlaylist(name: String, description: String = "") {
+        guard requireLoadedLibrary() else { return }
         let playlist = Playlist(
             name: name,
             description: description,
@@ -485,9 +623,10 @@ class MusicLibrary: ObservableObject {
         rebuildAlbumsAndArtists()
 
         do {
-            try persistenceStore?.updatePlaybackStats(for: updatedSong)
+            guard hasLoadedLibraryState, let persistenceStore else { throw LibraryPersistenceStore.StoreError.missingDatabase }
+            try persistenceStore.updatePlaybackStats(for: updatedSong)
         } catch {
-            lastScanError = "无法保存播放统计：\(error.localizedDescription)"
+            lastScanError = L10n.current(.saveStatsFailed, error.localizedDescription)
         }
     }
 
@@ -511,8 +650,10 @@ class MusicLibrary: ObservableObject {
 
     private func loadLibraryState() {
         do {
-            guard let persistenceStore else { return }
+            if persistenceStore == nil { persistenceStore = try LibraryPersistenceStore() }
+            guard let persistenceStore else { throw LibraryPersistenceStore.StoreError.missingDatabase }
             let snapshot = try persistenceStore.loadSnapshot()
+            hasLoadedLibraryState = true
             songs = snapshot.songs
             playlists = snapshot.playlists
             blockedSongs = snapshot.blockedSongs
@@ -520,7 +661,7 @@ class MusicLibrary: ObservableObject {
                 MusicLibrarySource(id: $0.id, name: $0.name, path: $0.path, isScanning: false, lastScanned: $0.lastScanned)
             }
         } catch {
-            lastScanError = "无法加载音乐库状态：\(error.localizedDescription)"
+            lastScanError = L10n.current(.loadLibraryFailed, error.localizedDescription)
         }
     }
 
@@ -535,9 +676,10 @@ class MusicLibrary: ObservableObject {
         )
 
         do {
-            try persistenceStore?.saveSnapshot(snapshot)
+            guard hasLoadedLibraryState, let persistenceStore else { throw LibraryPersistenceStore.StoreError.missingDatabase }
+            try persistenceStore.saveSnapshot(snapshot)
         } catch {
-            lastScanError = "无法保存音乐库状态：\(error.localizedDescription)"
+            lastScanError = L10n.current(.saveLibraryFailed, error.localizedDescription)
         }
     }
 
@@ -584,7 +726,7 @@ class MusicLibrary: ObservableObject {
         var artistDrafts: [ArtistSummary.ID: ArtistIndexDraft] = [:]
 
         for song in songs {
-            let albumID = albumSummaryID(title: song.album, artist: song.artist)
+            let albumID = albumSummaryID(title: song.album, artist: song.effectiveAlbumArtist)
             let artistNames = indexedArtistNames(from: song.artist)
 
             if var albumDraft = albumDrafts[albumID] {
@@ -600,7 +742,7 @@ class MusicLibrary: ObservableObject {
                 albumDrafts[albumID] = AlbumIndexDraft(
                     id: albumID,
                     title: song.album,
-                    artist: song.artist,
+                    artist: song.effectiveAlbumArtist,
                     coverPath: song.coverPath ?? "",
                     year: song.year ?? 0,
                     songIDs: [song.id]
@@ -724,6 +866,33 @@ class MusicLibrary: ObservableObject {
         return nil
     }
 
+    private func stringMetadataValue(in metadata: [AVMetadataItem], keys: [String]) -> String? {
+        for item in metadata {
+            guard let key = item.key as? String, keys.contains(key.uppercased()),
+                  let value = loadOptionalMetadataValue({ try await item.load(.stringValue) }),
+                  !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            return value
+        }
+        return nil
+    }
+
+    private func numberMetadata(in metadata: [AVMetadataItem], identifiers: [AVMetadataIdentifier], keys: [String]) -> Int? {
+        if let value = stringMetadata(for: identifiers, in: metadata) ?? stringMetadataValue(in: metadata, keys: keys),
+           let number = Int(value.split(separator: "/").first?.trimmingCharacters(in: .whitespaces) ?? ""), number > 0 {
+            return number
+        }
+        // iTunes stores track/disc indexes as a big-endian integer pair after two reserved bytes.
+        for item in metadata where item.identifier == .iTunesMetadataTrackNumber || item.identifier == .iTunesMetadataDiscNumber {
+            guard item.identifier.map({ identifiers.contains($0) }) == true else { continue }
+            if let data = loadOptionalMetadataValue({ try await item.load(.dataValue) }), data.count >= 4 {
+                let bytes = Array(data)
+                let number = Int(bytes[2]) << 8 | Int(bytes[3])
+                if number > 0 { return number }
+            }
+        }
+        return nil
+    }
+
     private func yearMetadata(in metadata: [AVMetadataItem]) -> Int? {
         let identifiers: [AVMetadataIdentifier] = [
             .commonIdentifierCreationDate,
@@ -819,13 +988,11 @@ class MusicLibrary: ObservableObject {
     }
 
     private func source(containing path: String) -> MusicLibrarySource? {
-        librarySources.first { isPath(path, inside: $0.path) }
+        librarySources.filter { isPath(path, inside: $0.path) }.max { $0.path.count < $1.path.count }
     }
 
     private func isSong(_ song: Song, from source: MusicLibrarySource) -> Bool {
-        if song.librarySourceId == source.id {
-            return true
-        }
+        if let sourceID = song.librarySourceId { return sourceID == source.id }
         return isPath(song.path, inside: source.path)
     }
 
