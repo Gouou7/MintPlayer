@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-11
+
 ### Added
 - Added album track numbers, disc numbers, and album artist metadata, with album playback ordered by disc and track and compilations grouped by album artist.
 - Added import progress, scan and playback error details, and retry actions while keeping folder imports responsive.
