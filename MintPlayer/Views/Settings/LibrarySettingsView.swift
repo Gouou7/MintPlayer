@@ -233,6 +233,7 @@ struct LibrarySettingsView: View {
             .help(settings.text(.remove))
         }
         .padding(.vertical, 4)
+        .mintRowHover()
     }
 
     private func blockedSongsList(_ songs: [BlockedSong]) -> some View {
@@ -277,6 +278,7 @@ struct LibrarySettingsView: View {
             .help(settings.text(.unblockSong))
         }
         .padding(.vertical, 3)
+        .mintRowHover()
     }
 
     private var aboutSettings: some View {

@@ -31,6 +31,7 @@ struct SidebarRow: View {
             }
         }
         .contentShape(Rectangle())
+        .mintRowHover(isSelected: isSelected, cornerRadius: 10)
     }
 
     private var iconColor: Color {

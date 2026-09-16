@@ -110,6 +110,14 @@ extension NativeArtistTableView {
             parent.artists.count
         }
 
+        func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+            let identifier = NSUserInterfaceItemIdentifier("artistRow")
+            let rowView = tableView.makeView(withIdentifier: identifier, owner: self) as? NativeMusicTableRowView
+                ?? NativeMusicTableRowView()
+            rowView.identifier = identifier
+            return rowView
+        }
+
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
             guard parent.artists.indices.contains(row) else { return nil }
             let artist = parent.artists[row]

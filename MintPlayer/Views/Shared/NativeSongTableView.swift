@@ -69,7 +69,8 @@ struct NativeSongTableView: NSViewRepresentable {
         tableView.allowsMultipleSelection = true
         tableView.allowsColumnReordering = true
         tableView.allowsColumnResizing = true
-        tableView.usesAlternatingRowBackgroundColors = style == .compactFolder
+        tableView.style = .inset
+        tableView.usesAlternatingRowBackgroundColors = false
         tableView.selectionHighlightStyle = .regular
         tableView.setDraggingSourceOperationMask(.copy, forLocal: true)
         tableView.setDraggingSourceOperationMask(.copy, forLocal: false)
@@ -136,6 +137,77 @@ private protocol SongTableInteractionDelegate: AnyObject {
 
 private protocol SongTableHeaderMenuProvider: AnyObject {
     func columnVisibilityMenu() -> NSMenu?
+}
+
+final class NativeMusicTableRowView: NSTableRowView {
+    private var hoverTrackingArea: NSTrackingArea?
+
+    var showsAlternateBackground = false {
+        didSet { needsDisplay = true }
+    }
+
+    // Keep AppKit's neutral selection color even when the table has keyboard focus.
+    override var isEmphasized: Bool {
+        get { false }
+        set { super.isEmphasized = false }
+    }
+
+    override func drawBackground(in dirtyRect: NSRect) {
+        guard !isSelected else { return }
+        let opacity: CGFloat = isHovered ? 0.07 : (showsAlternateBackground ? 0.04 : 0)
+        guard opacity > 0 else { return }
+        NSColor.labelColor.withAlphaComponent(opacity).setFill()
+        backgroundPath?.fill()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        hoverTrackingArea = area
+        needsDisplay = true
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        needsDisplay = true
+    }
+
+    private var isHovered: Bool {
+        guard let window, window.isKeyWindow else { return false }
+        return visibleRect.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
+    }
+
+    override func drawSelection(in dirtyRect: NSRect) {
+        guard selectionHighlightStyle != .none else { return }
+        NSColor.labelColor.withAlphaComponent(0.16).setFill()
+        backgroundPath?.fill()
+    }
+
+    private var backgroundPath: NSBezierPath? {
+        var rect = bounds
+        if let clipView = enclosingScrollView?.contentView {
+            // Columns can extend beyond the viewport; keep both rounded ends visible.
+            let viewport = convert(clipView.bounds, from: clipView)
+            rect = rect.intersection(NSRect(x: viewport.minX, y: bounds.minY, width: viewport.width, height: bounds.height))
+        }
+        rect = rect.insetBy(dx: 6, dy: 1)
+        guard rect.width > 0, rect.height > 0 else { return nil }
+        return NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6)
+    }
 }
 
 private final class InteractiveSongTableView: NSTableView {
@@ -516,6 +588,15 @@ extension NativeSongTableView {
 
         func numberOfRows(in tableView: NSTableView) -> Int {
             parent.songs.count
+        }
+
+        func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+            let identifier = NSUserInterfaceItemIdentifier("neutralSongRow")
+            let rowView = tableView.makeView(withIdentifier: identifier, owner: self) as? NativeMusicTableRowView
+                ?? NativeMusicTableRowView()
+            rowView.identifier = identifier
+            rowView.showsAlternateBackground = parent.style == .compactFolder && row.isMultiple(of: 2)
+            return rowView
         }
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -1208,7 +1289,7 @@ final class SongContextMenuController: NSObject {
         if enabledActions.contains(.addToPlaylist), !playlists.isEmpty {
             let playlistTitle = settings.text(.addToPlaylist)
             let playlistItem = NSMenuItem(title: playlistTitle, action: nil, keyEquivalent: "")
-            playlistItem.image = NSImage(systemSymbolName: "music.note.list", accessibilityDescription: playlistTitle)
+            configureMenuImage(playlistItem, systemImage: "music.note.list")
 
             let submenu = NSMenu()
             for playlist in playlists {
@@ -1242,8 +1323,16 @@ final class SongContextMenuController: NSObject {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
         item.isEnabled = !songs.isEmpty
-        item.image = NSImage(systemSymbolName: systemImage, accessibilityDescription: title)
+        configureMenuImage(item, systemImage: systemImage)
         return item
+    }
+
+    private func configureMenuImage(_ item: NSMenuItem, systemImage: String) {
+        item.image = NSImage(systemSymbolName: systemImage, accessibilityDescription: item.title)
+        if #available(macOS 27.0, *) {
+            // Invoke the public property through KVC so the project also builds with the macOS 26 SDK.
+            item.setValue(1, forKey: "preferredImageVisibility")
+        }
     }
 
     @objc private func playSongs() {

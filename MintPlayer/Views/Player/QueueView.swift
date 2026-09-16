@@ -43,6 +43,7 @@ struct QueueView: View {
                             Section(settings.text(.upNext)) {
                                 ForEach(upNextSongs, id: \.id) { song in
                                     queueRowContent(song: song, isCurrent: false)
+                                        .mintRowHover(isSelected: selectedSongIDs.contains(song.id))
                                         .tag(song.id)
                                         .onTapGesture(count: 2) { audioPlayer.play(song: song) }
                                         .contextMenu {
@@ -157,6 +158,7 @@ struct QueueView: View {
             queueRowContent(song: song, isCurrent: isCurrent)
         }
         .buttonStyle(.plain)
+        .mintRowHover()
     }
 
     private func queueRowContent(song: Song, isCurrent: Bool) -> some View {

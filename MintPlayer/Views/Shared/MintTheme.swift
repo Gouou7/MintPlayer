@@ -18,6 +18,33 @@ enum MintTheme {
     static let contentHoverStroke = Color.primary.opacity(0.12)
 }
 
+extension View {
+    func mintRowHover(isSelected: Bool = false, cornerRadius: CGFloat = 8) -> some View {
+        modifier(MintRowHoverModifier(isSelected: isSelected, cornerRadius: cornerRadius))
+    }
+}
+
+private struct MintRowHoverModifier: ViewModifier {
+    let isSelected: Bool
+    let cornerRadius: CGFloat
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.controlActiveState) private var controlActiveState
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            .background {
+                if isHovered && isEnabled && !isSelected && controlActiveState != .inactive {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(MintTheme.hoverFill)
+                }
+            }
+            .onHover { isHovered = $0 }
+            .onDisappear { isHovered = false }
+    }
+}
+
 struct MintPlainIconButtonStyle: ButtonStyle {
     var isActive = false
     var inactiveForeground = Color.primary
