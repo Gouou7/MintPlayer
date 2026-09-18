@@ -1,225 +1,233 @@
-# Changelog
+# 更新日志
 
 ## [Unreleased]
 
 
+## [0.14.0] - 2026-09-19
+
+### 更改
+- 优化歌曲列表显示
+
+### 修复
+- 修复侧栏最大宽度限制未稳定生效的问题。
+
 ## [0.13.1] - 2026-09-11
 
-### Changed
-- Updated accent colors and selection styling across the sidebar, song and artist lists, playback controls, and queue to better match the native macOS appearance.
+### 更改
+- 更新侧栏、歌曲与艺人列表、播放控件和队列的强调色及选中样式，使其更符合 macOS 原生外观。
 
 ## [0.13.0] - 2026-09-11
 
-### Added
-- Added album track numbers, disc numbers, and album artist metadata, with album playback ordered by disc and track and compilations grouped by album artist.
-- Added import progress, scan and playback error details, and retry actions while keeping folder imports responsive.
-- Added upcoming queue reordering, multi-song removal, and undo for clearing the queue.
-- Added per-song lyrics timing adjustment, custom lyrics file and text encoding selection, and manual reloading.
-- Added playback menu commands, keyboard shortcuts, accessible keyboard-adjustable progress sliders, and folder import buttons in empty library views.
+### 新增
+- 加入专辑曲目编号、碟片编号和专辑艺人元数据；专辑按碟片和曲目顺序播放，合辑按专辑艺人分组。
+- 加入导入进度、扫描与播放错误详情及重试操作，同时保持文件夹导入过程响应流畅。
+- 支持重排待播队列、批量移除歌曲，以及撤销清空队列操作。
+- 支持为每首歌曲调整歌词时间、选择自定义歌词文件与文本编码，并手动重新加载歌词。
+- 加入播放菜单命令、键盘快捷键、可通过键盘调整且支持辅助功能的进度滑块，以及空资料库视图中的文件夹导入按钮。
 
-### Fixed
-- Preserved song identities, favorites, play counts, and playlist references during rescans, and retained existing songs when folders or audio files cannot be read.
-- Kept existing databases intact when encountering unsupported versions or read errors.
-- Kept upcoming songs when replaying history, and allowed Play Next to reposition songs already in the queue.
-- Applied LRC offset tags and improved Chinese and UTF-16 lyrics decoding.
-- Localized Dock playback actions and library, playback, and lyrics errors in English and Chinese.
+### 修复
+- 重新扫描时保留歌曲身份、喜欢状态、播放次数和播放列表引用；文件夹或音频文件无法读取时保留现有歌曲。
+- 遇到不受支持的数据库版本或读取错误时，保持现有数据库不受损。
+- 重播历史歌曲时保留待播歌曲，并允许“下一首播放”重新定位队列中已有的歌曲。
+- 正确应用 LRC 偏移标签，改进中文及 UTF-16 歌词解码。
+- 为 Dock 播放操作及资料库、播放、歌词错误提供中英文文案。
 
 ## [0.12.0] - 2026-09-10
 
-### Changed
-- Updated library backgrounds to follow the system's wallpaper tinting, with native song table headers that keep scrolling content separate.
-- Switched sidebar row selection to the native list appearance and behavior.
-- Changed the player bar progress and volume sliders to grayscale, made the progress thumb solid on hover, and marked favorites with a monochrome filled heart.
+### 更改
+- 更新资料库背景以跟随系统壁纸着色，并使用原生歌曲表头将滚动内容分隔开。
+- 将侧栏行的选中外观和行为改为原生列表样式。
+- 将播放器栏的进度和音量滑块改为灰阶样式，悬停时使用实心进度滑块手柄，并以单色实心爱心标记喜欢的歌曲。
 
-### Fixed
-- Limited sidebar resizing to 204–300 points so it cannot grow too wide and crowd the library content.
-- Kept the volume popover and slider layout stable as the speaker icon changes during volume adjustment.
+### 修复
+- 将侧栏宽度限制在 204–300 点，避免侧栏过宽挤占资料库内容。
+- 音量调整时扬声器图标变化不会再影响音量弹出框和滑块布局。
 
 ## [0.11.2] - 2026-07-29
 
-### Changed
+### 更改
 
-- Kept embedded and standalone lyrics dark regardless of the app theme.
+- 无论应用主题如何，内嵌和独立窗口歌词均保持深色外观。
 
 ## [0.11.1] - 2026-07-29
 
-### Changed
+### 更改
 
-- Added light and dark appearances for the app icon.
+- 为应用图标添加浅色和深色外观。
 
 ## [0.11.0] - 2026-07-29
 
-### Changed
+### 更改
 
-- Included the commit identifier in Debug version displays.
+- 在 Debug 版本信息中显示提交标识。
 
-### Fixed
+### 修复
 
-- Fixed an uncovered toolbar strip when embedded lyrics entered full screen.
-- Improved click and hover areas for lyrics close and track navigation controls.
+- 修复内嵌歌词进入全屏后工具栏区域未被覆盖的问题。
+- 改进歌词关闭及切歌控件的点击和悬停区域。
 
 ## [0.10.0] - 2026-07-20
 
-### Added
+### 新增
 
-- Added an option to show lyrics inside the main window or in a separate window.
+- 支持选择在主窗口内或独立窗口中显示歌词。
 
-### Changed
+### 更改
 
-- Refined Songs and Favorites backgrounds, table headers, and sort indicators.
+- 优化歌曲和“喜欢”页面的背景、表头及排序标记。
 
-### Fixed
+### 修复
 
-- Fixed interrupted Chinese text input and searches carrying over to album or artist detail pages.
-- Fixed repeated shuffle actions producing the same song order.
+- 修复中文输入被打断，以及搜索内容被带入专辑或艺人详情页的问题。
+- 修复重复执行随机播放后歌曲顺序仍相同的问题。
 
 ## [0.8.0] - 2026-06-18
 
-### Added
+### 新增
 
-- Added smooth artwork transitions between album and artist grids and detail pages.
-- Added an optional lyrics blur effect.
-- Remembered lyrics and Settings window size and position.
-- Added player bar actions to add the current song to a playlist or block it.
+- 在专辑和艺人网格与详情页之间添加平滑的封面过渡。
+- 添加可选的歌词模糊效果。
+- 记住歌词与设置窗口的大小和位置。
+- 在播放器栏中添加将当前歌曲加入播放列表或屏蔽该歌曲的操作。
 
-### Changed
+### 更改
 
-- Reorganized Settings and made library folder information more compact.
-- Renamed the sidebar Folders section to Library and refined sidebar highlighting and add buttons.
-- Hid album and artist toolbar searches on detail pages.
+- 重新组织设置界面，并使资料库文件夹信息更紧凑。
+- 将侧栏“文件夹”分区重命名为“资料库”，并优化侧栏高亮和添加按钮。
+- 在专辑和艺人详情页隐藏工具栏搜索框。
 
-### Fixed
+### 修复
 
-- Fixed automatic track advancement, shuffle restoration and cycling, and clearing the upcoming queue.
-- Improved selected song contrast in the light theme.
-- Fixed Settings window resizing and scrolling.
-- Added confirmation before removing a library folder from the app.
+- 修复自动切歌、随机播放状态恢复与循环，以及清空待播队列的问题。
+- 提高浅色主题下选中歌曲的对比度。
+- 修复设置窗口的缩放与滚动问题。
+- 从应用中移除资料库文件夹前增加确认步骤。
 
 ## [0.7.0] - 2026-05-30
 
-### Added
+### 新增
 
-- Added Dock menu playback controls.
-- Added audio fading when pausing and resuming.
+- 添加 Dock 菜单播放控制。
+- 暂停和继续播放时加入音频淡入淡出效果。
 
-### Changed
+### 更改
 
-- Counted a play only after 60% of a song has been played.
-- Smoothed lyrics scrolling and moved the highlighted line closer to the top.
-- Animated playback control icons and softened lyrics background edges.
+- 仅在歌曲已播放 60% 后计入一次播放。
+- 使歌词滚动更平滑，并将高亮行移至更靠近顶部的位置。
+- 为播放控制图标添加动画，并柔化歌词背景边缘。
 
-### Fixed
+### 修复
 
-- Fixed artwork and lyrics background flashes during track changes with smooth crossfades.
-- Used gray placeholders for songs without artwork instead of the previous song's cover.
+- 通过平滑交叉淡入淡出修复切歌时封面和歌词背景闪烁的问题。
+- 无封面歌曲使用灰色占位图，不再显示上一首歌曲的封面。
 
 ## [0.6.0] - 2026-05-29
 
-### Added
+### 新增
 
-- Added Space key playback controls in the main and lyrics windows.
-- Remembered sidebar visibility between launches.
-- Added compact navigation tabs when the sidebar is hidden and back buttons on album and artist detail pages.
+- 在主窗口和歌词窗口中支持空格键控制播放。
+- 在应用启动之间记住侧栏显示状态。
+- 侧栏隐藏时显示紧凑导航标签，并在专辑和艺人详情页添加返回按钮。
 
-### Changed
+### 更改
 
-- Made low-volume adjustments more precise.
-- Standardized toolbar search fields and sorting controls.
+- 提高低音量调整的精度。
+- 统一工具栏搜索框和排序控件。
 
-### Fixed
+### 修复
 
-- Fixed duplicate sidebar toggle buttons and missing toolbar search icons.
+- 修复重复的侧栏切换按钮和缺失的工具栏搜索图标。
 
 ## [0.5.0] - 2026-05-24
 
-### Changed
+### 更改
 
-- Limited song table columns to half the screen width so oversized columns remain easy to shrink.
+- 将歌曲表格列宽限制在屏幕宽度的一半，使过宽的列仍易于缩小。
 
-### Fixed
+### 修复
 
-- Fixed Songs and playlist scrollbars stopping above the bottom of the page.
+- 修复歌曲和播放列表滚动条在页面底部上方提前停止的问题。
 
 ## [0.4.0] - 2026-05-23
 
-### Added
+### 新增
 
-- Licensed the project under GPLv3.
+- 项目采用 GPLv3 许可证。
 
-### Changed
+### 更改
 
-- Separated sort field and direction choices and kept them synchronized with table header sorting.
-- Improved hover areas for playback controls and album and artist pages.
-- Matched sidebar add button colors to section controls.
+- 分离排序字段与排序方向选项，并使其与表头排序保持同步。
+- 改进播放控件以及专辑、艺人页面的悬停区域。
+- 使侧栏添加按钮的颜色与分区控件一致。
 
-### Fixed
+### 修复
 
-- Fixed automatic track advancement in sequential and shuffle playback.
-- Fixed player bar hover effects changing its layout or extending beyond the artwork.
+- 修复顺序播放和随机播放时的自动切歌问题。
+- 修复播放器栏悬停效果改变布局或超出封面范围的问题。
 
 ## [0.3.0] - 2026-05-23
 
-### Added
+### 新增
 
-- Added Favorites and favorite controls in the player bar and song tables.
-- Added optional song columns with saved visibility, order, and widths for Songs, playlists, and folders.
-- Added consistent play and shuffle controls across library pages.
-- Added song blocking, unblocking in Settings, and removal from playlists.
-- Added Chinese, English, and system language options, plus a system theme option.
-- Restored the previous song, queue, playback position, shuffle, and repeat settings.
-- Kept Debug app libraries and preferences separate from the release app.
+- 添加“喜欢”视图，以及播放器栏和歌曲表格中的喜欢控件。
+- 为歌曲、播放列表和文件夹视图添加可选歌曲列，并保存列的显示状态、顺序和宽度。
+- 在资料库各页面提供一致的播放与随机播放控件。
+- 支持屏蔽歌曲、在设置中取消屏蔽，以及从播放列表中移除歌曲。
+- 提供中文、英文和跟随系统的语言选项，以及跟随系统的主题选项。
+- 恢复上次播放的歌曲、队列、播放进度、随机播放和循环设置。
+- 将 Debug 应用的资料库和偏好设置与正式版隔离。
 
-### Changed
+### 更改
 
-- Replaced Recently Played with Favorites.
-- Moved lyrics to a resizable window with native full-screen support and improved scrolling and highlighting.
-- Organized the queue into history, now playing, and up next, including the actual shuffle order.
-- Reorganized Settings into one page with theme and language menus and an updated About section.
-- Improved song table backgrounds and left scroll space for the floating player bar.
-- Indexed artists separately for songs with multiple artists while preserving their displayed names.
+- 以“喜欢”取代“最近播放”。
+- 将歌词移至可调整大小、支持原生全屏的窗口，并改进滚动和高亮效果。
+- 将队列分为播放历史、正在播放和接下来播放，并显示实际随机播放顺序。
+- 将设置整合为单个页面，加入主题和语言菜单，并更新“关于”区域。
+- 改进歌曲表格背景，并为悬浮播放器栏留出底部滚动空间。
+- 对包含多位艺人的歌曲分别建立艺人索引，同时保留歌曲显示的艺人名称。
 
-### Fixed
+### 修复
 
-- Fixed misplaced folder scrollbars and column widths resetting after sorting.
-- Fixed stale row highlights while scrolling and missing playlist drop feedback.
-- Fixed album detail backgrounds in dark mode and toolbar controls appearing above lyrics.
-- Reduced lyrics window memory usage and stutter during resizing.
+- 修复文件夹滚动条位置错误，以及排序后列宽重置的问题。
+- 修复滚动时过期的行高亮，以及缺失的播放列表拖放反馈。
+- 修复深色模式下的专辑详情背景和工具栏控件显示在歌词上方的问题。
+- 降低歌词窗口的内存占用，并减少调整窗口大小时的卡顿。
 
 ## [0.2.0] - 2026-05-16
 
-### Added
+### 新增
 
-- Added macOS Now Playing, media key, and Control Center support.
-- Added playlist name and description editing.
-- Added collapsible and reorderable sidebar sections.
-- Added song table selection, double-click playback, context menus, column resizing, and dragging into playlists.
-- Added album and artist browsing with cached artwork for better performance in large libraries.
-- Added hover and pressed feedback throughout the app and icons in song context menus.
+- 支持 macOS Now Playing、媒体键和控制中心。
+- 支持编辑播放列表名称与描述。
+- 支持折叠和重排侧栏分区。
+- 歌曲表格支持选择、双击播放、右键菜单、调整列宽，以及拖入播放列表。
+- 支持浏览专辑和艺人，并缓存封面以改善大型资料库的性能。
+- 在应用各处加入悬停和按下反馈，并为歌曲右键菜单添加图标。
 
-### Changed
+### 更改
 
-- Refined the floating glass player bar, queue, and volume controls.
-- Unified sidebar and control colors and moved searches and sorting to page toolbars.
-- Moved Settings to a dedicated window.
-- Added artist-to-album navigation with searches scoped to the current page.
-- Improved detail page layouts and table resizing, retaining compact folder tables with horizontal scrolling.
-- Set the minimum window size to 980 × 600 and refined sidebar, player bar, and grid sizing to fit.
+- 优化悬浮玻璃质感播放器栏、队列和音量控件。
+- 统一侧栏和控件颜色，并将搜索和排序移至页面工具栏。
+- 将设置移至独立窗口。
+- 添加从艺人进入专辑的导航，并将搜索范围限制在当前页面。
+- 改进详情页布局与表格缩放，同时保留可横向滚动的紧凑文件夹表格。
+- 将最小窗口尺寸设为 980 × 600，并调整侧栏、播放器栏和网格尺寸以适配。
 
-### Removed
+### 移除
 
-- Removed the nonfunctional equalizer placeholder.
+- 移除尚无功能的均衡器占位界面。
 
-### Fixed
+### 修复
 
-- Fixed Settings and queue access and added playlist and folder deletion confirmations.
-- Fixed sidebar collapse and artist navigation leaving the sidebar inaccessible or cramped.
-- Fixed artwork flicker and table scrollbars obscuring duration and menu controls.
-- Fixed clicks passing through the floating player bar.
+- 修复设置和队列入口，并为删除播放列表及移除文件夹添加确认步骤。
+- 修复折叠侧栏及艺人导航后，侧栏无法访问或空间狭窄的问题。
+- 修复封面闪烁，以及表格滚动条遮挡时长和菜单控件的问题。
+- 修复点击穿透悬浮播放器栏的问题。
 
 ## [0.1.0] - 2026-04-21
 
-### Added
+### 新增
 
-- Released the initial local music player with playback, seeking, and a floating player bar.
-- Added drag-and-drop import, multiple library folders, and music scanning.
-- Added sidebar navigation and basic music sorting.
+- 发布初版本地音乐播放器，支持播放、跳转进度和悬浮播放器栏。
+- 支持拖放导入、多个资料库文件夹及音乐扫描。
+- 添加侧栏导航和基础音乐排序。
