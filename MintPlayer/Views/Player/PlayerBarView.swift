@@ -485,6 +485,7 @@ struct PlaybackProgressAccessibility: ViewModifier {
     func body(content: Content) -> some View {
         content
             .focusable(isEnabled)
+            .focusEffectDisabled()
             .onMoveCommand { direction in
                 guard isEnabled else { return }
                 switch direction {

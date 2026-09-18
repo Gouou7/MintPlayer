@@ -305,6 +305,7 @@ enum L10n {
         case dateAddedAscending
         case columns
         case columnSong
+        case columnTrackNumber
         case columnArtist
         case columnDuration
         case columnPlayCount
@@ -514,6 +515,7 @@ enum L10n {
         .dateAddedAscending: "Date Added Ascending",
         .columns: "Columns",
         .columnSong: "Song",
+        .columnTrackNumber: "#",
         .columnArtist: "Artist",
         .columnDuration: "Duration",
         .columnPlayCount: "Play Count",
@@ -711,6 +713,7 @@ enum L10n {
         .dateAddedAscending: "添加时间升序",
         .columns: "列",
         .columnSong: "歌曲",
+        .columnTrackNumber: "#",
         .columnArtist: "艺人",
         .columnDuration: "时长",
         .columnPlayCount: "播放次数",

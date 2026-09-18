@@ -150,14 +150,11 @@ struct AlbumDetailView: View {
             VStack(alignment: .leading, spacing: 34) {
                 albumHeader
 
-                NativeSongTableView(
+                DetailedSongList(
                     songs: visibleSongs,
-                    style: .detailSongs(subtitle: albumSongs.contains { $0.artist != album.artist } ? .artist : .none),
+                    columnPreferenceScope: .albumDetail,
                     selectedSongIDs: $selectedSongIDs,
-                    sortOrder: $songSortOrder,
-                    onPlay: { song, queue in audioPlayer.play(song: song, in: queue) },
-                    onPlayNext: audioPlayer.playNext,
-                    onAddToQueue: audioPlayer.addToQueue
+                    sortOrder: $songSortOrder
                 )
                 .frame(height: songTableHeight(for: visibleSongs.count))
                 .frame(maxWidth: .infinity)
@@ -176,6 +173,9 @@ struct AlbumDetailView: View {
             refreshSongs()
         }
         .onChange(of: searchText) {
+            refreshVisibleSongs()
+        }
+        .onChange(of: songSortOrder) {
             refreshVisibleSongs()
         }
         .onChange(of: musicLibrary.songs) {
@@ -269,15 +269,12 @@ struct AlbumDetailView: View {
     }
 
     private func refreshVisibleSongs() {
-        guard !searchText.isEmpty else {
-            visibleSongs = albumSongs
-            return
-        }
-
-        visibleSongs = albumSongs.filter {
-            $0.title.localizedCaseInsensitiveContains(searchText) ||
+        let filteredSongs = albumSongs.filter {
+            searchText.isEmpty ||
+                $0.title.localizedCaseInsensitiveContains(searchText) ||
                 $0.artist.localizedCaseInsensitiveContains(searchText)
         }
+        visibleSongs = songSortOrder.isEmpty ? filteredSongs : filteredSongs.sorted(using: songSortOrder)
         selectedSongIDs = selectedSongIDs.filter { id in
             visibleSongs.contains { $0.id == id }
         }
@@ -289,7 +286,7 @@ struct AlbumDetailView: View {
     }
 
     private func songTableHeight(for count: Int) -> CGFloat {
-        min(max(CGFloat(max(count, 1)) * 58 + 10, 180), 620)
+        min(max(CGFloat(max(count, 1)) * 58 + 36, 180), 620)
     }
 }
 

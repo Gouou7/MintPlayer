@@ -4,6 +4,9 @@ import AppKit
 struct NativeSongTableView: NSViewRepresentable {
     enum ColumnPreferenceScope: String {
         case songs
+        case favorites
+        case albumDetail
+        case artistDetail
         case playlist
         case folder
         case none
@@ -12,33 +15,15 @@ struct NativeSongTableView: NSViewRepresentable {
     enum Style: Equatable {
         case detailed
         case compactFolder
-        case detailSongs(subtitle: DetailSubtitle)
 
         var rowHeight: CGFloat {
             switch self {
             case .detailed:
-                return 64
+                return 58
             case .compactFolder:
                 return 28
-            case .detailSongs:
-                return 58
             }
         }
-
-        var showsHeader: Bool {
-            switch self {
-            case .detailSongs:
-                return false
-            case .detailed, .compactFolder:
-                return true
-            }
-        }
-    }
-
-    enum DetailSubtitle: Equatable {
-        case none
-        case album
-        case artist
     }
 
     @EnvironmentObject private var musicLibrary: MusicLibrary
@@ -100,15 +85,16 @@ struct NativeSongTableView: NSViewRepresentable {
         guard let tableView = scrollView.documentView as? InteractiveSongTableView else { return }
 
         configureBackground(for: style, tableView: tableView, scrollView: scrollView)
-        let styleChanged = context.coordinator.currentStyle != style
-        if styleChanged {
+        let configurationChanged = context.coordinator.currentStyle != style ||
+            context.coordinator.currentColumnPreferenceScope != columnPreferenceScope
+        if configurationChanged {
             context.coordinator.configureColumns(for: style)
             context.coordinator.configureScrollBehavior(scrollView, for: style)
         }
         context.coordinator.configureContentInsets(scrollView)
 
         let songIDs = songs.map(\.id)
-        if styleChanged || context.coordinator.lastSongIDs != songIDs || context.coordinator.lastSongs != songs {
+        if configurationChanged || context.coordinator.lastSongIDs != songIDs || context.coordinator.lastSongs != songs {
             context.coordinator.lastSongIDs = songIDs
             context.coordinator.lastSongs = songs
             tableView.reloadData()
@@ -121,7 +107,7 @@ struct NativeSongTableView: NSViewRepresentable {
 
     private func configureBackground(for style: Style, tableView: NSTableView, scrollView: NSScrollView) {
         switch style {
-        case .detailed, .compactFolder, .detailSongs:
+        case .detailed, .compactFolder:
             tableView.backgroundColor = .clear
             scrollView.drawsBackground = false
             scrollView.backgroundColor = .clear
@@ -409,7 +395,7 @@ private enum NativeSongColumn: String, CaseIterable {
     case playCount
     case dateAdded
     case favorite
-    case index
+    case trackNumber
 }
 
 private enum NativeSongTableMetrics {
@@ -420,8 +406,7 @@ private enum NativeSongTableMetrics {
     static let favoriteWidth: CGFloat = 44
     static let detailedSongMinWidth: CGFloat = 76
     static let detailedArtistMinWidth: CGFloat = 44
-    static let detailSongMinWidth: CGFloat = 64
-    static let detailIndexWidth: CGFloat = 28
+    static let trackNumberWidth: CGFloat = 40
     static let headerHeight: CGFloat = 26
     static let maxHeaderColumnWidthRatio: CGFloat = 0.5
 }
@@ -431,6 +416,8 @@ extension NativeSongTableView {
         var parent: NativeSongTableView
         fileprivate weak var tableView: InteractiveSongTableView?
         var currentStyle: Style?
+        var currentColumnPreferenceScope: ColumnPreferenceScope?
+        private var isConfiguringColumns = false
         var lastSongIDs: [Song.ID] = []
         var lastSongs: [Song] = []
         private var isSyncingSelection = false
@@ -446,32 +433,21 @@ extension NativeSongTableView {
         func configureColumns(for style: Style) {
             guard let tableView else { return }
 
+            isConfiguringColumns = true
+            defer { isConfiguringColumns = false }
             tableView.tableColumns.forEach { tableView.removeTableColumn($0) }
             tableView.rowHeight = style.rowHeight
 
-            if style.showsHeader {
-                let headerView = InteractiveSongTableHeaderView(
-                    frame: NSRect(x: 0, y: 0, width: 0, height: NativeSongTableMetrics.headerHeight)
-                )
-                headerView.menuProvider = self
-                tableView.headerView = headerView
-                tableView.cornerView = nil
-            } else {
-                tableView.headerView = nil
-            }
-
-            switch style {
-            case .detailed:
-                visibleColumns(for: style).forEach { addVisibleColumn($0, for: style) }
-            case .compactFolder:
-                visibleColumns(for: style).forEach { addVisibleColumn($0, for: style) }
-            case .detailSongs:
-                addColumn(.index, title: "", width: NativeSongTableMetrics.detailIndexWidth, minWidth: 24)
-                addColumn(.song, title: "", width: 420, minWidth: NativeSongTableMetrics.detailSongMinWidth, sortKey: "title")
-                addColumn(.duration, title: "", width: NativeSongTableMetrics.durationTextWidth, minWidth: NativeSongTableMetrics.durationTextWidth, sortKey: "duration")
-            }
+            let headerView = InteractiveSongTableHeaderView(
+                frame: NSRect(x: 0, y: 0, width: 0, height: NativeSongTableMetrics.headerHeight)
+            )
+            headerView.menuProvider = self
+            tableView.headerView = headerView
+            tableView.cornerView = nil
+            visibleColumns(for: style).forEach { addVisibleColumn($0, for: style) }
 
             currentStyle = style
+            currentColumnPreferenceScope = parent.columnPreferenceScope
         }
 
         deinit {
@@ -530,7 +506,7 @@ extension NativeSongTableView {
         }
 
         func resizeColumnsToFit() {
-            guard parent.style != .compactFolder,
+            guard !isConfiguringColumns, parent.style != .compactFolder,
                   let tableView,
                   let scrollView = tableView.enclosingScrollView
             else { return }
@@ -541,7 +517,7 @@ extension NativeSongTableView {
             tableView.setFrameSize(NSSize(width: usableWidth, height: tableView.frame.height))
             updateHeaderColumnMaxWidths()
 
-            if parent.style.showsHeader, hasSavedColumnWidths(for: parent.style) {
+            if hasSavedColumnWidths(for: parent.style) {
                 return
             }
 
@@ -552,9 +528,10 @@ extension NativeSongTableView {
                     setColumnIfPresent(.playCount, width: NativeSongTableMetrics.playCountWidth)
                     setColumnIfPresent(.dateAdded, width: NativeSongTableMetrics.dateAddedWidth)
                     setColumnIfPresent(.favorite, width: NativeSongTableMetrics.favoriteWidth)
+                    setColumnIfPresent(.trackNumber, width: NativeSongTableMetrics.trackNumberWidth)
                 }
 
-                let fixedWidth = columnWidth(.duration) + columnWidth(.playCount) + columnWidth(.dateAdded) + columnWidth(.favorite)
+                let fixedWidth = columnWidth(.duration) + columnWidth(.playCount) + columnWidth(.dateAdded) + columnWidth(.favorite) + columnWidth(.trackNumber)
                 let remaining = max(0, usableWidth - fixedWidth)
                 let hasArtist = column(.artist) != nil
 
@@ -570,16 +547,6 @@ extension NativeSongTableView {
                     } else {
                         setColumn(.song, width: max(remaining, minWidth(.song)))
                     }
-                }
-            case .detailSongs:
-                applyProgrammaticColumnWidths {
-                    setColumn(.index, width: NativeSongTableMetrics.detailIndexWidth)
-                    setColumn(.duration, width: NativeSongTableMetrics.durationTextWidth)
-                }
-
-                let fixedWidth = columnWidth(.index) + columnWidth(.duration)
-                applyProgrammaticColumnWidths {
-                    setColumn(.song, width: max(usableWidth - fixedWidth, minWidth(.song)))
                 }
             case .compactFolder:
                 break
@@ -615,7 +582,7 @@ extension NativeSongTableView {
             case (.detailed, .playCount):
                 return hostingView(TextCell(text: "\(song.playCount)", color: .secondary, alignment: .center, monospaced: true))
             case (.detailed, .dateAdded):
-                return hostingView(DurationCell(text: formatDateAdded(song.dateAdded)))
+                return hostingView(TextCell(text: formatDateAdded(song.dateAdded), color: .secondary, monospaced: true))
             case (.detailed, .favorite):
                 return hostingView(FavoriteCell(isFavorite: song.isFavorite) { [weak self] in
                     self?.parent.musicLibrary.toggleFavorite(for: song.id)
@@ -636,17 +603,14 @@ extension NativeSongTableView {
             case (.compactFolder, .playCount):
                 return hostingView(TextCell(text: "\(song.playCount)", color: .secondary, alignment: .center, monospaced: true))
             case (.compactFolder, .dateAdded):
-                return hostingView(DurationCell(text: formatDateAdded(song.dateAdded)))
+                return hostingView(TextCell(text: formatDateAdded(song.dateAdded), color: .secondary, monospaced: true))
             case (.compactFolder, .favorite):
                 return hostingView(FavoriteCell(isFavorite: song.isFavorite) { [weak self] in
                     self?.parent.musicLibrary.toggleFavorite(for: song.id)
                 })
-            case (.detailSongs, .index):
-                return hostingView(TextCell(text: "\(row + 1)", color: .secondary, alignment: .trailing))
-            case (.detailSongs(let subtitle), .song):
-                return hostingView(DetailNativeSongCell(song: song, subtitle: detailSubtitle(for: song, mode: subtitle)))
-            case (.detailSongs, .duration):
-                return hostingView(DurationCell(text: formatDuration(song.duration), color: .secondary))
+            case (.detailed, .trackNumber):
+                let trackNumber = song.trackNumber.flatMap { $0 > 0 ? String($0) : nil } ?? ""
+                return hostingView(TextCell(text: trackNumber, color: .secondary, alignment: .leading, monospaced: true))
             default:
                 return hostingView(EmptyView())
             }
@@ -682,31 +646,30 @@ extension NativeSongTableView {
                 parent.sortOrder = [KeyPathComparator(\Song.playCount, order: order)]
             case "dateAdded":
                 parent.sortOrder = [KeyPathComparator(\Song.dateAdded, order: order)]
+            case "trackNumber":
+                parent.sortOrder = [KeyPathComparator(\Song.trackNumber, order: order)]
             default:
                 break
             }
         }
 
         func syncSortDescriptorsToTable() {
-            guard parent.style.showsHeader,
-                  let tableView,
-                  let descriptor = sortDescriptor(for: parent.sortOrder)
-            else { return }
-
-            guard tableView.sortDescriptors.first != descriptor else { return }
+            guard let tableView else { return }
+            let descriptors = sortDescriptor(for: parent.sortOrder).map { [$0] } ?? []
+            guard tableView.sortDescriptors != descriptors else { return }
             isApplyingSortDescriptors = true
-            tableView.sortDescriptors = [descriptor]
+            tableView.sortDescriptors = descriptors
             tableView.headerView?.needsDisplay = true
             isApplyingSortDescriptors = false
         }
 
         func tableViewColumnDidResize(_ notification: Notification) {
-            guard !isApplyingColumnWidths, parent.style.showsHeader else { return }
+            guard !isConfiguringColumns, !isApplyingColumnWidths else { return }
             saveColumnWidths(for: parent.style)
         }
 
         func tableViewColumnDidMove(_ notification: Notification) {
-            guard parent.style.showsHeader else { return }
+            guard !isConfiguringColumns else { return }
             saveVisibleColumns(visibleColumnsFromTable(), for: parent.style)
             saveColumnWidths(for: parent.style)
         }
@@ -780,8 +743,6 @@ extension NativeSongTableView {
         }
 
         func columnVisibilityMenu() -> NSMenu? {
-            guard parent.style.showsHeader else { return nil }
-
             let menu = NSMenu(title: parent.settings.text(.columns))
             for column in configurableColumns(for: parent.style) {
                 let item = NSMenuItem(
@@ -820,6 +781,7 @@ extension NativeSongTableView {
                 orderedVisibleColumns.insert(primaryColumn, at: 0)
             }
 
+            saveColumnWidths(for: parent.style)
             saveVisibleColumns(orderedVisibleColumns, for: parent.style)
             configureColumns(for: parent.style)
             tableView?.reloadData()
@@ -863,7 +825,7 @@ extension NativeSongTableView {
 
         private func headerAlignment(for id: NativeSongColumn) -> NSTextAlignment {
             switch id {
-            case .favorite, .playCount, .index:
+            case .favorite, .playCount:
                 return .center
             default:
                 return .left
@@ -875,7 +837,7 @@ extension NativeSongTableView {
         }
 
         private func updateHeaderColumnMaxWidths() {
-            guard parent.style.showsHeader, let tableView else { return }
+            guard let tableView else { return }
 
             let maxWidth = headerColumnMaxWidth()
             applyProgrammaticColumnWidths {
@@ -922,22 +884,25 @@ extension NativeSongTableView {
         private func configurableColumns(for style: Style) -> [NativeSongColumn] {
             switch style {
             case .detailed:
-                return [.song, .artist, .duration, .playCount, .dateAdded, .favorite]
+                return [.trackNumber, .favorite, .song, .duration, .artist, .playCount, .dateAdded]
             case .compactFolder:
                 return [.title, .artist, .album, .genre, .type, .duration, .playCount, .dateAdded, .favorite]
-            case .detailSongs:
-                return [.index, .song, .duration]
             }
         }
 
         private func defaultVisibleColumns(for style: Style) -> [NativeSongColumn] {
             switch style {
             case .detailed:
-                return [.song, .artist, .duration]
+                switch parent.columnPreferenceScope {
+                case .albumDetail:
+                    return [.trackNumber, .favorite, .song, .duration, .playCount]
+                case .artistDetail:
+                    return [.favorite, .song, .duration, .playCount]
+                default:
+                    return [.favorite, .song, .duration, .artist, .playCount]
+                }
             case .compactFolder:
                 return [.title, .artist, .album, .genre, .type, .duration]
-            case .detailSongs:
-                return [.index, .song, .duration]
             }
         }
 
@@ -976,7 +941,7 @@ extension NativeSongTableView {
 
         private func primaryColumn(for style: Style) -> NativeSongColumn {
             switch style {
-            case .detailed, .detailSongs:
+            case .detailed:
                 return .song
             case .compactFolder:
                 return .title
@@ -984,14 +949,14 @@ extension NativeSongTableView {
         }
 
         private func columnPreferenceKey(for style: Style) -> String? {
-            guard style.showsHeader, parent.columnPreferenceScope != .none else {
+            guard parent.columnPreferenceScope != .none else {
                 return nil
             }
             return AppConfiguration.userDefaultsKey("songTable.visibleColumns.\(parent.columnPreferenceScope.rawValue)")
         }
 
         private func columnWidthPreferenceKey(for style: Style) -> String? {
-            guard style.showsHeader, parent.columnPreferenceScope != .none else {
+            guard parent.columnPreferenceScope != .none else {
                 return nil
             }
             return AppConfiguration.userDefaultsKey("songTable.columnWidths.\(parent.columnPreferenceScope.rawValue)")
@@ -1016,7 +981,7 @@ extension NativeSongTableView {
         private func saveColumnWidths(for style: Style) {
             guard let tableView, let key = columnWidthPreferenceKey(for: style) else { return }
 
-            var widths: [String: Double] = [:]
+            var widths = savedColumnWidths(for: style).mapValues { Double($0) }
             for tableColumn in tableView.tableColumns {
                 guard let column = NativeSongColumn(rawValue: tableColumn.identifier.rawValue) else { continue }
                 widths[column.rawValue] = Double(max(tableColumn.minWidth, tableColumn.width))
@@ -1031,6 +996,8 @@ extension NativeSongTableView {
 
         private func title(for column: NativeSongColumn, style: Style) -> String {
             switch (style, column) {
+            case (.detailed, .trackNumber):
+                return parent.settings.text(.columnTrackNumber)
             case (.detailed, .song):
                 return parent.settings.text(.columnSong)
             case (.detailed, .artist):
@@ -1068,6 +1035,8 @@ extension NativeSongTableView {
 
         private func defaultWidth(for column: NativeSongColumn, style: Style) -> CGFloat {
             switch (style, column) {
+            case (.detailed, .trackNumber):
+                return NativeSongTableMetrics.trackNumberWidth
             case (.detailed, .song):
                 return 420
             case (.detailed, .artist):
@@ -1097,6 +1066,8 @@ extension NativeSongTableView {
 
         private func minWidth(for column: NativeSongColumn, style: Style) -> CGFloat {
             switch (style, column) {
+            case (.detailed, .trackNumber):
+                return NativeSongTableMetrics.trackNumberWidth
             case (.detailed, .song):
                 return NativeSongTableMetrics.detailedSongMinWidth
             case (.detailed, .artist):
@@ -1144,8 +1115,8 @@ extension NativeSongTableView {
                 return "dateAdded"
             case .favorite:
                 return nil
-            case .index:
-                return nil
+            case .trackNumber:
+                return "trackNumber"
             }
         }
 
@@ -1180,6 +1151,8 @@ extension NativeSongTableView {
                 return "playCount"
             case \Song.dateAdded:
                 return "dateAdded"
+            case \Song.trackNumber:
+                return "trackNumber"
             default:
                 return nil
             }
@@ -1206,17 +1179,6 @@ extension NativeSongTableView {
             let hostingView = NSHostingView(rootView: view)
             hostingView.sizingOptions = []
             return hostingView
-        }
-
-        private func detailSubtitle(for song: Song, mode: DetailSubtitle) -> String? {
-            switch mode {
-            case .none:
-                return nil
-            case .album:
-                return song.album
-            case .artist:
-                return song.artist
-            }
         }
     }
 }
@@ -1395,8 +1357,8 @@ private struct DetailedNativeSongCell: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ArtworkImage(path: song.coverPath, cornerRadius: 7, targetSize: CGSize(width: 46, height: 46))
-                .frame(width: 46, height: 46)
+            ArtworkImage(path: song.coverPath, cornerRadius: 6, targetSize: CGSize(width: 38, height: 38))
+                .frame(width: 38, height: 38)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(song.title)
@@ -1411,28 +1373,6 @@ private struct DetailedNativeSongCell: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .padding(.horizontal, 4)
-    }
-}
-
-private struct DetailNativeSongCell: View {
-    let song: Song
-    let subtitle: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(song.title)
-                .font(.headline)
-                .lineLimit(1)
-
-            if let subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
         .padding(.horizontal, 4)
     }
 }

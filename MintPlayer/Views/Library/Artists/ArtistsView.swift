@@ -206,15 +206,13 @@ private struct ArtistDetailView: View {
     }
 
     private var visibleArtistSongs: [Song] {
-        guard !searchText.isEmpty else {
-            return artistSongs
-        }
-
-        return artistSongs.filter { song in
-            song.title.localizedCaseInsensitiveContains(searchText) ||
+        let filteredSongs = artistSongs.filter { song in
+            searchText.isEmpty ||
+                song.title.localizedCaseInsensitiveContains(searchText) ||
                 song.album.localizedCaseInsensitiveContains(searchText) ||
                 song.displayGenre.localizedCaseInsensitiveContains(searchText)
         }
+        return filteredSongs.sorted(using: songSortOrder)
     }
 
     var body: some View {
@@ -291,14 +289,11 @@ private struct ArtistDetailView: View {
                     .font(.title.bold())
                     .padding(.bottom, 4)
 
-                NativeSongTableView(
+                DetailedSongList(
                     songs: visibleArtistSongs,
-                    style: .detailSongs(subtitle: .album),
+                    columnPreferenceScope: .artistDetail,
                     selectedSongIDs: $selectedSongIDs,
-                    sortOrder: $songSortOrder,
-                    onPlay: { song, queue in audioPlayer.play(song: song, in: queue) },
-                    onPlayNext: audioPlayer.playNext,
-                    onAddToQueue: audioPlayer.addToQueue
+                    sortOrder: $songSortOrder
                 )
                 .frame(height: songTableHeight(for: visibleArtistSongs.count))
                 .frame(maxWidth: .infinity)
@@ -355,7 +350,7 @@ private struct ArtistDetailView: View {
     }
 
     private func songTableHeight(for count: Int) -> CGFloat {
-        min(max(CGFloat(max(count, 1)) * 58 + 10, 180), 620)
+        min(max(CGFloat(max(count, 1)) * 58 + 36, 180), 620)
     }
 }
 

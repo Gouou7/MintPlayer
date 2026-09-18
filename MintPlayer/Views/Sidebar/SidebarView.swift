@@ -127,7 +127,7 @@ struct SidebarView: View {
 
             footer
         }
-        .frame(minWidth: SidebarWidth.minimum)
+        .frame(minWidth: SidebarWidth.minimum, maxWidth: SidebarWidth.maximum)
         .background {
             SidebarWidthConfigurator()
                 .frame(width: 0, height: 0)
@@ -354,9 +354,9 @@ private struct SidebarWidthConfigurator: NSViewRepresentable {
             var ancestor = superview
             while let view = ancestor {
                 if let splitView = view as? NSSplitView,
-                   let controller = splitView.delegate as? NSSplitViewController,
+                   let controller = splitViewController(for: splitView),
                    let item = controller.splitViewItems.first(where: {
-                       $0.behavior == .sidebar && isDescendant(of: $0.viewController.view)
+                       isDescendant(of: $0.viewController.view)
                    }) {
                     if configuredItem !== item {
                         restoreWidth()
@@ -376,6 +376,22 @@ private struct SidebarWidthConfigurator: NSViewRepresentable {
                 }
                 ancestor = view.superview
             }
+        }
+
+        private func splitViewController(for splitView: NSSplitView) -> NSSplitViewController? {
+            if let controller = splitView.delegate as? NSSplitViewController {
+                return controller
+            }
+
+            // SwiftUI may install a delegate proxy; the owning controller remains in the responder chain.
+            var responder = splitView.nextResponder
+            while let current = responder {
+                if let controller = current as? NSSplitViewController, controller.splitView === splitView {
+                    return controller
+                }
+                responder = current.nextResponder
+            }
+            return nil
         }
 
         func restoreWidth() {

@@ -174,7 +174,8 @@ struct MainView: View {
             SongsView(
                 title: settings.text(.favorites),
                 subtitle: "\(musicLibrary.favoriteSongs.count) \(settings.text(.tracks))",
-                scopedSongs: musicLibrary.favoriteSongs
+                scopedSongs: musicLibrary.favoriteSongs,
+                columnPreferenceScope: .favorites
             )
                 .dropToImport()
         case .playlist(let id):
