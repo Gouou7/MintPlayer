@@ -1,12 +1,6 @@
 import SwiftUI
 import AppKit
 
-enum SidebarWidth {
-    static let minimum: CGFloat = 204
-    static let ideal: CGFloat = 260
-    static let maximum: CGFloat = 300
-}
-
 struct SidebarView: View {
     @Binding var selection: LibrarySelection
     @EnvironmentObject private var musicLibrary: MusicLibrary
@@ -127,10 +121,7 @@ struct SidebarView: View {
 
             footer
         }
-        .frame(minWidth: SidebarWidth.minimum, maxWidth: SidebarWidth.maximum)
         .background {
-            SidebarWidthConfigurator()
-                .frame(width: 0, height: 0)
             SidebarSelectionConfigurator()
                 .frame(width: 0, height: 0)
         }
@@ -313,92 +304,6 @@ struct SidebarView: View {
         musicLibrary.removeLibrarySource(id: source.id)
         if selection == .folder(source.id) {
             selection = .songs
-        }
-    }
-}
-
-private struct SidebarWidthConfigurator: NSViewRepresentable {
-    func makeNSView(context: Context) -> HostView {
-        HostView()
-    }
-
-    func updateNSView(_ nsView: HostView, context: Context) {
-        nsView.configureWidth()
-    }
-
-    static func dismantleNSView(_ nsView: HostView, coordinator: ()) {
-        nsView.restoreWidth()
-    }
-
-    final class HostView: NSView {
-        private weak var configuredItem: NSSplitViewItem?
-        private var originalMinimum: CGFloat = NSSplitViewItem.unspecifiedDimension
-        private var originalMaximum: CGFloat = NSSplitViewItem.unspecifiedDimension
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            configureWidth()
-        }
-
-        override func viewDidMoveToSuperview() {
-            super.viewDidMoveToSuperview()
-            configureWidth()
-        }
-
-        override func layout() {
-            super.layout()
-            configureWidth()
-        }
-
-        func configureWidth() {
-            var ancestor = superview
-            while let view = ancestor {
-                if let splitView = view as? NSSplitView,
-                   let controller = splitViewController(for: splitView),
-                   let item = controller.splitViewItems.first(where: {
-                       isDescendant(of: $0.viewController.view)
-                   }) {
-                    if configuredItem !== item {
-                        restoreWidth()
-                        configuredItem = item
-                        originalMinimum = item.minimumThickness
-                        originalMaximum = item.maximumThickness
-                    }
-
-                    // SwiftUI column widths are preferences; AppKit enforces divider limits.
-                    if item.minimumThickness != SidebarWidth.minimum {
-                        item.minimumThickness = SidebarWidth.minimum
-                    }
-                    if item.maximumThickness != SidebarWidth.maximum {
-                        item.maximumThickness = SidebarWidth.maximum
-                    }
-                    return
-                }
-                ancestor = view.superview
-            }
-        }
-
-        private func splitViewController(for splitView: NSSplitView) -> NSSplitViewController? {
-            if let controller = splitView.delegate as? NSSplitViewController {
-                return controller
-            }
-
-            // SwiftUI may install a delegate proxy; the owning controller remains in the responder chain.
-            var responder = splitView.nextResponder
-            while let current = responder {
-                if let controller = current as? NSSplitViewController, controller.splitView === splitView {
-                    return controller
-                }
-                responder = current.nextResponder
-            }
-            return nil
-        }
-
-        func restoreWidth() {
-            guard let item = configuredItem else { return }
-            configuredItem = nil
-            item.minimumThickness = originalMinimum
-            item.maximumThickness = originalMaximum
         }
     }
 }

@@ -145,37 +145,34 @@ struct LyricsOverlayView: View {
     }
 
     private var lyricsOptions: some View {
-        Menu {
-            Button(settings.text(.chooseLyricsFile), action: chooseLyricsFile)
-            Button(settings.text(.lyricsReload)) { lyricsReloadGeneration += 1 }
-            if settings.lyricsFileURL(for: song) != nil {
-                Button(settings.text(.useMatchingLyrics)) { settings.updateLyricsFile(nil, for: song) }
-            }
-            Picker(settings.text(.lyricsEncoding), selection: Binding(
-                get: { settings.lyricsEncoding(for: song) },
-                set: { settings.updateLyricsEncoding($0, for: song) }
-            )) {
-                ForEach(LyricsTextEncoding.allCases, id: \.self) { encoding in
-                    Text(settings.text(encoding.titleKey)).tag(encoding)
-                }
-            }
-            Divider()
-            Text(settings.text(.lyricsTiming))
-            Text(String(format: settings.text(.lyricsTimingValue), settings.lyricsTimingOffset(for: song)))
-            Button(settings.text(.lyricsEarlier)) {
-                settings.updateLyricsTimingOffset(settings.lyricsTimingOffset(for: song) - 0.5, for: song)
-            }
-            .disabled(settings.lyricsTimingOffset(for: song) <= -60)
-            Button(settings.text(.lyricsLater)) {
-                settings.updateLyricsTimingOffset(settings.lyricsTimingOffset(for: song) + 0.5, for: song)
-            }
-            .disabled(settings.lyricsTimingOffset(for: song) >= 60)
-            Button(settings.text(.resetLyricsTiming)) { settings.updateLyricsTimingOffset(0, for: song) }
-                .disabled(settings.lyricsTimingOffset(for: song) == 0)
-        } label: {
-            Label(settings.text(.lyricsOptions), systemImage: "text.badge.gearshape")
-        }
-        .menuStyle(.borderlessButton)
+        let timingOffset = settings.lyricsTimingOffset(for: song)
+
+        return NativeLyricsOptionsMenu(
+            title: settings.text(.lyricsOptions),
+            chooseLyricsFileTitle: settings.text(.chooseLyricsFile),
+            reloadLyricsTitle: settings.text(.lyricsReload),
+            useMatchingLyricsTitle: settings.text(.useMatchingLyrics),
+            showsUseMatchingLyrics: settings.lyricsFileURL(for: song) != nil,
+            encodingTitle: settings.text(.lyricsEncoding),
+            encodingOptions: LyricsTextEncoding.allCases.map {
+                NativeLyricsOptionsMenu.EncodingOption(encoding: $0, title: settings.text($0.titleKey))
+            },
+            selectedEncoding: settings.lyricsEncoding(for: song),
+            timingValue: String(format: settings.text(.lyricsTimingValue), timingOffset),
+            earlierTitle: settings.text(.lyricsEarlier),
+            laterTitle: settings.text(.lyricsLater),
+            resetTitle: settings.text(.resetLyricsTiming),
+            canAdjustEarlier: timingOffset > -60,
+            canAdjustLater: timingOffset < 60,
+            canReset: timingOffset != 0,
+            onChooseLyricsFile: chooseLyricsFile,
+            onReloadLyrics: { lyricsReloadGeneration += 1 },
+            onUseMatchingLyrics: { settings.updateLyricsFile(nil, for: song) },
+            onSelectEncoding: { settings.updateLyricsEncoding($0, for: song) },
+            onAdjustEarlier: { settings.updateLyricsTimingOffset(timingOffset - 0.5, for: song) },
+            onAdjustLater: { settings.updateLyricsTimingOffset(timingOffset + 0.5, for: song) },
+            onReset: { settings.updateLyricsTimingOffset(0, for: song) }
+        )
         .fixedSize()
     }
 
@@ -314,6 +311,232 @@ struct LyricsOverlayView: View {
         guard time.isFinite else { return "0:00" }
         let totalSeconds = max(0, Int(time.rounded(.down)))
         return "\(totalSeconds / 60):\(String(format: "%02d", totalSeconds % 60))"
+    }
+}
+
+private struct NativeLyricsOptionsMenu: NSViewRepresentable {
+    struct EncodingOption {
+        let encoding: LyricsTextEncoding
+        let title: String
+    }
+
+    let title: String
+    let chooseLyricsFileTitle: String
+    let reloadLyricsTitle: String
+    let useMatchingLyricsTitle: String
+    let showsUseMatchingLyrics: Bool
+    let encodingTitle: String
+    let encodingOptions: [EncodingOption]
+    let selectedEncoding: LyricsTextEncoding
+    let timingValue: String
+    let earlierTitle: String
+    let laterTitle: String
+    let resetTitle: String
+    let canAdjustEarlier: Bool
+    let canAdjustLater: Bool
+    let canReset: Bool
+    let onChooseLyricsFile: () -> Void
+    let onReloadLyrics: () -> Void
+    let onUseMatchingLyrics: () -> Void
+    let onSelectEncoding: (LyricsTextEncoding) -> Void
+    let onAdjustEarlier: () -> Void
+    let onAdjustLater: () -> Void
+    let onReset: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: true)
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        // Native pull-down buttons reserve the first, hidden item for their label.
+        menu.addItem(NSMenuItem(title: title, action: nil, keyEquivalent: ""))
+        menu.delegate = context.coordinator
+        button.menu = menu
+        button.isBordered = false
+        button.controlSize = .regular
+        button.focusRingType = .none
+        button.imagePosition = .imageLeading
+        button.preferredEdge = .minY
+        button.autoenablesItems = false
+        button.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.configuration = self
+        button.title = title
+        button.image = symbolImage(named: "text.badge.gearshape", description: title)
+        button.setAccessibilityLabel(title)
+        button.invalidateIntrinsicContentSize()
+    }
+
+    private func populateMenu(_ menu: NSMenu, coordinator: Coordinator) {
+        // Keep the button's title item alive while refreshing the actionable items.
+        while menu.numberOfItems > 1 {
+            menu.removeItem(at: 1)
+        }
+        menu.addItem(actionItem(
+            chooseLyricsFileTitle,
+            systemImage: "folder",
+            action: #selector(Coordinator.chooseLyricsFile),
+            target: coordinator
+        ))
+        menu.addItem(actionItem(
+            reloadLyricsTitle,
+            systemImage: "arrow.clockwise",
+            action: #selector(Coordinator.reloadLyrics),
+            target: coordinator
+        ))
+
+        if showsUseMatchingLyrics {
+            menu.addItem(actionItem(
+                useMatchingLyricsTitle,
+                systemImage: "doc.text",
+                action: #selector(Coordinator.useMatchingLyrics),
+                target: coordinator
+            ))
+        }
+
+        let encodingItem = NSMenuItem(title: encodingTitle, action: nil, keyEquivalent: "")
+        configureMenuImage(encodingItem, systemImage: "textformat")
+        let encodingMenu = NSMenu()
+        encodingMenu.autoenablesItems = false
+        for option in encodingOptions {
+            let item = NSMenuItem(
+                title: option.title,
+                action: #selector(Coordinator.selectEncoding(_:)),
+                keyEquivalent: ""
+            )
+            item.target = coordinator
+            item.representedObject = option.encoding.rawValue
+            item.state = option.encoding == selectedEncoding ? .on : .off
+            encodingMenu.addItem(item)
+        }
+        menu.setSubmenu(encodingMenu, for: encodingItem)
+        menu.addItem(encodingItem)
+
+        menu.addItem(.separator())
+
+        menu.addItem(actionItem(
+            earlierTitle,
+            systemImage: "arrow.left",
+            action: #selector(Coordinator.adjustEarlier),
+            target: coordinator,
+            isEnabled: canAdjustEarlier
+        ))
+        menu.addItem(actionItem(
+            laterTitle,
+            systemImage: "arrow.right",
+            action: #selector(Coordinator.adjustLater),
+            target: coordinator,
+            isEnabled: canAdjustLater
+        ))
+        menu.addItem(actionItem(
+            resetTitle,
+            systemImage: "arrow.counterclockwise",
+            action: #selector(Coordinator.resetTiming),
+            target: coordinator,
+            isEnabled: canReset
+        ))
+
+        let timingStatus = NSMenuItem(title: timingValue, action: nil, keyEquivalent: "")
+        timingStatus.isEnabled = false
+        timingStatus.attributedTitle = NSAttributedString(
+            string: timingValue,
+            attributes: [.font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)]
+        )
+        menu.addItem(timingStatus)
+    }
+
+    private func actionItem(
+        _ title: String,
+        systemImage: String,
+        action: Selector,
+        target: AnyObject,
+        isEnabled: Bool = true
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = target
+        item.isEnabled = isEnabled
+        configureMenuImage(item, systemImage: systemImage)
+        return item
+    }
+
+    private func configureMenuImage(_ item: NSMenuItem, systemImage: String) {
+        item.image = symbolImage(named: systemImage, description: item.title)
+        if #available(macOS 27.0, *) {
+            // Invoke the public property through KVC so the project also builds with the macOS 26 SDK.
+            item.setValue(1, forKey: "preferredImageVisibility")
+        }
+    }
+
+    private func symbolImage(named name: String, description: String) -> NSImage? {
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: description)
+        image?.isTemplate = true
+        return image
+    }
+
+    final class Coordinator: NSObject, NSMenuDelegate {
+        var configuration: NativeLyricsOptionsMenu?
+
+        private var onChooseLyricsFile: () -> Void = {}
+        private var onReloadLyrics: () -> Void = {}
+        private var onUseMatchingLyrics: () -> Void = {}
+        private var onSelectEncoding: (LyricsTextEncoding) -> Void = { _ in }
+        private var onAdjustEarlier: () -> Void = {}
+        private var onAdjustLater: () -> Void = {}
+        private var onReset: () -> Void = {}
+
+        func menuNeedsUpdate(_ menu: NSMenu) {
+            guard let configuration else { return }
+            // Capture this song's actions when opening; playback updates must not replace an open menu.
+            updateCallbacks(from: configuration)
+            configuration.populateMenu(menu, coordinator: self)
+        }
+
+        func updateCallbacks(from menu: NativeLyricsOptionsMenu) {
+            onChooseLyricsFile = menu.onChooseLyricsFile
+            onReloadLyrics = menu.onReloadLyrics
+            onUseMatchingLyrics = menu.onUseMatchingLyrics
+            onSelectEncoding = menu.onSelectEncoding
+            onAdjustEarlier = menu.onAdjustEarlier
+            onAdjustLater = menu.onAdjustLater
+            onReset = menu.onReset
+        }
+
+        @objc func chooseLyricsFile() {
+            onChooseLyricsFile()
+        }
+
+        @objc func reloadLyrics() {
+            onReloadLyrics()
+        }
+
+        @objc func useMatchingLyrics() {
+            onUseMatchingLyrics()
+        }
+
+        @objc func selectEncoding(_ sender: NSMenuItem) {
+            guard let rawValue = sender.representedObject as? String,
+                  let encoding = LyricsTextEncoding(rawValue: rawValue) else { return }
+            onSelectEncoding(encoding)
+        }
+
+        @objc func adjustEarlier() {
+            onAdjustEarlier()
+        }
+
+        @objc func adjustLater() {
+            onAdjustLater()
+        }
+
+        @objc func resetTiming() {
+            onReset()
+        }
     }
 }
 

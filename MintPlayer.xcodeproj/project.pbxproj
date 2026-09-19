@@ -19,9 +19,11 @@
 		00000000000000000000010B /* MintPlayer/Services/AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000020B /* MintPlayer/Services/AudioPlayer.swift */; };
 		00000000000000000000010C /* MintPlayer/Services/NowPlayingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000020C /* MintPlayer/Services/NowPlayingService.swift */; };
 		00000000000000000000010D /* MintPlayer/Views/Root/MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000020D /* MintPlayer/Views/Root/MainView.swift */; };
+		ACEFABF9C8384FF491EF1003 /* MintPlayer/Views/Root/LibraryToolbarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEFABF9C8384FF491EF1004 /* MintPlayer/Views/Root/LibraryToolbarState.swift */; };
 		00000000000000000000010E /* MintPlayer/Views/Sidebar/LibrarySelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000020E /* MintPlayer/Views/Sidebar/LibrarySelection.swift */; };
 		00000000000000000000010F /* MintPlayer/Views/Sidebar/LibrarySidebarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000020F /* MintPlayer/Views/Sidebar/LibrarySidebarItem.swift */; };
 		000000000000000000000110 /* MintPlayer/Views/Sidebar/SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000210 /* MintPlayer/Views/Sidebar/SidebarView.swift */; };
+		ACEFABF9C8384FF491EF1001 /* MintPlayer/Views/Sidebar/NativeLibrarySplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEFABF9C8384FF491EF1002 /* MintPlayer/Views/Sidebar/NativeLibrarySplitView.swift */; };
 		000000000000000000000111 /* MintPlayer/Views/Sidebar/SidebarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000211 /* MintPlayer/Views/Sidebar/SidebarRow.swift */; };
 		000000000000000000000112 /* MintPlayer/Views/Sidebar/CollapsibleSidebarHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000212 /* MintPlayer/Views/Sidebar/CollapsibleSidebarHeader.swift */; };
 		000000000000000000000113 /* MintPlayer/Views/Sidebar/PlaylistEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000213 /* MintPlayer/Views/Sidebar/PlaylistEditor.swift */; };
@@ -69,9 +71,11 @@
 		00000000000000000000020B /* MintPlayer/Services/AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/AudioPlayer.swift; sourceTree = "<group>"; };
 		00000000000000000000020C /* MintPlayer/Services/NowPlayingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/NowPlayingService.swift; sourceTree = "<group>"; };
 		00000000000000000000020D /* MintPlayer/Views/Root/MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Root/MainView.swift; sourceTree = "<group>"; };
+		ACEFABF9C8384FF491EF1004 /* MintPlayer/Views/Root/LibraryToolbarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Root/LibraryToolbarState.swift; sourceTree = "<group>"; };
 		00000000000000000000020E /* MintPlayer/Views/Sidebar/LibrarySelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Sidebar/LibrarySelection.swift; sourceTree = "<group>"; };
 		00000000000000000000020F /* MintPlayer/Views/Sidebar/LibrarySidebarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Sidebar/LibrarySidebarItem.swift; sourceTree = "<group>"; };
 		000000000000000000000210 /* MintPlayer/Views/Sidebar/SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Sidebar/SidebarView.swift; sourceTree = "<group>"; };
+		ACEFABF9C8384FF491EF1002 /* MintPlayer/Views/Sidebar/NativeLibrarySplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Sidebar/NativeLibrarySplitView.swift; sourceTree = "<group>"; };
 		000000000000000000000211 /* MintPlayer/Views/Sidebar/SidebarRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Sidebar/SidebarRow.swift; sourceTree = "<group>"; };
 		000000000000000000000212 /* MintPlayer/Views/Sidebar/CollapsibleSidebarHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Sidebar/CollapsibleSidebarHeader.swift; sourceTree = "<group>"; };
 		000000000000000000000213 /* MintPlayer/Views/Sidebar/PlaylistEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Sidebar/PlaylistEditor.swift; sourceTree = "<group>"; };
@@ -209,6 +213,7 @@
 			isa = PBXGroup;
 			children = (
 				00000000000000000000020D /* MintPlayer/Views/Root/MainView.swift */,
+				ACEFABF9C8384FF491EF1004 /* MintPlayer/Views/Root/LibraryToolbarState.swift */,
 			);
 			name = Root;
 			sourceTree = "<group>";
@@ -219,6 +224,7 @@
 				00000000000000000000020E /* MintPlayer/Views/Sidebar/LibrarySelection.swift */,
 				00000000000000000000020F /* MintPlayer/Views/Sidebar/LibrarySidebarItem.swift */,
 				000000000000000000000210 /* MintPlayer/Views/Sidebar/SidebarView.swift */,
+				ACEFABF9C8384FF491EF1002 /* MintPlayer/Views/Sidebar/NativeLibrarySplitView.swift */,
 				000000000000000000000211 /* MintPlayer/Views/Sidebar/SidebarRow.swift */,
 				000000000000000000000212 /* MintPlayer/Views/Sidebar/CollapsibleSidebarHeader.swift */,
 				000000000000000000000213 /* MintPlayer/Views/Sidebar/PlaylistEditor.swift */,
@@ -411,9 +417,11 @@
 				00000000000000000000010B /* MintPlayer/Services/AudioPlayer.swift in Sources */,
 				00000000000000000000010C /* MintPlayer/Services/NowPlayingService.swift in Sources */,
 				00000000000000000000010D /* MintPlayer/Views/Root/MainView.swift in Sources */,
+				ACEFABF9C8384FF491EF1003 /* MintPlayer/Views/Root/LibraryToolbarState.swift in Sources */,
 				00000000000000000000010E /* MintPlayer/Views/Sidebar/LibrarySelection.swift in Sources */,
 				00000000000000000000010F /* MintPlayer/Views/Sidebar/LibrarySidebarItem.swift in Sources */,
 				000000000000000000000110 /* MintPlayer/Views/Sidebar/SidebarView.swift in Sources */,
+				ACEFABF9C8384FF491EF1001 /* MintPlayer/Views/Sidebar/NativeLibrarySplitView.swift in Sources */,
 				000000000000000000000111 /* MintPlayer/Views/Sidebar/SidebarRow.swift in Sources */,
 				000000000000000000000112 /* MintPlayer/Views/Sidebar/CollapsibleSidebarHeader.swift in Sources */,
 				000000000000000000000113 /* MintPlayer/Views/Sidebar/PlaylistEditor.swift in Sources */,

@@ -3,7 +3,6 @@ import SwiftUI
 struct AlbumsView: View {
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
-    @Environment(\.isPlayerOverlayPresented) private var isPlayerOverlayPresented
     @State private var searchText = ""
     @State private var albumSearchText = ""
     @State private var selectedAlbum: AlbumSummary?
@@ -42,14 +41,13 @@ struct AlbumsView: View {
             }
 
         }
-        .toolbar {
-            if selectedAlbum == nil && !isPlayerOverlayPresented {
-                ToolbarItem(placement: .primaryAction) {
-                    NativeToolbarSearchField(
-                        text: $searchText,
-                        prompt: settings.text(.searchAlbums)
-                    )
-                }
+        .transformPreference(LibraryToolbarPreferenceKey.self) { configuration in
+            if selectedAlbum == nil {
+                configuration = LibraryToolbarConfiguration(
+                    id: "albums",
+                    searchText: $searchText,
+                    searchPrompt: settings.text(.searchAlbums)
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -132,7 +130,6 @@ struct AlbumDetailView: View {
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
-    @Environment(\.isPlayerOverlayPresented) private var isPlayerOverlayPresented
 
     let album: AlbumSummary
     @Binding var searchText: String
@@ -182,16 +179,14 @@ struct AlbumDetailView: View {
             albumSongs = musicLibrary.songs(forAlbum: album)
             refreshVisibleSongs()
         }
-        .toolbar {
-            if !isPlayerOverlayPresented {
-                ToolbarItem(placement: .navigation) {
-                    Button(action: onBack) {
-                        Label(backButtonTitle, systemImage: "chevron.left")
-                    }
-                    .labelStyle(.iconOnly)
-                }
-            }
-        }
+        .preference(
+            key: LibraryToolbarPreferenceKey.self,
+            value: LibraryToolbarConfiguration(
+                id: "album.\(album.id)",
+                backTitle: backButtonTitle,
+                onBack: onBack
+            )
+        )
     }
 
     private var backButtonTitle: String {

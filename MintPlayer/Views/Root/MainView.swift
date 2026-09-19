@@ -2,17 +2,15 @@ import SwiftUI
 import AppKit
 
 struct MainView: View {
-    private static let sidebarCollapsedDefaultsKey = AppConfiguration.userDefaultsKey("sidebar.isCollapsed")
-
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
 
-    @AppStorage(Self.sidebarCollapsedDefaultsKey) private var isSidebarCollapsedStored = false
+    @StateObject private var sidebarState = LibrarySidebarState()
     @State private var selection: LibrarySelection = .songs
-    @State private var columnVisibility: NavigationSplitViewVisibility = UserDefaults.standard.bool(forKey: Self.sidebarCollapsedDefaultsKey) ? .detailOnly : .all
+    @StateObject private var libraryToolbar = LibraryToolbarState()
     @State private var didRestorePlaybackSession = false
     @State private var isLyricsMounted = false
     @State private var isLyricsVisible = false
@@ -23,14 +21,12 @@ struct MainView: View {
 
     var body: some View {
         ZStack {
-            NavigationSplitView(columnVisibility: $columnVisibility) {
+            NativeLibrarySplitView(
+                sidebarState: sidebarState,
+                minimumDetailWidth: playerBarWidth,
+                toolbar: libraryToolbar
+            ) {
                 SidebarView(selection: $selection)
-                    .navigationSplitViewColumnWidth(
-                        min: SidebarWidth.minimum,
-                        ideal: SidebarWidth.ideal,
-                        max: SidebarWidth.maximum
-                    )
-                    .toolbar(removing: isLyricsMounted ? .sidebarToggle : nil)
             } detail: {
                 ZStack(alignment: .bottom) {
                     contentView
@@ -46,6 +42,7 @@ struct MainView: View {
                 }
                 .background(MintTheme.contentBackground)
             }
+            .ignoresSafeArea(.container, edges: .top)
             .navigationTitle(isLyricsMounted ? "" : currentTitle)
             .scrollEdgeEffectStyle(.soft, for: .top)
             .disabled(isLyricsMounted)
@@ -80,9 +77,44 @@ struct MainView: View {
                         .accessibilityLabel(settings.text(.close))
                     }
                 }
-            } else if isSidebarCollapsed {
-                ToolbarItem(placement: .principal) {
-                    CollapsedSidebarNavigationPicker(selection: $selection)
+            } else {
+                ToolbarItem(id: "library.sidebar", placement: .navigation) {
+                    Button(action: sidebarState.toggle) {
+                        Label(
+                            settings.text(sidebarState.isCollapsed ? .showSidebar : .hideSidebar),
+                            systemImage: "sidebar.left"
+                        )
+                    }
+                    .labelStyle(.iconOnly)
+                    .help(settings.text(sidebarState.isCollapsed ? .showSidebar : .hideSidebar))
+                }
+
+                if let backTitle = libraryToolbar.appearance.backTitle {
+                    ToolbarItem(placement: .navigation) {
+                        Button(action: libraryToolbar.goBack) {
+                            Label(backTitle, systemImage: "chevron.left")
+                        }
+                        .labelStyle(.iconOnly)
+                    }
+                }
+
+                if sidebarState.isCollapsed {
+                    ToolbarItem(placement: .principal) {
+                        CollapsedSidebarNavigationPicker(selection: $selection)
+                    }
+                }
+
+                if libraryToolbar.appearance.showsSort {
+                    ToolbarItem(placement: .primaryAction) {
+                        SongSortButton(sortOrder: libraryToolbar.sortOrder)
+                    }
+                    ToolbarSpacer(.fixed, placement: .primaryAction)
+                }
+
+                if let prompt = libraryToolbar.appearance.searchPrompt {
+                    ToolbarItem(placement: .primaryAction) {
+                        NativeToolbarSearchField(text: libraryToolbar.searchText, prompt: prompt)
+                    }
                 }
             }
         }
@@ -97,22 +129,9 @@ struct MainView: View {
                 .frame(width: 0, height: 0)
         }
         .onAppear {
-            columnVisibility = preferredColumnVisibility
             restorePlaybackSessionIfNeeded()
             audioPlayer.onPlaybackCounted = { songId in
                 musicLibrary.recordQualifiedPlayback(for: songId)
-            }
-        }
-        .onChange(of: columnVisibility) { _, newVisibility in
-            switch newVisibility {
-            case .detailOnly:
-                isSidebarCollapsedStored = true
-            case .all, .doubleColumn:
-                isSidebarCollapsedStored = false
-            case .automatic:
-                break
-            default:
-                break
             }
         }
         .onChange(of: musicLibrary.songs) { _, songs in
@@ -127,14 +146,6 @@ struct MainView: View {
         .onDisappear {
             audioPlayer.onPlaybackCounted = nil
         }
-    }
-
-    private var isSidebarCollapsed: Bool {
-        columnVisibility == .detailOnly
-    }
-
-    private var preferredColumnVisibility: NavigationSplitViewVisibility {
-        isSidebarCollapsedStored ? .detailOnly : .all
     }
 
     private var lyricsPresentationAnimation: Animation {

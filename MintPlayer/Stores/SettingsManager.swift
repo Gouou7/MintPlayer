@@ -330,6 +330,8 @@ enum L10n {
         case emptyLyrics
         case noSongPlaying
         case close
+        case showSidebar
+        case hideSidebar
         case name
         case description
         case playlistName
@@ -396,11 +398,11 @@ enum L10n {
         .chooseLyricsFile: "Choose Lyrics File…",
         .lyricsOptions: "Lyrics Options",
         .useMatchingLyrics: "Use Matching Lyrics File",
-        .lyricsTiming: "Lyrics Timing",
-        .lyricsEarlier: "Show 0.5 Seconds Earlier",
-        .lyricsLater: "Show 0.5 Seconds Later",
-        .resetLyricsTiming: "Reset Timing",
-        .lyricsTimingValue: "Adjustment: %+.1f s",
+        .lyricsTiming: "Song Timing Adjustment",
+        .lyricsEarlier: "0.5 Seconds Earlier",
+        .lyricsLater: "0.5 Seconds Later",
+        .resetLyricsTiming: "Reset",
+        .lyricsTimingValue: "Current: %+.1f s",
         .lyricsEncodingFailed: "The lyrics file encoding could not be read.",
         .lyricsParsingFailed: "The lyrics timeline could not be parsed.",
         .selectedLyricsMissing: "The selected lyrics file “%@” is missing. Choose it again or use the matching file.",
@@ -540,6 +542,8 @@ enum L10n {
         .emptyLyrics: "The lyrics file has no displayable text.",
         .noSongPlaying: "No Song Playing",
         .close: "Close",
+        .showSidebar: "Show Sidebar",
+        .hideSidebar: "Hide Sidebar",
         .name: "Name",
         .description: "Description",
         .playlistName: "Playlist Name",
@@ -594,11 +598,11 @@ enum L10n {
         .chooseLyricsFile: "选择歌词文件…",
         .lyricsOptions: "歌词选项",
         .useMatchingLyrics: "使用同名歌词文件",
-        .lyricsTiming: "歌词时间校准",
-        .lyricsEarlier: "提前 0.5 秒显示",
-        .lyricsLater: "延后 0.5 秒显示",
-        .resetLyricsTiming: "重置时间校准",
-        .lyricsTimingValue: "校准：%+.1f 秒",
+        .lyricsTiming: "歌曲时间校准",
+        .lyricsEarlier: "提前 0.5 秒",
+        .lyricsLater: "延后 0.5 秒",
+        .resetLyricsTiming: "重置",
+        .lyricsTimingValue: "当前：%+.1f 秒",
         .lyricsEncodingFailed: "无法读取歌词文件编码。",
         .lyricsParsingFailed: "无法解析歌词时间轴。",
         .selectedLyricsMissing: "找不到选定的歌词文件“%@”。请重新选择或使用同名歌词文件。",
@@ -738,6 +742,8 @@ enum L10n {
         .emptyLyrics: "歌词文件里没有可显示的文本。",
         .noSongPlaying: "没有正在播放的歌曲",
         .close: "关闭",
+        .showSidebar: "显示侧栏",
+        .hideSidebar: "隐藏侧栏",
         .name: "名称",
         .description: "描述",
         .playlistName: "播放列表名称",

@@ -9,7 +9,6 @@ struct SongsView: View {
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
-    @Environment(\.isPlayerOverlayPresented) private var isPlayerOverlayPresented
 
     let title: String
     let subtitle: String?
@@ -89,22 +88,15 @@ struct SongsView: View {
             .padding(.top, 28)
             .padding(.bottom, 0)
         }
-        .toolbar {
-            if !isPlayerOverlayPresented {
-                ToolbarItem(placement: .primaryAction) {
-                    SongSortButton(sortOrder: sortOrderBinding)
-                }
-
-                ToolbarSpacer(.fixed, placement: .primaryAction)
-
-                ToolbarItem(placement: .primaryAction) {
-                    NativeToolbarSearchField(
-                        text: searchTextBinding,
-                        prompt: settings.text(.searchSongs)
-                    )
-                }
-            }
-        }
+        .preference(
+            key: LibraryToolbarPreferenceKey.self,
+            value: LibraryToolbarConfiguration(
+                id: "songs.\(columnPreferenceScope.rawValue).\(playlistId?.uuidString ?? title)",
+                searchText: searchTextBinding,
+                searchPrompt: settings.text(.searchSongs),
+                sortOrder: sortOrderBinding
+            )
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             rebuildDisplayedSongs()
