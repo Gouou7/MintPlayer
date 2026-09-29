@@ -104,7 +104,7 @@ Debug 使用 `Mint Player Debug.app`、Bundle ID `dev.govo.mintplayer.debug`、A
 
 ## 文档与发布
 
-- `README.md` 为仓库默认入口，使用中文；`README.en.md` 是对应的英文版。用户要求或你认为非常有必要时可修改 `README.md`，并保持中英文两份文档内容同步。
+- `README.md` 为仓库默认入口，使用中文；`README.en.md` 是对应的英文版。用户要求或你认为非常有必要时可修改 `README.md`，内容要精简，并保持中英文两份文档内容同步。
 - `AGENTS.md`（即本文档）为 Agent 开发指南。
 - `CHANGELOG.md` 记录用户可感知的软件变更日志。每次修改代码后应同步在顶部 `Unreleased` 区写入变更。
 - Git Tag为唯一的版本号来源（匹配 `vMAJOR.MINOR.PATCH`），不要手动维护 Xcode 中 `MARKETING_VERSION` 或 `CURRENT_PROJECT_VERSION` 的占位值。
