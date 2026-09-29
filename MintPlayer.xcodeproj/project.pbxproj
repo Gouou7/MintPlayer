@@ -54,6 +54,14 @@
 		00000000000000000000012D /* MintPlayer/Views/Shared/ListPlaybackControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022E /* MintPlayer/Views/Shared/ListPlaybackControls.swift */; };
 		00000000000000000000012E /* MintPlayer/Services/LibraryPersistenceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022F /* MintPlayer/Services/LibraryPersistenceStore.swift */; };
 		00000000000000000000012F /* MintPlayer/App/AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000230 /* MintPlayer/App/AppConfiguration.swift */; };
+		000000000000000000000130 /* MintPlayer/Services/MCPToolRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000231 /* MintPlayer/Services/MCPToolRouter.swift */; };
+		000000000000000000000131 /* MintPlayer/Services/MCPTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000232 /* MintPlayer/Services/MCPTokenStore.swift */; };
+		000000000000000000000132 /* MintPlayer/Services/MCPServiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000233 /* MintPlayer/Services/MCPServiceController.swift */; };
+		000000000000000000000133 /* MintPlayer/Services/MCPHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000234 /* MintPlayer/Services/MCPHTTPServer.swift */; };
+		000000000000000000000134 /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000A10 /* MCP */; };
+		000000000000000000000135 /* NIOCore in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000A11 /* NIOCore */; };
+		000000000000000000000136 /* NIOHTTP1 in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000A12 /* NIOHTTP1 */; };
+		000000000000000000000137 /* NIOPosix in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000A13 /* NIOPosix */; };
 		7A1100012F00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7A1100022F00000000000001 /* Assets.xcassets */; };
 		6B8086182F99168000930F3F /* MintPlayer.icon in Resources */ = {isa = PBXBuildFile; fileRef = 6B8086172F99168000930F3F /* MintPlayer.icon */; };
 /* End PBXBuildFile section */
@@ -70,6 +78,10 @@
 		00000000000000000000020A /* MintPlayer/Stores/SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Stores/SettingsManager.swift; sourceTree = "<group>"; };
 		00000000000000000000020B /* MintPlayer/Services/AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/AudioPlayer.swift; sourceTree = "<group>"; };
 		00000000000000000000020C /* MintPlayer/Services/NowPlayingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/NowPlayingService.swift; sourceTree = "<group>"; };
+		000000000000000000000231 /* MintPlayer/Services/MCPToolRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/MCPToolRouter.swift; sourceTree = "<group>"; };
+		000000000000000000000232 /* MintPlayer/Services/MCPTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/MCPTokenStore.swift; sourceTree = "<group>"; };
+		000000000000000000000233 /* MintPlayer/Services/MCPServiceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/MCPServiceController.swift; sourceTree = "<group>"; };
+		000000000000000000000234 /* MintPlayer/Services/MCPHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/MCPHTTPServer.swift; sourceTree = "<group>"; };
 		00000000000000000000020D /* MintPlayer/Views/Root/MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Root/MainView.swift; sourceTree = "<group>"; };
 		ACEFABF9C8384FF491EF1004 /* MintPlayer/Views/Root/LibraryToolbarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Root/LibraryToolbarState.swift; sourceTree = "<group>"; };
 		00000000000000000000020E /* MintPlayer/Views/Sidebar/LibrarySelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Sidebar/LibrarySelection.swift; sourceTree = "<group>"; };
@@ -117,6 +129,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				000000000000000000000134 /* MCP in Frameworks */,
+				000000000000000000000135 /* NIOCore in Frameworks */,
+				000000000000000000000136 /* NIOHTTP1 in Frameworks */,
+				000000000000000000000137 /* NIOPosix in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -190,6 +206,10 @@
 			children = (
 				00000000000000000000020B /* MintPlayer/Services/AudioPlayer.swift */,
 				00000000000000000000020C /* MintPlayer/Services/NowPlayingService.swift */,
+				000000000000000000000231 /* MintPlayer/Services/MCPToolRouter.swift */,
+				000000000000000000000232 /* MintPlayer/Services/MCPTokenStore.swift */,
+				000000000000000000000233 /* MintPlayer/Services/MCPServiceController.swift */,
+				000000000000000000000234 /* MintPlayer/Services/MCPHTTPServer.swift */,
 				00000000000000000000022B /* MintPlayer/Services/LyricsService.swift */,
 				00000000000000000000022F /* MintPlayer/Services/LibraryPersistenceStore.swift */,
 			);
@@ -325,6 +345,12 @@
 			dependencies = (
 			);
 			name = MintPlayer;
+			packageProductDependencies = (
+				000000000000000000000A10 /* MCP */,
+				000000000000000000000A11 /* NIOCore */,
+				000000000000000000000A12 /* NIOHTTP1 */,
+				000000000000000000000A13 /* NIOPosix */,
+			);
 			productName = MintPlayer;
 			productReference = 000000000000000000000301 /* Mint Player Debug.app */;
 			productType = "com.apple.product-type.application";
@@ -353,6 +379,10 @@
 				Chinese,
 			);
 			mainGroup = 000000000000000000000501;
+			packageReferences = (
+				000000000000000000000A20 /* XCRemoteSwiftPackageReference "swift-sdk" */,
+				000000000000000000000A21 /* XCRemoteSwiftPackageReference "swift-nio" */,
+			);
 			productRefGroup = 000000000000000000000503 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -416,6 +446,10 @@
 				00000000000000000000010A /* MintPlayer/Stores/SettingsManager.swift in Sources */,
 				00000000000000000000010B /* MintPlayer/Services/AudioPlayer.swift in Sources */,
 				00000000000000000000010C /* MintPlayer/Services/NowPlayingService.swift in Sources */,
+				000000000000000000000130 /* MintPlayer/Services/MCPToolRouter.swift in Sources */,
+				000000000000000000000131 /* MintPlayer/Services/MCPTokenStore.swift in Sources */,
+				000000000000000000000132 /* MintPlayer/Services/MCPServiceController.swift in Sources */,
+				000000000000000000000133 /* MintPlayer/Services/MCPHTTPServer.swift in Sources */,
 				00000000000000000000010D /* MintPlayer/Views/Root/MainView.swift in Sources */,
 				ACEFABF9C8384FF491EF1003 /* MintPlayer/Views/Root/LibraryToolbarState.swift in Sources */,
 				00000000000000000000010E /* MintPlayer/Views/Sidebar/LibrarySelection.swift in Sources */,
@@ -620,6 +654,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		000000000000000000000A20 /* XCRemoteSwiftPackageReference "swift-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/modelcontextprotocol/swift-sdk.git";
+			requirement = { kind = exactVersion; version = 0.12.1; };
+		};
+		000000000000000000000A21 /* XCRemoteSwiftPackageReference "swift-nio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-nio.git";
+			requirement = { kind = exactVersion; version = 2.65.0; };
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		000000000000000000000A10 /* MCP */ = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000A20 /* XCRemoteSwiftPackageReference "swift-sdk" */; productName = MCP; };
+		000000000000000000000A11 /* NIOCore */ = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000A21 /* XCRemoteSwiftPackageReference "swift-nio" */; productName = NIOCore; };
+		000000000000000000000A12 /* NIOHTTP1 */ = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000A21 /* XCRemoteSwiftPackageReference "swift-nio" */; productName = NIOHTTP1; };
+		000000000000000000000A13 /* NIOPosix */ = {isa = XCSwiftPackageProductDependency; package = 000000000000000000000A21 /* XCRemoteSwiftPackageReference "swift-nio" */; productName = NIOPosix; };
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 000000000000000000000901 /* Project object */;
 }

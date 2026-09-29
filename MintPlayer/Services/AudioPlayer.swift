@@ -106,6 +106,10 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func replayHistorySong(_ song: Song) {
+        playImmediatelyPreservingUpcoming(song)
+    }
+
+    func playImmediatelyPreservingUpcoming(_ song: Song) {
         let upcoming = upcomingSongs.filter { $0.id != song.id }
         invalidateQueueUndo()
         queue = [song] + upcoming
@@ -113,6 +117,20 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         sourceQueue = [song] + sourceQueue.filter { upcomingIDs.contains($0.id) }
         currentIndex = 0
         start(song: song)
+    }
+
+    func moveUpcomingSong(_ songID: Song.ID, before targetID: Song.ID?) -> Bool {
+        let upcoming = upcomingSongs
+        guard let source = upcoming.firstIndex(where: { $0.id == songID }) else { return false }
+        let destination: Int
+        if let targetID {
+            guard let index = upcoming.firstIndex(where: { $0.id == targetID }) else { return false }
+            destination = index
+        } else {
+            destination = upcoming.count
+        }
+        moveUpcomingSongs(from: IndexSet(integer: source), to: destination)
+        return true
     }
 
     func refreshLibrarySongs(_ songs: [Song]) {

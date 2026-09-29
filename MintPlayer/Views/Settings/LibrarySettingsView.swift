@@ -4,6 +4,7 @@ import AppKit
 struct LibrarySettingsView: View {
     @EnvironmentObject private var settings: SettingsManager
     @EnvironmentObject private var musicLibrary: MusicLibrary
+    @EnvironmentObject private var mcpService: MCPServiceController
 
     @State private var selectedTheme = ThemeMode.dark
     @State private var selectedLanguage = AppLanguage.system
@@ -12,6 +13,7 @@ struct LibrarySettingsView: View {
     @State private var showFolderPicker = false
     @State private var newLibraryPath = ""
     @State private var folderPendingDeletion: MusicLibrarySource?
+    @State private var mcpCopyError: String?
 
     var body: some View {
         Form {
@@ -24,6 +26,7 @@ struct LibrarySettingsView: View {
             }
             appearanceSettings
             playbackSettings
+            mcpSettings
             librarySettings
             aboutSettings
         }
@@ -169,6 +172,146 @@ struct LibrarySettingsView: View {
             .buttonStyle(.bordered)
             .disabled(musicLibrary.librarySources.isEmpty || musicLibrary.isScanning)
         }
+    }
+
+    private var mcpSettings: some View {
+        Section(settings.text(.mcpSection)) {
+            SettingsToggleRow(
+                title: settings.text(.mcpEnable),
+                description: settings.text(.mcpDescription),
+                isOn: Binding(
+                    get: { settings.mcpEnabled },
+                    set: { settings.updateMCPEnabled($0) }
+                )
+            )
+
+            SettingsToggleRow(
+                title: settings.text(.mcpRequireToken),
+                description: settings.text(.mcpRequireTokenDescription),
+                isOn: Binding(
+                    get: { settings.mcpRequiresToken },
+                    set: { settings.updateMCPRequiresToken($0) }
+                )
+            )
+
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(settings.text(.mcpPort))
+                        .font(.body.weight(.semibold))
+                    Text(settings.text(.mcpPortHint))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 16)
+
+                TextField(settings.text(.mcpPort), value: Binding(
+                    get: { settings.mcpPort },
+                    set: { settings.updateMCPPort($0) }
+                ), format: .number.grouping(.never))
+                    .frame(width: 90)
+                    .multilineTextAlignment(.trailing)
+                    .accessibilityLabel(settings.text(.mcpPort))
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Text(settings.text(.mcpStatus))
+                        .font(.body.weight(.semibold))
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(mcpStatusColor)
+                            .frame(width: 8, height: 8)
+                            .accessibilityHidden(true)
+                        Text(mcpStatusText)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(mcpStatusColor)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Text(mcpService.endpoint)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+
+                    Button {
+                        copyToPasteboard(mcpService.endpoint)
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help(settings.text(.mcpCopyAddress))
+                    .accessibilityLabel(settings.text(.mcpCopyAddress))
+                }
+
+                if case .failed(let message) = mcpService.status {
+                    HStack(spacing: 12) {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Spacer(minLength: 8)
+                        Button(settings.text(.retry), action: mcpService.retry)
+                    }
+                }
+            }
+
+            if settings.mcpEnabled {
+                if settings.mcpRequiresToken {
+                    HStack {
+                        Button(settings.text(.mcpCopyToken)) {
+                            do { copyToPasteboard(try mcpService.copyToken()) }
+                            catch { mcpCopyError = error.localizedDescription }
+                        }
+                        Button(settings.text(.mcpRotateToken)) {
+                            Task { await mcpService.rotateToken() }
+                        }
+                    }
+                }
+                Text(settings.text(settings.mcpRequiresToken ? .mcpAuthenticationHint : .mcpNoAuthenticationHint))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let mcpCopyError {
+                    Text(mcpCopyError)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                if let operationError = mcpService.operationError {
+                    Text(operationError)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+
+    private var mcpStatusText: String {
+        switch mcpService.status {
+        case .off: return settings.text(.mcpOff)
+        case .starting: return settings.text(.mcpStarting)
+        case .running: return settings.text(.mcpRunning)
+        case .failed: return settings.text(.mcpFailed)
+        }
+    }
+
+    private var mcpStatusColor: Color {
+        switch mcpService.status {
+        case .off: return .gray
+        case .starting, .failed: return .orange
+        case .running: return .green
+        }
+    }
+
+    private func copyToPasteboard(_ value: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(value, forType: .string)
+        mcpCopyError = nil
     }
 
     private func librarySourceRow(_ source: MusicLibrarySource) -> some View {

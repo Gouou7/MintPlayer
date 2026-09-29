@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 @main
 struct MintPlayerApp: App {
@@ -16,7 +17,7 @@ struct MintPlayerApp: App {
                 .environmentObject(settings)
                 .preferredColorScheme(settings.preferredColorScheme)
                 .onAppear {
-                    appDelegate.configure(audioPlayer: audioPlayer, musicLibrary: musicLibrary)
+                    appDelegate.configure(audioPlayer: audioPlayer, musicLibrary: musicLibrary, settings: settings)
                 }
         }
         .windowStyle(.automatic)
@@ -31,6 +32,9 @@ struct MintPlayerApp: App {
                 .preferredColorScheme(.dark)
                 .toolbar(removing: .title)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+                .onAppear {
+                    appDelegate.configure(audioPlayer: audioPlayer, musicLibrary: musicLibrary, settings: settings)
+                }
         }
         .defaultSize(width: 1180, height: 760)
         .defaultWindowPlacement { _, context in
@@ -56,7 +60,11 @@ struct MintPlayerApp: App {
                 .environmentObject(audioPlayer)
                 .environmentObject(musicLibrary)
                 .environmentObject(settings)
+                .environmentObject(appDelegate.mcpService)
                 .preferredColorScheme(settings.preferredColorScheme)
+                .onAppear {
+                    appDelegate.configure(audioPlayer: audioPlayer, musicLibrary: musicLibrary, settings: settings)
+                }
         }
         .defaultWindowPlacement { _, context in
             let fallbackSize = CGSize(width: 620, height: 640)
@@ -119,13 +127,42 @@ private struct PlayerCommands: Commands {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    let mcpService = MCPServiceController()
     private weak var audioPlayer: AudioPlayer?
     private weak var musicLibrary: MusicLibrary?
+    private var librarySubscription: AnyCancellable?
+    private var mcpSettingsSubscription: AnyCancellable?
+    private var didRestorePlaybackSession = false
 
-    func configure(audioPlayer: AudioPlayer, musicLibrary: MusicLibrary) {
+    func configure(audioPlayer: AudioPlayer, musicLibrary: MusicLibrary, settings: SettingsManager) {
         self.audioPlayer = audioPlayer
         self.musicLibrary = musicLibrary
+        guard librarySubscription == nil else { return }
+        audioPlayer.onPlaybackCounted = { [weak musicLibrary] songID in
+            musicLibrary?.recordQualifiedPlayback(for: songID)
+        }
+        librarySubscription = musicLibrary.$songs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak audioPlayer] songs in
+                guard let self, let audioPlayer else { return }
+                audioPlayer.refreshLibrarySongs(songs)
+                if !self.didRestorePlaybackSession, !songs.isEmpty {
+                    audioPlayer.restoreLastSession(from: songs)
+                    self.didRestorePlaybackSession = true
+                }
+            }
+        mcpService.configure(audioPlayer: audioPlayer, musicLibrary: musicLibrary, settings: settings)
+        mcpSettingsSubscription = settings.$mcpEnabled.combineLatest(settings.$mcpPort, settings.$mcpRequiresToken)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled, port, requiresToken in
+                self?.mcpService.update(enabled: enabled, port: port, requiresToken: requiresToken)
+            }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        mcpService.update(enabled: false, port: AppConfiguration.defaultMCPPort, requiresToken: true)
     }
 
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {

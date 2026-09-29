@@ -35,6 +35,7 @@ class MusicLibrary: ObservableObject {
     }
 
     var isScanning: Bool { pendingImports > 0 || librarySources.contains(where: \.isScanning) }
+    var isLibraryReady: Bool { hasLoadedLibraryState }
 
     func retryFailedOperations() {
         lastScanError = nil
@@ -419,6 +420,15 @@ class MusicLibrary: ObservableObject {
 
     func songs(forArtist artist: ArtistSummary) -> [Song] {
         songs(from: artistSongIDs[artist.id] ?? [])
+    }
+
+    func songsForArtistPlayback(_ artist: ArtistSummary) -> [Song] {
+        songs(forArtist: artist).sorted {
+            if $0.album == $1.album {
+                return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+            }
+            return $0.album.localizedCaseInsensitiveCompare($1.album) == .orderedAscending
+        }
     }
 
     func albums(forArtist artist: ArtistSummary) -> [AlbumSummary] {

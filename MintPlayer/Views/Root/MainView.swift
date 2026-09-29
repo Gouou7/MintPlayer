@@ -11,7 +11,6 @@ struct MainView: View {
     @StateObject private var sidebarState = LibrarySidebarState()
     @State private var selection: LibrarySelection = .songs
     @StateObject private var libraryToolbar = LibraryToolbarState()
-    @State private var didRestorePlaybackSession = false
     @State private var isLyricsMounted = false
     @State private var isLyricsVisible = false
     @State private var isLyricsImmersiveFullScreen = false
@@ -128,23 +127,10 @@ struct MainView: View {
             PlaybackSpaceKeyHandler()
                 .frame(width: 0, height: 0)
         }
-        .onAppear {
-            restorePlaybackSessionIfNeeded()
-            audioPlayer.onPlaybackCounted = { songId in
-                musicLibrary.recordQualifiedPlayback(for: songId)
-            }
-        }
-        .onChange(of: musicLibrary.songs) { _, songs in
-            audioPlayer.refreshLibrarySongs(songs)
-            restorePlaybackSessionIfNeeded()
-        }
         .onChange(of: audioPlayer.currentSong?.id) { _, songID in
             if songID == nil, isLyricsMounted {
                 dismissEmbeddedLyrics()
             }
-        }
-        .onDisappear {
-            audioPlayer.onPlaybackCounted = nil
         }
     }
 
@@ -217,12 +203,6 @@ struct MainView: View {
                 EmptyStateView(title: settings.text(.folderNotFound), systemImage: "folder")
             }
         }
-    }
-
-    private func restorePlaybackSessionIfNeeded() {
-        guard !didRestorePlaybackSession, !musicLibrary.songs.isEmpty else { return }
-        audioPlayer.restoreLastSession(from: musicLibrary.songs)
-        didRestorePlaybackSession = true
     }
 
     private func showLyrics() {

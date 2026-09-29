@@ -12,6 +12,17 @@ Mint Player is a native macOS local music player with the familiar Liquid Glass 
 - Browses tracks by album or artist and supports custom playlists
 - Lets you favorite or block songs and tracks play counts
 - Displays scrolling lyrics
+- Optionally exposes a local MCP server so agents can find songs and control playback and the upcoming queue
+
+## Agent Playback Control
+
+Turn on **Enable MCP** under **MCP** in Settings. Keep Mint Player running, then enter the address shown there in a local MCP client. An access token is required by default: use **Copy Token** and configure an `Authorization: Bearer <token>` request header. You can turn off **Require Access Token** to connect without that header; any local process can then control playback. The server is off by default and listens only on `127.0.0.1`; turning off the server or quitting the app makes it unavailable.
+
+The token is stored in the current user's app data directory without accessing Keychain. The directory and token file use `0700` and `0600` permissions, respectively; processes running as the same system user may still read the file. After upgrading from a version that stored the token in Keychain, copy the new token and update your MCP client.
+
+The default ports are `49431` for Release and `49432` for Debug, and can be changed in Settings. If a port is occupied, Settings shows the startup error so you can choose another port and retry. After rotating the token, update clients that used the old token.
+
+The MCP tools search songs, artists, and albums; play an artist or album sequentially or shuffled; read the current song's full lyrics, playback state, and queue; and control playback, volume, position, and upcoming songs. Songs are selected by library UUID, while artists and albums use IDs from search results. Tool results do not include local audio paths.
 
 ## Screenshots
 

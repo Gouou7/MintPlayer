@@ -6,6 +6,9 @@ class SettingsManager: ObservableObject {
     @Published var language: AppLanguage = .system
     @Published var lyricsPresentationMode: LyricsPresentationMode = .embedded
     @Published var lyricsBlurEnabled = true
+    @Published private(set) var mcpEnabled = false
+    @Published private(set) var mcpRequiresToken = true
+    @Published private(set) var mcpPort = AppConfiguration.defaultMCPPort
     @Published private(set) var lyricsFilePaths: [String: String] = [:]
     @Published private(set) var lyricsTimingOffsets: [String: Double] = [:]
     @Published private(set) var lyricsEncodings: [String: String] = [:]
@@ -18,6 +21,9 @@ class SettingsManager: ObservableObject {
     private let languageKey = AppConfiguration.userDefaultsKey("settings.language")
     private let lyricsPresentationModeKey = AppConfiguration.userDefaultsKey("settings.lyrics.presentationMode")
     private let lyricsBlurEnabledKey = AppConfiguration.userDefaultsKey("settings.lyrics.blurEnabled")
+    private let mcpEnabledKey = AppConfiguration.userDefaultsKey("settings.mcp.enabled")
+    private let mcpRequiresTokenKey = AppConfiguration.userDefaultsKey("settings.mcp.requiresToken")
+    private let mcpPortKey = AppConfiguration.userDefaultsKey("settings.mcp.port")
 
     init() {
         loadSettings()
@@ -41,6 +47,12 @@ class SettingsManager: ObservableObject {
         if userDefaults.object(forKey: lyricsBlurEnabledKey) != nil {
             lyricsBlurEnabled = userDefaults.bool(forKey: lyricsBlurEnabledKey)
         }
+        mcpEnabled = userDefaults.bool(forKey: mcpEnabledKey)
+        if userDefaults.object(forKey: mcpRequiresTokenKey) != nil {
+            mcpRequiresToken = userDefaults.bool(forKey: mcpRequiresTokenKey)
+        }
+        let storedPort = userDefaults.integer(forKey: mcpPortKey)
+        if (1024...65535).contains(storedPort) { mcpPort = storedPort }
     }
 
     // 保存设置
@@ -70,6 +82,22 @@ class SettingsManager: ObservableObject {
     func updateLyricsBlurEnabled(_ isEnabled: Bool) {
         lyricsBlurEnabled = isEnabled
         saveSettings()
+    }
+
+    func updateMCPEnabled(_ enabled: Bool) {
+        mcpEnabled = enabled
+        userDefaults.set(enabled, forKey: mcpEnabledKey)
+    }
+
+    func updateMCPRequiresToken(_ requiresToken: Bool) {
+        mcpRequiresToken = requiresToken
+        userDefaults.set(requiresToken, forKey: mcpRequiresTokenKey)
+    }
+
+    func updateMCPPort(_ port: Int) {
+        guard (1024...65535).contains(port) else { return }
+        mcpPort = port
+        userDefaults.set(port, forKey: mcpPortKey)
     }
 
     func lyricsEncoding(for song: Song) -> LyricsTextEncoding {
@@ -202,6 +230,25 @@ enum L10n {
         case emptyPlaylist
         case emptyPlaylistHint
         case showDetails
+        case mcpSection
+        case mcpEnable
+        case mcpDescription
+        case mcpRequireToken
+        case mcpRequireTokenDescription
+        case mcpPort
+        case mcpPortHint
+        case mcpStatus
+        case mcpOff
+        case mcpStarting
+        case mcpRunning
+        case mcpFailed
+        case mcpCopyAddress
+        case mcpCopyToken
+        case mcpRotateToken
+        case mcpAuthenticationHint
+        case mcpNoAuthenticationHint
+        case mcpPlayerNotReady
+        case mcpTokenInvalid
 
         case general
         case appearance
@@ -415,6 +462,25 @@ enum L10n {
         .emptyPlaylist: "This playlist is empty",
         .emptyPlaylistHint: "Drag songs from your library to this playlist in the sidebar.",
         .showDetails: "Show Details",
+        .mcpSection: "MCP",
+        .mcpEnable: "Enable MCP",
+        .mcpDescription: "Let local MCP clients search your library and control playback while Mint Player is running.",
+        .mcpRequireToken: "Require Access Token",
+        .mcpRequireTokenDescription: "When off, any local process can control playback through this address.",
+        .mcpPort: "Port",
+        .mcpPortHint: "Use a port from 1024 to 65535. Changing it restarts the service.",
+        .mcpStatus: "Status",
+        .mcpOff: "Off",
+        .mcpStarting: "Starting…",
+        .mcpRunning: "Running",
+        .mcpFailed: "Failed to start",
+        .mcpCopyAddress: "Copy Address",
+        .mcpCopyToken: "Copy Token",
+        .mcpRotateToken: "Rotate Token",
+        .mcpAuthenticationHint: "Configure your MCP client with the address above and an Authorization: Bearer header using the copied token.",
+        .mcpNoAuthenticationHint: "Configure your MCP client with the address above. No Authorization header is needed.",
+        .mcpPlayerNotReady: "The player is not ready yet.",
+        .mcpTokenInvalid: "The MCP access token could not be read. Rotate it in Settings.",
         .general: "General",
         .appearance: "Appearance",
         .interfaceTheme: "Interface Theme",
@@ -615,6 +681,25 @@ enum L10n {
         .emptyPlaylist: "此播放列表为空",
         .emptyPlaylistHint: "将资料库中的歌曲拖到侧栏中的此播放列表。",
         .showDetails: "查看详情",
+        .mcpSection: "MCP",
+        .mcpEnable: "启用 MCP",
+        .mcpDescription: "Mint Player 运行时，允许本机 MCP 客户端搜索资料库并控制播放。",
+        .mcpRequireToken: "要求访问令牌",
+        .mcpRequireTokenDescription: "关闭后，本机任意进程都可以通过此地址控制播放。",
+        .mcpPort: "端口",
+        .mcpPortHint: "端口范围为 1024 至 65535。修改端口会重新启动服务。",
+        .mcpStatus: "状态",
+        .mcpOff: "已关闭",
+        .mcpStarting: "正在启动…",
+        .mcpRunning: "运行中",
+        .mcpFailed: "启动失败",
+        .mcpCopyAddress: "复制地址",
+        .mcpCopyToken: "复制令牌",
+        .mcpRotateToken: "重新生成令牌",
+        .mcpAuthenticationHint: "在 MCP 客户端中设置上述地址，并使用复制的令牌添加 Authorization: Bearer 请求头。",
+        .mcpNoAuthenticationHint: "在 MCP 客户端中设置上述地址，无需添加 Authorization 请求头。",
+        .mcpPlayerNotReady: "播放器尚未就绪。",
+        .mcpTokenInvalid: "无法读取 MCP 访问令牌。请在设置中重新生成令牌。",
         .general: "通用",
         .appearance: "外观",
         .interfaceTheme: "界面主题",

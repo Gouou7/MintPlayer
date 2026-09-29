@@ -183,12 +183,7 @@ private struct ArtistDetailView: View {
     }
 
     private var artistSongs: [Song] {
-        musicLibrary.songs(forArtist: artist).sorted {
-            if $0.album == $1.album {
-                return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
-            }
-            return $0.album.localizedCaseInsensitiveCompare($1.album) == .orderedAscending
-        }
+        musicLibrary.songsForArtistPlayback(artist)
     }
 
     private var visibleArtistAlbums: [AlbumSummary] {
