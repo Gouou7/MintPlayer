@@ -2,7 +2,7 @@
 
 ## 项目与代码结构
 
-Mint Player 是使用 Swift 5、SwiftUI、局部 AppKit 桥接、AVFoundation、MediaPlayer、SQLite 和 `UserDefaults` 构建的原生 macOS 本地音乐播放器。需要 macOS 26.0 或更高版本，以及带 macOS 26 SDK 的 Xcode。`MintPlayer.xcodeproj` 是唯一的构建入口。
+Mint Player 是原生 macOS 本地音乐播放器，使用 Swift 与 SwiftUI，需要 macOS 26.0 或更高版本以及带 macOS 26 SDK 的 Xcode；完整技术栈见 [README.md](README.md)。`MintPlayer.xcodeproj` 是唯一的构建入口。
 
 本文档包含项目开发规则、实现约束及验证指南。
 
@@ -14,6 +14,7 @@ Mint Player 是使用 Swift 5、SwiftUI、局部 AppKit 桥接、AVFoundation、
 | `MintPlayer/Services/` | 音频播放、SQLite 持久化、歌词解析及 Now Playing |
 | `MintPlayer/Views/` | `Root`、`Sidebar`、`Library`、`Player`、`Settings` 及可复用的 `Shared` 视图和 AppKit 桥接 |
 | `Scripts/embed-git-version.sh` | 在构建阶段根据 Git 标签生成版本信息 |
+| `docs/mcp.md`、`docs/mcp.en.md` | MCP 播放控制使用说明，中英成对 |
 | `docs/images/` | README 截图与图片资源 |
 
 `MintPlayerApp` 用 `@StateObject` 创建共享状态，并通过 `@EnvironmentObject` 注入主窗口、歌词窗口和设置场景。`MusicLibrary` 扫描文件、汇总专辑和艺人，并通过 `LibraryPersistenceStore` 保存资料库状态。`AudioPlayer` 负责 `AVAudioPlayer`、队列、播放状态恢复、有效播放次数统计及系统媒体信息更新。SQLite 保存资料库记录；带命名空间的偏好设置保存设置和界面状态；Application Support 保存数据库和封面缓存。
@@ -24,11 +25,9 @@ Mint Player 是使用 Swift 5、SwiftUI、局部 AppKit 桥接、AVFoundation、
 - 修改行为前先阅读相关实现；扩展现有辅助逻辑，避免重写子系统。
 - 除非用户明确要求，否则不要运行构建或测试。
 - 除非用户明确批准破坏性变更或迁移，否则保持公开 API 和 SQLite 兼容性。
-- 除非用户明确要求，否则不要引入包管理器、依赖、测试 target、脚本、Lint 工具或 CI 配置。
-- 优先使用原生 macOS 控件与系统行为，除非用户要求自定义实现。不要留下缺少实际功能的占位界面。
-- 将 AppKit 对象限制在 representable、coordinator、职责明确的辅助类或服务中。不要用定时器、强制重建或关闭再打开等变通方式掩盖原生控件问题。
+- 除非用户明确要求，否则不要新增第三方依赖、包管理器、测试 target、脚本、Lint 工具或 CI 配置。现有 SwiftPM 依赖见 `MintPlayer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`，不要擅自增删或升级版本；首次构建需联网解析这些依赖。
 - 遵循现有 Swift 风格：四空格缩进、视图文件以主要类型命名、视图局部状态使用状态属性包装器、共享状态通过 `@EnvironmentObject` 传递。保持改动聚焦，仅为不明显的行为或平台限制添加注释。
-- 面向用户的文案，包括菜单、错误、标签和辅助功能描述，须更新 `SettingsManager` 中所有受支持的语言。
+- 面向用户的文案，包括菜单、错误、标签和辅助功能描述，须在 `SettingsManager.swift` 的 `en` 与 `zh` 两张表中同时补齐。查找顺序为 `zh` → `en` → key，缺失 `zh` 条目会静默回退英文而不报错；改动后逐条核对两张表的 key 是否对应。
 
 ## 数据与播放约束
 
@@ -55,6 +54,11 @@ Mint Player 是使用 Swift 5、SwiftUI、局部 AppKit 桥接、AVFoundation、
 
 ## 界面与 AppKit 边界
 
+### 原生控件与实现边界
+
+- 优先使用原生 macOS 控件与系统行为，除非用户要求自定义实现。不要留下缺少实际功能的占位界面。
+- 将 AppKit 对象限制在 representable、coordinator、职责明确的辅助类或服务中。不要用定时器、强制重建或关闭再打开等变通方式掩盖原生控件问题。
+
 ### 资料库、搜索与窗口
 
 - 保留原生 `NavigationSplitView` 侧栏和 Liquid Glass 行为。居中的悬浮播放器栏必须拦截点击，不能让点击穿透到资料库。
@@ -73,9 +77,16 @@ Mint Player 是使用 Swift 5、SwiftUI、局部 AppKit 桥接、AVFoundation、
 - 保留原生工具栏。专门的 `NSWindow` 桥接在内嵌全屏歌词期间临时调整标题栏属性并隐藏工具栏，让歌词表面覆盖顶边。在 AppKit 全屏切换通知到达时重新应用状态；退出、关闭或拆卸时恢复所有捕获的属性。全屏关闭操作由歌词界面自有控件完成。
 - 窗口模式的关闭操作放在工具栏尾部，在 `.automatic` 项目前添加 `ToolbarSpacer(.flexible)`。macOS 不支持 `.topBarTrailing`，语义位置也不能保证尾部对齐。
 
+## MCP 服务
+
+- 新增或修改 MCP 工具时，同步 `MCPToolRouter.swift` 的路由与参数校验、`SettingsManager.swift` 的中英两份文案，以及 `README.md`、`docs/mcp.md` 与对应英文版的说明。
+- 服务默认关闭且仅监听 `127.0.0.1`；默认端口定义在 `AppConfiguration.swift`，Release 与 Debug 必须取不同值，改动时不要让两者冲突。
+- 令牌保存在 Application Support 下的 `MCP` 目录，不访问钥匙串：目录 `0700`、文件 `0600`。不要把令牌写入日志、错误信息或工具输出。
+- 工具结果不得包含本地音频路径，只返回资料库 UUID 与搜索结果中的 ID。
+
 ## 构建与验证
 
-无需安装依赖。本仓库没有测试 target、Lint 配置或 CI 配置；不要假定这些命令存在。Xcode 会在构建阶段运行现有版本脚本。
+无需手动安装依赖：Xcode 在构建时解析 `Package.resolved` 中的 SwiftPM 依赖，首次构建需要联网。本仓库没有测试 target、Lint 配置或 CI 配置；不要假定这些命令存在。Xcode 会在构建阶段运行现有版本脚本。
 
 仅在用户明确要求时，使用以下命令检查或构建：
 
@@ -102,12 +113,18 @@ Debug 使用 `Mint Player Debug.app`、Bundle ID `dev.govo.mintplayer.debug`、A
 
 仅修改文档时，核对内容与仓库是否一致、检查本地链接和最终 diff；无需构建应用。
 
-## 文档与发布
+## 文档维护
 
 - `README.md` 为仓库默认入口，使用中文；`README.en.md` 是对应的英文版。用户要求或你认为非常有必要时可修改 `README.md`，内容要精简，并保持中英文两份文档内容同步。
-- `AGENTS.md`（即本文档）为 Agent 开发指南。
-- `CHANGELOG.md` 记录用户可感知的软件变更日志。每次修改代码后应同步在顶部 `Unreleased` 区写入变更。
-- Git Tag为唯一的版本号来源（匹配 `vMAJOR.MINOR.PATCH`），不要手动维护 Xcode 中 `MARKETING_VERSION` 或 `CURRENT_PROJECT_VERSION` 的占位值。
+- README 面向使用者，不要在其中引用本文件；`AGENTS.md`（即本文档）面向改代码的人与 Agent。
+- 改动 README 后逐项核对两份的章节标题与条目数量；任一侧缺失时，以用户当前交流的语言版本为准补齐另一侧。
+- `docs/` 下的使用说明同样中英成对（`docs/mcp.md` 与 `docs/mcp.en.md`），README 只保留摘要与链接。
+- `CHANGELOG.md` 记录用户可感知的软件变更日志。每次修改代码后应同步在顶部 `Unreleased` 区写入变更；条目一条一改动，用短句描述用户可感知的结果，不写技术细节。已发布版本的条目不再改动。
+- 文档维护本身不写入 `CHANGELOG.md`，除非文档内容属于项目功能。
+
+## 版本与发布
+
+- Git Tag 为唯一的版本号来源（匹配 `vMAJOR.MINOR.PATCH`），不要手动维护 Xcode 中 `MARKETING_VERSION` 或 `CURRENT_PROJECT_VERSION` 的占位值。
 - `Scripts/embed-git-version.sh` 在 DerivedData 中生成 Info.plist。Debug 使用最新可达的匹配标签；Release 要求 HEAD 上有匹配标签。没有可达语义版本标签或 Git 元数据时构建失败。`CFBundleShortVersionString` 来自标签，`CFBundleVersion` 来自提交数；`MintDisplayVersion` 显示发布版本，或带七位哈希的 `MAJOR.MINOR.PATCH-COMMIT-debug`。
 
 ## Git 与数据安全
