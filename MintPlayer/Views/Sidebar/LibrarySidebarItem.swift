@@ -1,15 +1,15 @@
 import Foundation
 
 enum LibrarySidebarItem: String, CaseIterable, Hashable {
-    case favorites
+    case home
     case songs
     case albums
     case artists
 
     var selection: LibrarySelection {
         switch self {
-        case .favorites:
-            return .favorites
+        case .home:
+            return .home
         case .songs:
             return .songs
         case .albums:
@@ -21,8 +21,8 @@ enum LibrarySidebarItem: String, CaseIterable, Hashable {
 
     func title(language: AppLanguage) -> String {
         switch self {
-        case .favorites:
-            return L10n.text(.favorites, language: language)
+        case .home:
+            return L10n.text(.home, language: language)
         case .songs:
             return L10n.text(.songs, language: language)
         case .albums:
@@ -34,8 +34,8 @@ enum LibrarySidebarItem: String, CaseIterable, Hashable {
 
     var systemImage: String {
         switch self {
-        case .favorites:
-            return "heart.fill"
+        case .home:
+            return "house.fill"
         case .songs:
             return "music.note"
         case .albums:

@@ -285,6 +285,18 @@ enum L10n {
         case add
         case cancel
         case enterLibraryName
+        case home
+        case startListening
+        case resumePlayback
+        case resumeFromTime
+        case quickPlay
+        case playFavoriteSongs
+        case shuffleLibrary
+        case browseAlbums
+        case recentlyPlayed
+        case noRecentlyPlayed
+        case recentlyPlayedHint
+        case showMore
         case songs
         case albums
         case artists
@@ -516,6 +528,18 @@ enum L10n {
         .add: "Add",
         .cancel: "Cancel",
         .enterLibraryName: "Enter a name for this music library",
+        .home: "Home",
+        .startListening: "Start listening",
+        .resumePlayback: "Resume",
+        .resumeFromTime: "Continue from %@",
+        .quickPlay: "Quick play",
+        .playFavoriteSongs: "Play your favorite songs",
+        .shuffleLibrary: "Shuffle your library",
+        .browseAlbums: "Browse your albums",
+        .recentlyPlayed: "Recently played",
+        .noRecentlyPlayed: "No recently played songs",
+        .recentlyPlayedHint: "Play a song to see it here.",
+        .showMore: "Show more",
         .songs: "Songs",
         .albums: "Albums",
         .artists: "Artists",
@@ -735,6 +759,18 @@ enum L10n {
         .add: "添加",
         .cancel: "取消",
         .enterLibraryName: "输入此音乐资料库的名称",
+        .home: "首页",
+        .startListening: "开始聆听",
+        .resumePlayback: "继续播放",
+        .resumeFromTime: "从 %@ 继续",
+        .quickPlay: "快速播放",
+        .playFavoriteSongs: "播放收藏的歌曲",
+        .shuffleLibrary: "从整个资料库开始",
+        .browseAlbums: "浏览资料库中的专辑",
+        .recentlyPlayed: "最近播放",
+        .noRecentlyPlayed: "还没有最近播放的歌曲",
+        .recentlyPlayedHint: "播放音乐后，最近聆听的歌曲会显示在这里。",
+        .showMore: "显示更多",
         .songs: "歌曲",
         .albums: "专辑",
         .artists: "艺人",

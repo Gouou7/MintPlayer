@@ -25,13 +25,25 @@ struct SidebarView: View {
                         )
                         .listRowBackground(Color.clear)
                         .tag(item.selection)
+                        .moveDisabled(item == .home)
                     }
                     .onMove(perform: moveLibraryItems)
                 }
 
                 Section {
                     if isPlaylistsExpanded {
-                        if musicLibrary.playlists.isEmpty {
+                        if !musicLibrary.favoriteSongs.isEmpty {
+                            SidebarRow(
+                                title: settings.text(.favorites),
+                                systemImage: "heart.fill",
+                                isSelected: selection == .favorites
+                            )
+                            .listRowBackground(Color.clear)
+                            .tag(LibrarySelection.favorites)
+                            .moveDisabled(true)
+                        }
+
+                        if musicLibrary.playlists.isEmpty && musicLibrary.favoriteSongs.isEmpty {
                             emptyRow(settings.text(.noPlaylists))
                         } else {
                             ForEach(musicLibrary.playlists, id: \.id) { playlist in
@@ -194,8 +206,8 @@ struct SidebarView: View {
             .split(separator: ",")
             .compactMap { LibrarySidebarItem(rawValue: String($0)) }
         let missingItems = LibrarySidebarItem.allCases.filter { !storedItems.contains($0) }
-        let movableItems = (storedItems + missingItems).filter { $0 != .favorites }
-        return [.favorites] + movableItems
+        let movableItems = (storedItems + missingItems).filter { $0 != .home }
+        return [.home] + movableItems
     }
 
     private var listSelection: Binding<LibrarySelection?> {
@@ -255,14 +267,14 @@ struct SidebarView: View {
     }
 
     private func moveLibraryItems(from source: IndexSet, to destination: Int) {
-        let favoritesIndex = 0
-        let filteredSource = IndexSet(source.filter { $0 != favoritesIndex })
+        let homeIndex = 0
+        let filteredSource = IndexSet(source.filter { $0 != homeIndex })
         guard !filteredSource.isEmpty else { return }
 
         var items = orderedLibraryItems
         items.move(fromOffsets: filteredSource, toOffset: max(destination, 1))
-        items.removeAll { $0 == .favorites }
-        libraryOrderStorage = ([.favorites] + items).map(\.rawValue).joined(separator: ",")
+        items.removeAll { $0 == .home }
+        libraryOrderStorage = ([.home] + items).map(\.rawValue).joined(separator: ",")
     }
 
     private func deletePlaylist(_ playlist: Playlist) {

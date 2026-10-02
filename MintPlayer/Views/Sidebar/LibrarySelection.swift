@@ -1,6 +1,7 @@
 import Foundation
 
 enum LibrarySelection: Hashable {
+    case home
     case songs
     case albums
     case artists

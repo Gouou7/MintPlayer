@@ -7,8 +7,8 @@ struct ListPlaybackControls: View {
     let playAction: () -> Void
     let shuffleAction: () -> Void
 
-    private let buttonWidth: CGFloat = 99
-    private let buttonHeight: CGFloat = 30
+    static let buttonWidth: CGFloat = 99
+    static let buttonHeight: CGFloat = 30
 
     private var isDisabled: Bool {
         songs.isEmpty
@@ -18,13 +18,13 @@ struct ListPlaybackControls: View {
         HStack(spacing: 10) {
             Button(action: playAction) {
                 Label(settings.text(.play), systemImage: "play.fill")
-                    .frame(width: buttonWidth, height: buttonHeight)
+                    .frame(width: Self.buttonWidth, height: Self.buttonHeight)
             }
             .buttonStyle(.borderedProminent)
 
             Button(action: shuffleAction) {
                 Label(settings.text(.shuffle), systemImage: "shuffle")
-                    .frame(width: buttonWidth, height: buttonHeight)
+                    .frame(width: Self.buttonWidth, height: Self.buttonHeight)
             }
             .buttonStyle(.bordered)
         }

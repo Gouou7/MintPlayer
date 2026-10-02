@@ -9,7 +9,7 @@ struct MainView: View {
     @EnvironmentObject private var settings: SettingsManager
 
     @StateObject private var sidebarState = LibrarySidebarState()
-    @State private var selection: LibrarySelection = .songs
+    @State private var selection: LibrarySelection = .home
     @StateObject private var libraryToolbar = LibraryToolbarState()
     @State private var isLyricsMounted = false
     @State private var isLyricsVisible = false
@@ -132,6 +132,11 @@ struct MainView: View {
                 dismissEmbeddedLyrics()
             }
         }
+        .onChange(of: musicLibrary.favoriteSongs.isEmpty) { _, isEmpty in
+            if isEmpty, selection == .favorites {
+                selection = .home
+            }
+        }
     }
 
     private var lyricsPresentationAnimation: Animation {
@@ -140,6 +145,8 @@ struct MainView: View {
 
     private var currentTitle: String {
         switch selection {
+        case .home:
+            return settings.text(.home)
         case .songs:
             return settings.text(.songs)
         case .albums:
@@ -158,6 +165,11 @@ struct MainView: View {
     @ViewBuilder
     private var contentView: some View {
         switch selection {
+        case .home:
+            HomeView { destination in
+                selection = destination
+            }
+            .dropToImport()
         case .songs:
             SongsView(title: settings.text(.songs), subtitle: "\(musicLibrary.songs.count) \(settings.text(.tracks))")
                 .dropToImport()
@@ -476,7 +488,7 @@ private struct CollapsedSidebarNavigationPicker: View {
     @Binding var selection: LibrarySelection
     @EnvironmentObject private var settings: SettingsManager
 
-    private let items: [LibrarySidebarItem] = [.favorites, .songs, .albums, .artists]
+    private let items: [LibrarySidebarItem] = [.home, .songs, .albums, .artists]
 
     var body: some View {
         NativeCollapsedSidebarTabBar(
@@ -500,12 +512,7 @@ private struct CollapsedSidebarNavigationPicker: View {
     }
 
     private func tabTitle(for item: LibrarySidebarItem) -> String {
-        switch item {
-        case .favorites:
-            return settings.effectiveLanguage == .chinese ? "喜欢" : "Favorites"
-        case .songs, .albums, .artists:
-            return item.title(language: settings.effectiveLanguage)
-        }
+        item.title(language: settings.effectiveLanguage)
     }
 }
 
@@ -581,15 +588,15 @@ private struct NativeCollapsedSidebarTabBar: NSViewRepresentable {
 private extension LibrarySidebarItem {
     init?(selection: LibrarySelection) {
         switch selection {
-        case .favorites:
-            self = .favorites
+        case .home:
+            self = .home
         case .songs:
             self = .songs
         case .albums:
             self = .albums
         case .artists:
             self = .artists
-        case .playlist, .folder:
+        case .favorites, .playlist, .folder:
             return nil
         }
     }

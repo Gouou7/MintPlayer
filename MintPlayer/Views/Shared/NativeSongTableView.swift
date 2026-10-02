@@ -3,6 +3,7 @@ import AppKit
 
 struct NativeSongTableView: NSViewRepresentable {
     enum ColumnPreferenceScope: String {
+        case home
         case songs
         case favorites
         case albumDetail
