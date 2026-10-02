@@ -2,13 +2,11 @@ import SwiftUI
 import AppKit
 
 enum MintTheme {
-    // Share an opaque surface across SwiftUI content and AppKit table headers.
-    static let contentBackgroundNSColor = NSColor(name: nil) { appearance in
-        let match = appearance.bestMatch(from: [.darkAqua, .aqua])
-        return NSColor(hex: match == .darkAqua ? 0x202428 : 0xF5F5F5)
+    static var contentBackground: some View {
+        NativeContentBackground()
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
     }
-
-    static let contentBackground = Color(nsColor: contentBackgroundNSColor)
 
     static let textOnAccent = Color.black
     static let activeControl = Color.black
@@ -133,12 +131,15 @@ struct MintContentButtonStyle: ButtonStyle {
     }
 }
 
-private extension NSColor {
-    convenience init(hex: UInt32) {
-        let red = Double((hex >> 16) & 0xFF) / 255.0
-        let green = Double((hex >> 8) & 0xFF) / 255.0
-        let blue = Double(hex & 0xFF) / 255.0
-
-        self.init(calibratedRed: red, green: green, blue: blue, alpha: 1)
+private struct NativeContentBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        // The native content material applies wallpaper tinting without a custom color.
+        view.material = .contentBackground
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
     }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

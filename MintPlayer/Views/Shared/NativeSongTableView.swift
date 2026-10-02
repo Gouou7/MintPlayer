@@ -214,7 +214,7 @@ private final class InteractiveSongTableHeaderView: NSTableHeaderView {
     private var hoverTrackingArea: NSTrackingArea?
     private(set) var hoveredColumn = -1
 
-    override var isOpaque: Bool { true }
+    override var isOpaque: Bool { false }
     override var allowsVibrancy: Bool { false }
 
     override func updateTrackingAreas() {
@@ -254,10 +254,7 @@ private final class InteractiveSongTableHeaderView: NSTableHeaderView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // AppKit still owns mouse tracking; omit its material and border drawing.
-        MintTheme.contentBackgroundNSColor.setFill()
-        bounds.fill()
-
+        // Keep the header transparent so it shares the library's native content material.
         guard let tableView else { return }
         for index in tableView.tableColumns.indices where index != draggedColumn {
             let rect = headerRect(ofColumn: index)
@@ -285,9 +282,6 @@ private final class InteractiveSongTableHeaderView: NSTableHeaderView {
 
 private final class FlatSongTableHeaderCell: NSTableHeaderCell {
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
-        MintTheme.contentBackgroundNSColor.setFill()
-        cellFrame.fill()
-
         let headerView = controlView as? InteractiveSongTableHeaderView
         let tableView = headerView?.tableView
         let columnIndex = tableView?.tableColumns.firstIndex { $0.headerCell === self }
@@ -333,7 +327,7 @@ private final class FlatSongTableHeaderCell: NSTableHeaderCell {
 
     override func highlight(_ flag: Bool, withFrame cellFrame: NSRect, in controlView: NSView) {
         isHighlighted = flag
-        draw(withFrame: cellFrame, in: controlView)
+        controlView.setNeedsDisplay(cellFrame)
     }
 }
 
