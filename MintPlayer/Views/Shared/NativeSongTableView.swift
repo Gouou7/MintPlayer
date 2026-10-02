@@ -1329,7 +1329,7 @@ final class SongContextMenuController: NSObject {
 
             let submenu = NSMenu()
             for playlist in playlists {
-                let item = menuItem(playlist.name, systemImage: "plus", action: #selector(addToPlaylist(_:)))
+                let item = menuItem(playlist.name, systemImage: "music.note.list", action: #selector(addToPlaylist(_:)))
                 item.representedObject = playlist.id.uuidString
                 submenu.addItem(item)
             }

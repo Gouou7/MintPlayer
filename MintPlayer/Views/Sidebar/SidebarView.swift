@@ -42,19 +42,15 @@ struct SidebarView: View {
                                 )
                                 .listRowBackground(Color.clear)
                                 .tag(LibrarySelection.playlist(playlist.id))
-                                .contextMenu {
-                                    Button {
-                                        editPlaylist(playlist)
-                                    } label: {
-                                        Label(settings.text(.editPlaylistAction), systemImage: "pencil")
-                                    }
-
-                                    Button {
-                                        playlistPendingDeletion = playlist
-                                    } label: {
-                                        Label(settings.text(.deletePlaylist), systemImage: "trash")
-                                            .foregroundStyle(.red)
-                                    }
+                                .overlay {
+                                    SidebarContextMenu(items: [
+                                        .init(title: settings.text(.editPlaylistAction), systemImage: "pencil") {
+                                            editPlaylist(playlist)
+                                        },
+                                        .init(title: settings.text(.deletePlaylist), systemImage: "trash") {
+                                            playlistPendingDeletion = playlist
+                                        }
+                                    ])
                                 }
                                 .background {
                                     PlaylistDropDestination(
@@ -96,13 +92,12 @@ struct SidebarView: View {
                                 )
                                 .listRowBackground(Color.clear)
                                 .tag(LibrarySelection.folder(source.id))
-                                .contextMenu {
-                                    Button {
-                                        folderPendingDeletion = source
-                                    } label: {
-                                        Label(settings.text(.deleteFolder), systemImage: "trash")
-                                            .foregroundStyle(.red)
-                                    }
+                                .overlay {
+                                    SidebarContextMenu(items: [
+                                        .init(title: settings.text(.deleteFolder), systemImage: "trash") {
+                                            folderPendingDeletion = source
+                                        }
+                                    ])
                                 }
                             }
                         }
@@ -304,6 +299,60 @@ struct SidebarView: View {
         musicLibrary.removeLibrarySource(id: source.id)
         if selection == .folder(source.id) {
             selection = .songs
+        }
+    }
+}
+
+private struct SidebarContextMenu: NSViewRepresentable {
+    struct Item {
+        let title: String
+        let systemImage: String
+        let action: () -> Void
+    }
+
+    let items: [Item]
+
+    func makeNSView(context: Context) -> MenuView {
+        MenuView()
+    }
+
+    func updateNSView(_ nsView: MenuView, context: Context) {
+        nsView.configure(items: items)
+    }
+
+    static func dismantleNSView(_ nsView: MenuView, coordinator: ()) {
+        nsView.menu = nil
+    }
+
+    final class MenuView: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            guard let event = NSApp.currentEvent else { return nil }
+            let isContextClick = event.type == .rightMouseDown
+                || (event.type == .leftMouseDown && event.modifierFlags.contains(.control))
+            // Ordinary clicks and drag events must keep reaching the SwiftUI sidebar row.
+            return isContextClick ? super.hitTest(point) : nil
+        }
+
+        func configure(items: [Item]) {
+            let menu = NSMenu()
+            menu.autoenablesItems = false
+            for item in items {
+                let menuItem = NSMenuItem(title: item.title, action: #selector(performAction(_:)), keyEquivalent: "")
+                menuItem.target = self
+                menuItem.representedObject = item
+                menuItem.image = NSImage(systemSymbolName: item.systemImage, accessibilityDescription: item.title)
+                menuItem.image?.isTemplate = true
+                if #available(macOS 27.0, *) {
+                    // Invoke the public property through KVC so the project also builds with the macOS 26 SDK.
+                    menuItem.setValue(1, forKey: "preferredImageVisibility")
+                }
+                menu.addItem(menuItem)
+            }
+            self.menu = menu
+        }
+
+        @objc private func performAction(_ sender: NSMenuItem) {
+            (sender.representedObject as? Item)?.action()
         }
     }
 }
