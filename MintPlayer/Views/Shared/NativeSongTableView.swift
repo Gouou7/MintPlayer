@@ -211,11 +211,74 @@ private final class InteractiveSongTableView: NSTableView {
 
 private final class InteractiveSongTableHeaderView: NSTableHeaderView {
     weak var menuProvider: SongTableHeaderMenuProvider?
+    private let backgroundView = SongTableHeaderBackgroundView()
+    private let contentView = SongTableHeaderContentView()
+    private var isInvalidatingContent = false
     private var hoverTrackingArea: NSTrackingArea?
     private(set) var hoveredColumn = -1
 
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        configureSubviews()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureSubviews()
+    }
+
     override var isOpaque: Bool { false }
     override var allowsVibrancy: Bool { false }
+
+    override var needsDisplay: Bool {
+        didSet {
+            if needsDisplay {
+                invalidateContent()
+            }
+        }
+    }
+
+    override func setNeedsDisplay(_ invalidRect: NSRect) {
+        super.setNeedsDisplay(invalidRect)
+        invalidateContent()
+    }
+
+    override func layout() {
+        super.layout()
+        backgroundView.frame = bounds
+        contentView.frame = bounds
+        contentView.bounds = bounds
+    }
+
+    private func configureSubviews() {
+        wantsLayer = true
+        clipsToBounds = true
+        backgroundView.material = .contentBackground
+        backgroundView.blendingMode = .behindWindow
+        backgroundView.state = .followsWindowActiveState
+        backgroundView.frame = bounds
+        backgroundView.autoresizingMask = [.width, .height]
+        addSubview(backgroundView)
+
+        // Keep foreground drawing in its own layer above the material, rather than
+        // flattening header text into an ancestor beneath the visual effect view.
+        contentView.headerView = self
+        contentView.wantsLayer = true
+        contentView.clipsToBounds = true
+        contentView.layerContentsRedrawPolicy = .duringViewResize
+        contentView.frame = bounds
+        contentView.bounds = bounds
+        contentView.autoresizingMask = [.width, .height]
+        addSubview(contentView, positioned: .above, relativeTo: backgroundView)
+        contentView.needsDisplay = true
+    }
+
+    private func invalidateContent() {
+        guard !isInvalidatingContent else { return }
+        isInvalidatingContent = true
+        contentView.needsDisplay = true
+        isInvalidatingContent = false
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -254,18 +317,7 @@ private final class InteractiveSongTableHeaderView: NSTableHeaderView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // Keep the header transparent so it shares the library's native content material.
-        guard let tableView else { return }
-        for index in tableView.tableColumns.indices where index != draggedColumn {
-            let rect = headerRect(ofColumn: index)
-            guard rect.intersects(dirtyRect) else { continue }
-            tableView.tableColumns[index].headerCell.draw(withFrame: rect, in: self)
-        }
-
-        if tableView.tableColumns.indices.contains(draggedColumn) {
-            let rect = headerRect(ofColumn: draggedColumn).offsetBy(dx: draggedDistance, dy: 0)
-            tableView.tableColumns[draggedColumn].headerCell.draw(withFrame: rect, in: self)
-        }
+        // Subviews draw the material and text; this native header still owns all interactions.
     }
 
     private func updateHoveredColumn(with event: NSEvent) {
@@ -277,6 +329,30 @@ private final class InteractiveSongTableHeaderView: NSTableHeaderView {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         menuProvider?.columnVisibilityMenu()
+    }
+}
+
+private final class SongTableHeaderContentView: NSView {
+    weak var headerView: InteractiveSongTableHeaderView?
+
+    override var isFlipped: Bool { headerView?.isFlipped ?? true }
+    override var allowsVibrancy: Bool { false }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let headerView, let tableView = headerView.tableView else { return }
+        for index in tableView.tableColumns.indices where index != headerView.draggedColumn {
+            let rect = headerView.headerRect(ofColumn: index)
+            guard rect.intersects(dirtyRect) else { continue }
+            tableView.tableColumns[index].headerCell.draw(withFrame: rect, in: headerView)
+        }
+
+        if tableView.tableColumns.indices.contains(headerView.draggedColumn) {
+            let rect = headerView.headerRect(ofColumn: headerView.draggedColumn)
+                .offsetBy(dx: headerView.draggedDistance, dy: 0)
+            tableView.tableColumns[headerView.draggedColumn].headerCell.draw(withFrame: rect, in: headerView)
+        }
     }
 }
 
@@ -369,6 +445,10 @@ private final class InsetSongScrollView: NSScrollView {
     }
 }
 
+private final class SongTableHeaderBackgroundView: NSVisualEffectView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
 private extension NSEdgeInsets {
     func isApproximatelyEqual(to other: NSEdgeInsets) -> Bool {
         abs(top - other.top) < 0.5 &&
@@ -449,10 +529,10 @@ extension NativeSongTableView {
         }
 
         func configureScrollBehavior(_ scrollView: NSScrollView, for style: Style) {
-            let shouldResizeColumns = style != .compactFolder
-            scrollView.hasHorizontalScroller = false
-            scrollView.autohidesScrollers = shouldResizeColumns
-            tableView?.columnAutoresizingStyle = shouldResizeColumns ? .noColumnAutoresizing : .lastColumnOnlyAutoresizingStyle
+            // Folder columns can grow independently without being constrained by the last column.
+            scrollView.hasHorizontalScroller = style == .compactFolder
+            scrollView.autohidesScrollers = true
+            tableView?.columnAutoresizingStyle = .noColumnAutoresizing
         }
 
         func configureContentInsets(_ scrollView: NSScrollView) {

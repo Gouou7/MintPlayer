@@ -191,10 +191,11 @@ struct MainView: View {
             }
         case .folder(let id):
             if let source = musicLibrary.librarySources.first(where: { $0.id == id }) {
+                let sourceSongs = musicLibrary.songs(in: source)
                 SongsView(
                     title: source.name,
-                    subtitle: source.path,
-                    scopedSongs: musicLibrary.songs(in: source),
+                    subtitle: "\(sourceSongs.count) \(settings.text(.tracks)) · \(source.path)",
+                    scopedSongs: sourceSongs,
                     presentation: .table,
                     columnPreferenceScope: .folder
                 )
