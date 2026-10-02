@@ -9,156 +9,144 @@ enum SidebarWidth {
 
 final class LibrarySidebarState: ObservableObject {
     private static let defaultsKey = AppConfiguration.userDefaultsKey("sidebar.isCollapsed")
-    @Published private(set) var isCollapsed = UserDefaults.standard.bool(forKey: LibrarySidebarState.defaultsKey)
-    fileprivate var toggleAction: (() -> Void)?
 
-    func toggle() {
-        toggleAction?()
+    @Published var columnVisibility: NavigationSplitViewVisibility {
+        didSet {
+            guard columnVisibility != oldValue else { return }
+            switch columnVisibility {
+            case .detailOnly:
+                UserDefaults.standard.set(true, forKey: Self.defaultsKey)
+            case .all, .doubleColumn:
+                UserDefaults.standard.set(false, forKey: Self.defaultsKey)
+            default:
+                break
+            }
+        }
     }
 
-    fileprivate func didToggle(_ collapsed: Bool) {
-        guard isCollapsed != collapsed else { return }
-        isCollapsed = collapsed
-        UserDefaults.standard.set(collapsed, forKey: Self.defaultsKey)
+    var isCollapsed: Bool { columnVisibility == .detailOnly }
+
+    init() {
+        columnVisibility = UserDefaults.standard.bool(forKey: Self.defaultsKey) ? .detailOnly : .all
+    }
+
+    func toggle() {
+        columnVisibility = isCollapsed ? .all : .detailOnly
     }
 }
 
-/// Owns the split controller so SwiftUI never rewrites its items or interrupts its animator.
-struct NativeLibrarySplitView<Sidebar: View, Detail: View>: NSViewControllerRepresentable {
-    let sidebarState: LibrarySidebarState
+/// Lets NavigationSplitView own the sidebar button, toolbar sections, and collapse animation.
+struct NativeLibrarySplitView<Sidebar: View, Detail: View>: View {
+    @ObservedObject var sidebarState: LibrarySidebarState
     let minimumDetailWidth: CGFloat
     let toolbar: LibraryToolbarState
     @ViewBuilder var sidebar: () -> Sidebar
     @ViewBuilder var detail: () -> Detail
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(toolbar: toolbar, sidebarState: sidebarState)
-    }
-
-    func makeNSViewController(context: Context) -> Controller {
-        let controller = Controller(
-            sidebar: AnyView(sidebar().environment(\.self, context.environment)),
-            detail: hostedDetail(context: context),
-            isSidebarCollapsed: sidebarState.isCollapsed,
-            minimumDetailWidth: minimumDetailWidth
-        )
-        controller.reducesMotion = context.environment.accessibilityReduceMotion
-        controller.onCollapsedChanged = { [weak sidebarState] collapsed in
-            sidebarState?.didToggle(collapsed)
-        }
-        sidebarState.toggleAction = { [weak controller] in
-            controller?.toggleFromToolbar()
-        }
-        return controller
-    }
-
-    func updateNSViewController(_ controller: Controller, context: Context) {
-        controller.sidebarHost.rootView = AnyView(sidebar().environment(\.self, context.environment))
-        controller.detailHost.rootView = hostedDetail(context: context)
-        controller.reducesMotion = context.environment.accessibilityReduceMotion
-    }
-
-    static func dismantleNSViewController(_ controller: Controller, coordinator: Coordinator) {
-        coordinator.isActive = false
-        coordinator.sidebarState.toggleAction = nil
-        controller.onCollapsedChanged = nil
-    }
-
-    private func hostedDetail(context: Context) -> AnyView {
-        let coordinator = context.coordinator
-        return AnyView(
-            detail()
-                .environment(\.self, context.environment)
-                .onPreferenceChange(LibraryToolbarPreferenceKey.self) { configuration in
-                    coordinator.receive(configuration)
+    var body: some View {
+        NavigationSplitView(columnVisibility: $sidebarState.columnVisibility) {
+            sidebar()
+                .navigationSplitViewColumnWidth(
+                    min: SidebarWidth.minimum,
+                    ideal: SidebarWidth.ideal,
+                    max: SidebarWidth.maximum
+                )
+                .background {
+                    SidebarColumnWidthConfigurator()
+                        .frame(width: 0, height: 0)
                 }
-        )
+        } detail: {
+            detail()
+                .frame(minWidth: minimumDetailWidth)
+                .onPreferenceChange(LibraryToolbarPreferenceKey.self) { configuration in
+                    toolbar.update(configuration)
+                }
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+}
+
+private struct SidebarColumnWidthConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> HostView {
+        HostView()
     }
 
-    final class Coordinator {
-        let sidebarState: LibrarySidebarState
-        private let toolbar: LibraryToolbarState
-        private var generation = 0
-        var isActive = true
-
-        init(toolbar: LibraryToolbarState, sidebarState: LibrarySidebarState) {
-            self.toolbar = toolbar
-            self.sidebarState = sidebarState
-        }
-
-        func receive(_ configuration: LibraryToolbarConfiguration) {
-            generation += 1
-            let currentGeneration = generation
-            // Deliver preferences outside the hosted SwiftUI update, without rebuilding the split view.
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.isActive, self.generation == currentGeneration else { return }
-                self.toolbar.update(configuration)
-            }
-        }
+    func updateNSView(_ nsView: HostView, context: Context) {
+        nsView.configureWidth()
     }
 
-    final class Controller: NSSplitViewController {
-        let sidebarHost: NSHostingController<AnyView>
-        let detailHost: NSHostingController<AnyView>
-        private let sidebarItem: NSSplitViewItem
-        var reducesMotion = false
-        var onCollapsedChanged: ((Bool) -> Void)?
+    static func dismantleNSView(_ nsView: HostView, coordinator: ()) {
+        nsView.restoreWidth()
+    }
 
-        init(sidebar: AnyView, detail: AnyView, isSidebarCollapsed: Bool, minimumDetailWidth: CGFloat) {
-            let sidebarController = NSHostingController(rootView: sidebar)
-            sidebarHost = sidebarController
-            detailHost = NSHostingController(rootView: detail)
-            sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebarController)
-            super.init(nibName: nil, bundle: nil)
+    final class HostView: NSView {
+        private weak var configuredItem: NSSplitViewItem?
+        private var originalMinimum = NSSplitViewItem.unspecifiedDimension
+        private var originalMaximum = NSSplitViewItem.unspecifiedDimension
 
-            // Only the split items set pane minimums. A hosting view's fitting size must not grow
-            // the window when the sidebar opens. 300 + 648 + divider fits the 980-point window.
-            sidebarHost.sizingOptions = []
-            detailHost.sizingOptions = []
-            minimumThicknessForInlineSidebars = 0
-            sidebarItem.minimumThickness = SidebarWidth.minimum
-            sidebarItem.maximumThickness = SidebarWidth.maximum
-            sidebarItem.canCollapse = false
-            sidebarItem.canCollapseFromWindowResize = false
-            sidebarItem.isSpringLoaded = false
-            sidebarItem.preferredThicknessFraction = NSSplitViewItem.unspecifiedDimension
-            // Hold the sidebar ahead of the detail (250), but yield to native divider drags (490).
-            sidebarItem.holdingPriority = NSLayoutConstraint.Priority(rawValue: 260)
-            sidebarItem.collapseBehavior = .preferResizingSiblingsWithFixedSplitView
-            sidebarItem.isCollapsed = isSidebarCollapsed
-
-            let detailItem = NSSplitViewItem(viewController: detailHost)
-            detailItem.minimumThickness = minimumDetailWidth
-            detailItem.holdingPriority = .defaultLow
-            addSplitViewItem(sidebarItem)
-            addSplitViewItem(detailItem)
-
-            // A low-priority initial width yields to AppKit's native divider dragging and restoration.
-            let initialWidth = sidebarHost.view.widthAnchor.constraint(equalToConstant: SidebarWidth.ideal)
-            initialWidth.priority = NSLayoutConstraint.Priority(rawValue: 249)
-            initialWidth.isActive = true
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            configureWidth()
         }
 
-        required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            configureWidth()
         }
 
-        override func viewDidLoad() {
-            super.viewDidLoad()
-            splitView.isVertical = true
-            splitView.dividerStyle = .thin
+        override func layout() {
+            super.layout()
+            configureWidth()
         }
 
-        func toggleFromToolbar() {
-            let collapsed = !sidebarItem.isCollapsed
-            if reducesMotion {
-                sidebarItem.isCollapsed = collapsed
-            } else {
-                // Programmatic collapse remains available when canCollapse disables user gestures.
-                // Animate the item itself instead of routing through the controller's toggle action.
-                sidebarItem.animator().isCollapsed = collapsed
+        func configureWidth() {
+            var ancestor = superview
+            while let view = ancestor {
+                if let splitView = view as? NSSplitView,
+                   let controller = splitViewController(for: splitView),
+                   let item = controller.splitViewItems.first(where: {
+                       $0.behavior == .sidebar && isDescendant(of: $0.viewController.view)
+                   }) {
+                    if configuredItem !== item {
+                        restoreWidth()
+                        configuredItem = item
+                        originalMinimum = item.minimumThickness
+                        originalMaximum = item.maximumThickness
+                    }
+
+                    // SwiftUI column widths are preferences; AppKit enforces divider limits.
+                    if item.minimumThickness != SidebarWidth.minimum {
+                        item.minimumThickness = SidebarWidth.minimum
+                    }
+                    if item.maximumThickness != SidebarWidth.maximum {
+                        item.maximumThickness = SidebarWidth.maximum
+                    }
+                    return
+                }
+                ancestor = view.superview
             }
-            onCollapsedChanged?(collapsed)
+        }
+
+        private func splitViewController(for splitView: NSSplitView) -> NSSplitViewController? {
+            if let controller = splitView.delegate as? NSSplitViewController {
+                return controller
+            }
+
+            var responder = splitView.nextResponder
+            while let current = responder {
+                if let controller = current as? NSSplitViewController, controller.splitView === splitView {
+                    return controller
+                }
+                responder = current.nextResponder
+            }
+            return nil
+        }
+
+        func restoreWidth() {
+            guard let item = configuredItem else { return }
+            configuredItem = nil
+            item.minimumThickness = originalMinimum
+            item.maximumThickness = originalMaximum
         }
     }
 }

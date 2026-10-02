@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Carries page controls across the native hosting boundary to the existing window toolbar.
+/// Describes the current page's controls for the library toolbar.
 struct LibraryToolbarConfiguration: Equatable {
     let revision = UUID()
     var id = ""

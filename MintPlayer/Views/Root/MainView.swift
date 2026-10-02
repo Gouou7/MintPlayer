@@ -26,6 +26,7 @@ struct MainView: View {
                 toolbar: libraryToolbar
             ) {
                 SidebarView(selection: $selection)
+                    .toolbar(removing: isLyricsMounted ? .sidebarToggle : nil)
             } detail: {
                 ZStack(alignment: .bottom) {
                     contentView
@@ -40,9 +41,13 @@ struct MainView: View {
                     .padding(.bottom, 20)
                 }
                 .background(MintTheme.contentBackground)
+                .navigationTitle(isLyricsMounted ? "" : currentTitle)
+                .toolbar {
+                    if !isLyricsMounted {
+                        libraryToolbarItems
+                    }
+                }
             }
-            .ignoresSafeArea(.container, edges: .top)
-            .navigationTitle(isLyricsMounted ? "" : currentTitle)
             .scrollEdgeEffectStyle(.soft, for: .top)
             .disabled(isLyricsMounted)
             .accessibilityHidden(isLyricsMounted)
@@ -76,45 +81,6 @@ struct MainView: View {
                         .accessibilityLabel(settings.text(.close))
                     }
                 }
-            } else {
-                ToolbarItem(id: "library.sidebar", placement: .navigation) {
-                    Button(action: sidebarState.toggle) {
-                        Label(
-                            settings.text(sidebarState.isCollapsed ? .showSidebar : .hideSidebar),
-                            systemImage: "sidebar.left"
-                        )
-                    }
-                    .labelStyle(.iconOnly)
-                    .help(settings.text(sidebarState.isCollapsed ? .showSidebar : .hideSidebar))
-                }
-
-                if let backTitle = libraryToolbar.appearance.backTitle {
-                    ToolbarItem(placement: .navigation) {
-                        Button(action: libraryToolbar.goBack) {
-                            Label(backTitle, systemImage: "chevron.left")
-                        }
-                        .labelStyle(.iconOnly)
-                    }
-                }
-
-                if sidebarState.isCollapsed {
-                    ToolbarItem(placement: .principal) {
-                        CollapsedSidebarNavigationPicker(selection: $selection)
-                    }
-                }
-
-                if libraryToolbar.appearance.showsSort {
-                    ToolbarItem(placement: .primaryAction) {
-                        SongSortButton(sortOrder: libraryToolbar.sortOrder)
-                    }
-                    ToolbarSpacer(.fixed, placement: .primaryAction)
-                }
-
-                if let prompt = libraryToolbar.appearance.searchPrompt {
-                    ToolbarItem(placement: .primaryAction) {
-                        NativeToolbarSearchField(text: libraryToolbar.searchText, prompt: prompt)
-                    }
-                }
             }
         }
         .frame(minWidth: 980, minHeight: 600)
@@ -135,6 +101,37 @@ struct MainView: View {
         .onChange(of: musicLibrary.favoriteSongs.isEmpty) { _, isEmpty in
             if isEmpty, selection == .favorites {
                 selection = .home
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var libraryToolbarItems: some ToolbarContent {
+        if let backTitle = libraryToolbar.appearance.backTitle {
+            ToolbarItem(placement: .navigation) {
+                Button(action: libraryToolbar.goBack) {
+                    Label(backTitle, systemImage: "chevron.left")
+                }
+                .labelStyle(.iconOnly)
+            }
+        }
+
+        if sidebarState.isCollapsed {
+            ToolbarItem(placement: .principal) {
+                CollapsedSidebarNavigationPicker(selection: $selection)
+            }
+        }
+
+        if libraryToolbar.appearance.showsSort {
+            ToolbarItem(placement: .primaryAction) {
+                SongSortButton(sortOrder: libraryToolbar.sortOrder)
+            }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+        }
+
+        if let prompt = libraryToolbar.appearance.searchPrompt {
+            ToolbarItem(placement: .primaryAction) {
+                NativeToolbarSearchField(text: libraryToolbar.searchText, prompt: prompt)
             }
         }
     }
