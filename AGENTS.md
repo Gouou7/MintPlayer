@@ -121,7 +121,6 @@ Debug 使用 `Mint Player Debug.app`、Bundle ID `dev.govo.mintplayer.debug`、A
 - `README.md` 为仓库默认入口，使用中文；`README.en.md` 是对应的英文版。用户要求或你认为非常有必要时可修改 `README.md`，内容要精简，并保持中英文两份文档内容同步。
 - README 面向使用者，不要在其中引用本文件；`AGENTS.md`（即本文档）面向改代码的人与 Agent。
 - 改动 README 后逐项核对两份的章节标题与条目数量；任一侧缺失时，以用户当前交流的语言版本为准补齐另一侧。
-- `docs/` 下的使用说明同样中英成对（`docs/mcp.md` 与 `docs/mcp.en.md`），README 只保留摘要与链接。
 - `CHANGELOG.md` 记录用户可感知的软件变更日志。每次修改代码后应同步在顶部 `Unreleased` 区写入变更；条目一条一改动，用短句描述用户可感知的结果，不写技术细节。已发布版本的条目不再改动。
 - 文档维护本身不写入 `CHANGELOG.md`，除非文档内容属于项目功能。
 
