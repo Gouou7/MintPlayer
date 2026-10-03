@@ -1117,6 +1117,8 @@ struct SyncedLyricsView: View {
 }
 
 private struct LyricLineRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let line: LyricLine
     let distanceFromActiveLine: Int
     let isBlurEnabled: Bool
@@ -1127,12 +1129,20 @@ private struct LyricLineRow: View {
         Text(line.text)
             .font(.system(size: style == .widget ? 12 : 24, weight: .semibold))
             .lineSpacing(style == .widget ? 2 : 8)
-            .foregroundStyle(distanceFromActiveLine == 0 ? Color.primary : Color.secondary)
+            .foregroundStyle(foregroundColor)
             .opacity(opacity)
             .blur(radius: blurRadius)
             .frame(minHeight: style == .widget ? 25 : nil, alignment: .leading)
             .contentShape(Rectangle())
             .animation(transitionAnimation, value: distanceFromActiveLine)
+    }
+
+    private var foregroundColor: Color {
+        if style == .widget {
+            let foreground: Color = colorScheme == .dark ? .white : .black
+            return distanceFromActiveLine == 0 ? foreground : foreground.opacity(0.78)
+        }
+        return distanceFromActiveLine == 0 ? .primary : .secondary
     }
 
     private var blurRadius: CGFloat {
@@ -1173,6 +1183,7 @@ private struct LyricLineRow: View {
     }
 
     private var opacity: Double {
+        if style == .widget { return 1 }
         switch distanceFromActiveLine {
         case 0:
             return 0.98

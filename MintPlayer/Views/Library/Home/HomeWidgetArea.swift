@@ -247,6 +247,7 @@ private struct HomeListeningWidget: View {
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
     let suggestedSong: Song?
 
     private var song: Song? {
@@ -271,27 +272,35 @@ private struct HomeListeningWidget: View {
                 Spacer(minLength: 8)
                 Button {
                     guard let song else { return }
-                    if audioPlayer.currentSong != nil {
-                        audioPlayer.togglePlayPause()
+                    if audioPlayer.isPlaying {
+                        audioPlayer.next()
+                    } else if audioPlayer.currentSong != nil {
+                        audioPlayer.resume()
                     } else {
                         audioPlayer.play(song: song, in: musicLibrary.songs)
                     }
                 } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: song != nil && audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 20))
-                            .frame(width: 20, height: 20)
-                        Text(buttonTitle)
-                            .font(.system(size: 14, weight: .semibold))
+                    ZStack {
+                        HStack(spacing: 8) {
+                            Image(systemName: audioPlayer.isPlaying ? "forward.fill" : "play.fill")
+                                .font(.system(size: 20))
+                                .frame(width: 20, height: 20)
+                            Text(buttonTitle)
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .id(buttonTitle)
+                        .transition(.blurReplace)
                     }
                     .lineLimit(1)
                     .frame(width: 114, height: 43)
                     .background(Color.primary.opacity(0.10), in: Capsule())
+                    .animation(reducesMotion ? nil : .easeInOut(duration: 0.22), value: buttonTitle)
                 }
                 .buttonStyle(MintContentButtonStyle(cornerRadius: 21.5, hoverOutset: 0))
                 .fixedSize()
                 .disabled(song == nil || musicLibrary.songs.isEmpty)
-                .help(song == nil ? settings.text(.noSongsYet) : playbackCaption)
+                .help(song == nil ? settings.text(.noSongsYet) : (audioPlayer.isPlaying ? buttonTitle : playbackCaption))
+                .accessibilityLabel(buttonTitle)
             }
             .frame(maxWidth: .infinity, minHeight: 134, maxHeight: 134, alignment: .topLeading)
         }
@@ -300,9 +309,7 @@ private struct HomeListeningWidget: View {
     }
 
     private var buttonTitle: String {
-        if song == nil { return settings.text(.play) }
-        if audioPlayer.isPlaying { return settings.text(.pause) }
-        return settings.text(audioPlayer.currentSong == nil ? .play : .resumePlayback)
+        settings.text(audioPlayer.isPlaying ? .nextTrack : .resumePlayback)
     }
 
     private var playbackCaption: String {

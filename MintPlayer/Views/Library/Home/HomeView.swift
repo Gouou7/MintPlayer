@@ -147,24 +147,8 @@ struct HomeView: View {
 
     private var recentlyPlayedSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(settings.text(.recentlyPlayed))
-                    .font(.title2.bold())
-                Spacer()
-                if recentSongs.count > recentSongLimit {
-                    Button {
-                        recentSearchText = ""
-                        rebuildDisplayedRecentSongs()
-                        withAnimation(pageSwitchAnimation) {
-                            showsRecentSongs = true
-                        }
-                    } label: {
-                        Label(settings.text(.showMore), systemImage: "chevron.right")
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.secondary)
-                }
-            }
+            Text(settings.text(.recentlyPlayed))
+                .font(.title2.bold())
             if recentSongs.isEmpty {
                 EmptyStateView(
                     title: settings.text(.noRecentlyPlayed),
@@ -180,6 +164,19 @@ struct HomeView: View {
                     sortOrder: sortOrderBinding
                 )
                 .frame(height: CGFloat(displayedSongs.count) * 60 + 36)
+            }
+            if recentSongs.count > recentSongLimit {
+                Button {
+                    recentSearchText = ""
+                    rebuildDisplayedRecentSongs()
+                    withAnimation(pageSwitchAnimation) {
+                        showsRecentSongs = true
+                    }
+                } label: {
+                    Label(settings.text(.showMore), systemImage: "chevron.right")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
             }
         }
     }

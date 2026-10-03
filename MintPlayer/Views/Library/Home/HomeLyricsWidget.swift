@@ -5,6 +5,7 @@ struct HomeLyricsWidget: View {
 
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var settings: SettingsManager
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reducesMotion
 
     @State private var lyricsState: LyricsLoadState = .loading
@@ -25,7 +26,7 @@ struct HomeLyricsWidget: View {
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .scaleEffect(1.2)
                         .blur(radius: 18)
-                        .overlay(Color.black.opacity(0.28))
+                        .overlay(backgroundOverlay)
                         .clipped()
                         .transaction { transaction in
                             if reducesMotion { transaction.disablesAnimations = true }
@@ -42,7 +43,6 @@ struct HomeLyricsWidget: View {
         .help(settings.text(.showFullScreenLyrics))
         .accessibilityLabel(settings.text(.showFullScreenLyrics))
         .accessibilityValue(lyricsAccessibilityValue)
-        .environment(\.colorScheme, .dark)
         .task(id: lyricsRequest) {
             guard let song = audioPlayer.currentSong, let request = lyricsRequest else {
                 lyricsState = .loading
@@ -87,7 +87,7 @@ struct HomeLyricsWidget: View {
                             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                                 Text(line)
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(lyricsForeground.opacity(0.78))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
@@ -107,7 +107,15 @@ struct HomeLyricsWidget: View {
         ProgressView(settings.text(.lyricsLoading))
             .controlSize(.small)
             .font(.caption)
-            .foregroundStyle(.white.opacity(0.85))
+            .foregroundStyle(lyricsForeground.opacity(0.85))
+    }
+
+    private var backgroundOverlay: Color {
+        colorScheme == .dark ? .black.opacity(0.60) : .white.opacity(0.66)
+    }
+
+    private var lyricsForeground: Color {
+        colorScheme == .dark ? .white : .black
     }
 
     private var lyricsAccessibilityValue: String {
@@ -141,10 +149,10 @@ struct HomeLyricsWidget: View {
                 .font(.headline)
             Text(detail)
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.72))
+                .foregroundStyle(lyricsForeground.opacity(0.78))
                 .lineLimit(3)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(lyricsForeground)
         .multilineTextAlignment(.center)
         .padding(16)
         .help(detail)

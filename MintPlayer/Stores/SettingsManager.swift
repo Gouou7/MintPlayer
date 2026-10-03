@@ -288,6 +288,7 @@ enum L10n {
         case home
         case startListening
         case resumePlayback
+        case nextTrack
         case resumeFromTime
         case quickPlay
         case addWidget
@@ -539,6 +540,7 @@ enum L10n {
         .home: "Home",
         .startListening: "Start listening",
         .resumePlayback: "Resume",
+        .nextTrack: "Next Track",
         .resumeFromTime: "Continue from %@",
         .quickPlay: "Quick play",
         .addWidget: "Add Widget",
@@ -778,6 +780,7 @@ enum L10n {
         .home: "首页",
         .startListening: "开始聆听",
         .resumePlayback: "继续播放",
+        .nextTrack: "下一曲",
         .resumeFromTime: "从 %@ 继续",
         .quickPlay: "快速播放",
         .addWidget: "添加小组件",
