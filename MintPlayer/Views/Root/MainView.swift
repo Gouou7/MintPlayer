@@ -48,7 +48,8 @@ struct MainView: View {
                     }
                 }
             }
-            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.automatic, for: .top)
+            .scrollEdgeEffectHidden(false, for: .top)
             .disabled(isLyricsMounted)
             .accessibilityHidden(isLyricsMounted)
 
@@ -163,9 +164,10 @@ struct MainView: View {
     private var contentView: some View {
         switch selection {
         case .home:
-            HomeView { destination in
-                selection = destination
-            }
+            HomeView(
+                onNavigate: { destination in selection = destination },
+                onShowLyrics: showFullScreenLyrics
+            )
             .dropToImport()
         case .songs:
             SongsView(title: settings.text(.songs), subtitle: "\(musicLibrary.songs.count) \(settings.text(.tracks))")
@@ -213,6 +215,11 @@ struct MainView: View {
                 EmptyStateView(title: settings.text(.folderNotFound), systemImage: "folder")
             }
         }
+    }
+
+    private func showFullScreenLyrics() {
+        guard audioPlayer.currentSong != nil else { return }
+        presentEmbeddedLyrics()
     }
 
     private func showLyrics() {

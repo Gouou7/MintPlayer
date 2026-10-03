@@ -31,7 +31,8 @@ struct LibrarySettingsView: View {
             aboutSettings
         }
         .formStyle(.grouped)
-        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.automatic, for: .top)
+        .scrollEdgeEffectHidden(false, for: .top)
         .frame(minWidth: 620, minHeight: 640)
         .background {
             SettingsWindowConfigurator()

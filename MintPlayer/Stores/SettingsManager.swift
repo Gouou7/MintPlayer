@@ -290,6 +290,14 @@ enum L10n {
         case resumePlayback
         case resumeFromTime
         case quickPlay
+        case addWidget
+        case removeWidget
+        case removeThisWidget
+        case addWidgetsHint
+        case favoriteWidgetSubtitle
+        case shuffleWidgetSubtitle
+        case lyricsWidgetIdle
+        case showFullScreenLyrics
         case playFavoriteSongs
         case shuffleLibrary
         case browseAlbums
@@ -533,6 +541,14 @@ enum L10n {
         .resumePlayback: "Resume",
         .resumeFromTime: "Continue from %@",
         .quickPlay: "Quick play",
+        .addWidget: "Add Widget",
+        .removeWidget: "Remove Widget",
+        .removeThisWidget: "Remove This Widget",
+        .addWidgetsHint: "Right-click to add a widget",
+        .favoriteWidgetSubtitle: "Revisit favorites",
+        .shuffleWidgetSubtitle: "All library songs",
+        .lyricsWidgetIdle: "Play a song to see lyrics",
+        .showFullScreenLyrics: "Show Full-Screen Lyrics",
         .playFavoriteSongs: "Play your favorite songs",
         .shuffleLibrary: "Shuffle your library",
         .browseAlbums: "Browse your albums",
@@ -764,6 +780,14 @@ enum L10n {
         .resumePlayback: "继续播放",
         .resumeFromTime: "从 %@ 继续",
         .quickPlay: "快速播放",
+        .addWidget: "添加小组件",
+        .removeWidget: "移除小组件",
+        .removeThisWidget: "移除此小组件",
+        .addWidgetsHint: "右键添加小组件",
+        .favoriteWidgetSubtitle: "重温最爱",
+        .shuffleWidgetSubtitle: "资料库全部歌曲",
+        .lyricsWidgetIdle: "播放歌曲以显示歌词",
+        .showFullScreenLyrics: "显示全屏歌词",
         .playFavoriteSongs: "播放收藏的歌曲",
         .shuffleLibrary: "从整个资料库开始",
         .browseAlbums: "浏览资料库中的专辑",

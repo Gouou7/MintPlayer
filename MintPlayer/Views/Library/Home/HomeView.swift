@@ -6,6 +6,7 @@ struct HomeView: View {
     @EnvironmentObject private var settings: SettingsManager
 
     let onNavigate: (LibrarySelection) -> Void
+    let onShowLyrics: () -> Void
 
     @State private var searchText = ""
     @State private var showsRecentSongs = false
@@ -96,7 +97,6 @@ struct HomeView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
         .preference(
             key: LibraryToolbarPreferenceKey.self,
             value: LibraryToolbarConfiguration(
@@ -122,6 +122,8 @@ struct HomeView: View {
     private var overview: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
+                HomeWidgetArea(suggestedSong: suggestedSong, onShowLyrics: onShowLyrics)
+
                 if musicLibrary.songs.isEmpty {
                     EmptyStateView(
                         title: settings.text(.noSongsYet),
@@ -132,8 +134,6 @@ struct HomeView: View {
                     )
                     .frame(minHeight: 360)
                 } else {
-                    listeningHeader
-
                     recentlyPlayedSection
                 }
             }
@@ -142,21 +142,6 @@ struct HomeView: View {
             .padding(.horizontal, 28)
             .padding(.top, 28)
             .padding(.bottom, 132)
-        }
-    }
-
-    private var listeningHeader: some View {
-        HomePlaybackHeaderLayout {
-            Text(settings.text(.quickPlay))
-                .font(.title2.bold())
-                .lineLimit(1)
-            Text(settings.text(.resumePlayback))
-                .font(.title2.bold())
-                .lineLimit(1)
-            HomeQuickPlay(onNavigate: onNavigate)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            HomeListeningCard(suggestedSong: suggestedSong)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -301,187 +286,6 @@ struct HomeView: View {
         withAnimation(pageSwitchAnimation) {
             showsRecentSongs = false
         }
-    }
-}
-
-private struct HomePlaybackHeaderLayout: Layout {
-    private let quickPlayWidth: CGFloat = 192
-    private let horizontalSpacing: CGFloat = 20
-    private let verticalSpacing: CGFloat = 14
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard subviews.count == 4 else { return .zero }
-        let width = proposal.width ?? subviews[3].sizeThatFits(.unspecified).width + horizontalSpacing + quickPlayWidth
-        let heights = measuredHeights(width: width, subviews: subviews)
-        return CGSize(width: width, height: heights.title + verticalSpacing + heights.cards)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        guard subviews.count == 4 else { return }
-        let rightWidth = max(bounds.width - horizontalSpacing - quickPlayWidth, 0)
-        let rightX = bounds.minX + quickPlayWidth + horizontalSpacing
-        let heights = measuredHeights(width: bounds.width, subviews: subviews)
-        let cardsY = bounds.minY + heights.title + verticalSpacing
-        subviews[0].place(
-            at: CGPoint(x: bounds.minX, y: bounds.minY), anchor: .topLeading,
-            proposal: ProposedViewSize(width: quickPlayWidth, height: heights.title)
-        )
-        subviews[1].place(
-            at: CGPoint(x: rightX, y: bounds.minY), anchor: .topLeading,
-            proposal: ProposedViewSize(width: rightWidth, height: heights.title)
-        )
-        subviews[2].place(
-            at: CGPoint(x: bounds.minX, y: cardsY), anchor: .topLeading,
-            proposal: ProposedViewSize(width: quickPlayWidth, height: heights.cards)
-        )
-        subviews[3].place(
-            at: CGPoint(x: rightX, y: cardsY), anchor: .topLeading,
-            proposal: ProposedViewSize(width: rightWidth, height: heights.cards)
-        )
-    }
-
-    private func measuredHeights(width: CGFloat, subviews: Subviews) -> (title: CGFloat, cards: CGFloat) {
-        let leftProposal = ProposedViewSize(width: quickPlayWidth, height: nil)
-        let rightProposal = ProposedViewSize(width: max(width - horizontalSpacing - quickPlayWidth, 0), height: nil)
-        return (
-            title: max(subviews[0].sizeThatFits(leftProposal).height, subviews[1].sizeThatFits(rightProposal).height),
-            cards: max(subviews[2].sizeThatFits(leftProposal).height, subviews[3].sizeThatFits(rightProposal).height)
-        )
-    }
-}
-
-private struct HomeListeningCard: View {
-    @EnvironmentObject private var audioPlayer: AudioPlayer
-    @EnvironmentObject private var musicLibrary: MusicLibrary
-    @EnvironmentObject private var settings: SettingsManager
-    let suggestedSong: Song?
-
-    var body: some View {
-        if let song = audioPlayer.currentSong ?? suggestedSong {
-            HStack(alignment: .center, spacing: 16) {
-                ArtworkImage(path: song.coverPath, cornerRadius: 10, targetSize: CGSize(width: 112, height: 112), crossfadeChanges: true)
-                    .frame(width: 112, height: 112)
-                    .shadow(color: .black.opacity(0.16), radius: 10, x: 0, y: 5)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(song.title)
-                        .font(.system(size: 26, weight: .bold))
-                        .lineLimit(2)
-                    Text("\(song.artist) - \(song.album)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    HStack(spacing: 10) {
-                        Button {
-                            if audioPlayer.currentSong != nil {
-                                audioPlayer.togglePlayPause()
-                            } else {
-                                audioPlayer.play(song: song, in: musicLibrary.songs)
-                            }
-                        } label: {
-                            Label(buttonTitle, systemImage: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                                .frame(width: ListPlaybackControls.buttonWidth, height: ListPlaybackControls.buttonHeight)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.capsule)
-                        .controlSize(.regular)
-                        .fixedSize()
-                        if audioPlayer.currentSong != nil {
-                            Text(playbackCaption)
-                                .font(.caption)
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                    .padding(.top, 8)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
-            }
-        }
-    }
-
-    private var buttonTitle: String {
-        if audioPlayer.isPlaying { return settings.text(.pause) }
-        return settings.text(audioPlayer.currentSong == nil ? .play : .resumePlayback)
-    }
-
-    private var playbackCaption: String {
-        if audioPlayer.isPlaying { return settings.text(.nowPlaying) }
-        if audioPlayer.currentTime >= audioPlayer.duration { return settings.text(.startListening) }
-        let seconds = Int(max(audioPlayer.currentTime, 0))
-        let time = String(format: "%d:%02d", seconds / 60, seconds % 60)
-        return String(format: settings.text(.resumeFromTime), time)
-    }
-}
-
-private struct HomeQuickPlay: View {
-    @EnvironmentObject private var audioPlayer: AudioPlayer
-    @EnvironmentObject private var musicLibrary: MusicLibrary
-    @EnvironmentObject private var settings: SettingsManager
-    let onNavigate: (LibrarySelection) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            favoritesOrAlbumsAction
-            shuffleAction
-        }
-    }
-
-    @ViewBuilder
-    private var favoritesOrAlbumsAction: some View {
-        if !musicLibrary.favoriteSongs.isEmpty {
-            quickAction(title: settings.text(.favorites), detail: settings.text(.playFavoriteSongs), systemImage: "heart.fill") {
-                audioPlayer.play(songs: musicLibrary.favoriteSongs)
-            }
-        } else {
-            quickAction(title: settings.text(.albums), detail: settings.text(.browseAlbums), systemImage: "square.stack.fill") {
-                onNavigate(.albums)
-            }
-        }
-    }
-
-    private var shuffleAction: some View {
-        quickAction(title: settings.text(.shuffle), detail: settings.text(.shuffleLibrary), systemImage: "shuffle") {
-            audioPlayer.shuffle(songs: musicLibrary.songs)
-        }
-    }
-
-    private func quickAction(title: String, detail: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 23, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 40, height: 40)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
-            }
-        }
-        .buttonStyle(MintContentButtonStyle(cornerRadius: 16, hoverOutset: 0))
-        .frame(maxHeight: .infinity)
     }
 }
 

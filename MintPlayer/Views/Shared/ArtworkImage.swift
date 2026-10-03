@@ -83,7 +83,7 @@ struct ArtworkImage: View {
             scale: displayScale
         )
         
-        guard cacheKey == requestedCacheKey else { return }
+        guard !Task.isCancelled, cacheKey == requestedCacheKey else { return }
         updateDisplayedImage(loadedImage, cacheKey: requestedCacheKey)
     }
 

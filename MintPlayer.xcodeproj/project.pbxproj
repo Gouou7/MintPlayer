@@ -34,6 +34,8 @@
 		000000000000000000000118 /* MintPlayer/Views/Library/Songs/SongTableCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000218 /* MintPlayer/Views/Library/Songs/SongTableCell.swift */; };
 		000000000000000000000119 /* MintPlayer/Views/Library/Albums/AlbumsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000219 /* MintPlayer/Views/Library/Albums/AlbumsView.swift */; };
 		000000000000000000000138 /* MintPlayer/Views/Library/Home/HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000238 /* MintPlayer/Views/Library/Home/HomeView.swift */; };
+		000000000000000000000139 /* MintPlayer/Views/Library/Home/HomeWidgetArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000239 /* MintPlayer/Views/Library/Home/HomeWidgetArea.swift */; };
+		00000000000000000000013A /* MintPlayer/Views/Library/Home/HomeLyricsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000023A /* MintPlayer/Views/Library/Home/HomeLyricsWidget.swift */; };
 		00000000000000000000011A /* MintPlayer/Views/Library/Albums/AlbumCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000021A /* MintPlayer/Views/Library/Albums/AlbumCardView.swift */; };
 		00000000000000000000011B /* MintPlayer/Views/Library/Artists/ArtistsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000021B /* MintPlayer/Views/Library/Artists/ArtistsView.swift */; };
 		00000000000000000000011D /* MintPlayer/Views/Player/PlayerBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000021D /* MintPlayer/Views/Player/PlayerBarView.swift */; };
@@ -99,6 +101,8 @@
 		000000000000000000000218 /* MintPlayer/Views/Library/Songs/SongTableCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Library/Songs/SongTableCell.swift; sourceTree = "<group>"; };
 		000000000000000000000219 /* MintPlayer/Views/Library/Albums/AlbumsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Library/Albums/AlbumsView.swift; sourceTree = "<group>"; };
 		000000000000000000000238 /* MintPlayer/Views/Library/Home/HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Library/Home/HomeView.swift; sourceTree = "<group>"; };
+		000000000000000000000239 /* MintPlayer/Views/Library/Home/HomeWidgetArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Library/Home/HomeWidgetArea.swift; sourceTree = "<group>"; };
+		00000000000000000000023A /* MintPlayer/Views/Library/Home/HomeLyricsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Library/Home/HomeLyricsWidget.swift; sourceTree = "<group>"; };
 		00000000000000000000021A /* MintPlayer/Views/Library/Albums/AlbumCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Library/Albums/AlbumCardView.swift; sourceTree = "<group>"; };
 		00000000000000000000021B /* MintPlayer/Views/Library/Artists/ArtistsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Library/Artists/ArtistsView.swift; sourceTree = "<group>"; };
 		00000000000000000000021D /* MintPlayer/Views/Player/PlayerBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Player/PlayerBarView.swift; sourceTree = "<group>"; };
@@ -270,6 +274,8 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000238 /* MintPlayer/Views/Library/Home/HomeView.swift */,
+				000000000000000000000239 /* MintPlayer/Views/Library/Home/HomeWidgetArea.swift */,
+				00000000000000000000023A /* MintPlayer/Views/Library/Home/HomeLyricsWidget.swift */,
 			);
 			name = Home;
 			sourceTree = "<group>";
@@ -478,6 +484,8 @@
 				000000000000000000000118 /* MintPlayer/Views/Library/Songs/SongTableCell.swift in Sources */,
 				000000000000000000000119 /* MintPlayer/Views/Library/Albums/AlbumsView.swift in Sources */,
 				000000000000000000000138 /* MintPlayer/Views/Library/Home/HomeView.swift in Sources */,
+				000000000000000000000139 /* MintPlayer/Views/Library/Home/HomeWidgetArea.swift in Sources */,
+				00000000000000000000013A /* MintPlayer/Views/Library/Home/HomeLyricsWidget.swift in Sources */,
 				00000000000000000000011A /* MintPlayer/Views/Library/Albums/AlbumCardView.swift in Sources */,
 				00000000000000000000011B /* MintPlayer/Views/Library/Artists/ArtistsView.swift in Sources */,
 				00000000000000000000011D /* MintPlayer/Views/Player/PlayerBarView.swift in Sources */,

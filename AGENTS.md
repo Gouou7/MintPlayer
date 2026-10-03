@@ -15,6 +15,7 @@ Mint Player 是原生 macOS 本地音乐播放器，使用 Swift 与 SwiftUI，�
 | `MintPlayer/Views/` | `Root`、`Sidebar`、`Library`、`Player`、`Settings` 及可复用的 `Shared` 视图和 AppKit 桥接 |
 | `Scripts/embed-git-version.sh` | 在构建阶段根据 Git 标签生成版本信息 |
 | `docs/mcp.md`、`docs/mcp.en.md` | MCP 播放控制使用说明，中英成对 |
+| [docs/home-widgets.md](docs/home-widgets.md)、[英文版](docs/home-widgets.en.md) | 首页小组件的网格尺寸、间隙、固定排列与卡片样式规范 |
 | `docs/images/` | README 截图与图片资源 |
 
 `MintPlayerApp` 用 `@StateObject` 创建共享状态，并通过 `@EnvironmentObject` 注入主窗口、歌词窗口和设置场景。`MusicLibrary` 扫描文件、汇总专辑和艺人，并通过 `LibraryPersistenceStore` 保存资料库状态。`AudioPlayer` 负责 `AVAudioPlayer`、队列、播放状态恢复、有效播放次数统计及系统媒体信息更新。SQLite 保存资料库记录；带命名空间的偏好设置保存设置和界面状态；Application Support 保存数据库和封面缓存。
@@ -59,6 +60,7 @@ Mint Player 是原生 macOS 本地音乐播放器，使用 Swift 与 SwiftUI，�
 - 优先使用原生 macOS 控件与系统行为，除非用户要求自定义实现。不要留下缺少实际功能的占位界面。
 - 右键菜单默认为重要（用户经常点击）的选项添加 SF Symbols，不重要的选项可不添加图标。
 - 将 AppKit 对象限制在 representable、coordinator、职责明确的辅助类或服务中。不要用定时器、强制重建或关闭再打开等变通方式掩盖原生控件问题。
+- 各 Tab 顶部跟随系统原生工具栏滚动边缘效果，不在页面外层裁切滚动内容。[macOS 27 的自动样式](https://developer.apple.com/videos/play/wwdc2026/289/)会根据窗口标题和工具栏内容决定过渡样式。
 
 ### 资料库、搜索与窗口
 

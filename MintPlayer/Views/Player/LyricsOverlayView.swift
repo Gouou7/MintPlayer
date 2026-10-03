@@ -916,16 +916,28 @@ private struct PlaybackToggleButtonStyle: ButtonStyle {
     }
 }
 
-private struct SyncedLyricsView: View {
+struct SyncedLyricsView: View {
+    enum Style {
+        case overlay
+        case widget
+    }
+
     let lines: [LyricLine]
+    let style: Style
+
+    init(lines: [LyricLine], style: Style = .overlay) {
+        self.lines = lines
+        self.style = style
+    }
 
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var settings: SettingsManager
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
     @State private var lyricsScrollView: NSScrollView?
     @State private var lineMidYByID: [LyricLine.ID: CGFloat] = [:]
 
-    private let lineSpacing: CGFloat = 18
-    private let lyricFocusAnchorY: CGFloat = 0.18
+    private var lineSpacing: CGFloat { style == .widget ? 0 : 18 }
+    private var lyricFocusAnchorY: CGFloat { style == .widget ? 0.3 : 0.18 }
     private let compactFocusSpacerHeight: CGFloat = 132
 
     private var activeLineIndex: Int? {
@@ -980,10 +992,11 @@ private struct SyncedLyricsView: View {
     }
 
     private func activeLineTransitionAnimation(duration: TimeInterval) -> Animation {
-        .timingCurve(0.45, 0.0, 0.20, 1.0, duration: duration)
+        if reducesMotion { return .linear(duration: 0) }
+        return .timingCurve(0.45, 0.0, 0.20, 1.0, duration: duration)
     }
 
-    private func distanceFromActiveLine(for index: Int) -> Int {
+    private func distanceFromActiveLine(for index: Int, activeLineIndex: Int?) -> Int {
         guard let activeLineIndex else { return 4 }
         return abs(index - activeLineIndex)
     }
@@ -991,6 +1004,11 @@ private struct SyncedLyricsView: View {
     var body: some View {
         GeometryReader { geometry in
             let focusSpacerHeight = focusSpacerHeight(for: geometry.size.height)
+            let trailingSpacerHeight = style == .widget
+                ? geometry.size.height * (1 - lyricFocusAnchorY)
+                : focusSpacerHeight
+            let activeIndex = activeLineIndex
+            let transitionAnimation = activeLineTransitionAnimation(duration: highlightTransitionDuration)
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: lineSpacing) {
@@ -998,23 +1016,19 @@ private struct SyncedLyricsView: View {
                         .frame(height: focusSpacerHeight)
 
                     ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
-                        LyricLineRow(
+                        lyricRow(
                             line: line,
-                            distanceFromActiveLine: distanceFromActiveLine(for: index),
-                            isBlurEnabled: settings.lyricsBlurEnabled,
-                            transitionAnimation: activeLineTransitionAnimation(duration: highlightTransitionDuration)
+                            distanceFromActiveLine: distanceFromActiveLine(for: index, activeLineIndex: activeIndex),
+                            transitionAnimation: transitionAnimation
                         )
                         .id(line.id)
                         .background {
                             LyricsLinePositionReader(lineID: line.id)
                         }
-                        .onTapGesture {
-                            audioPlayer.seek(to: line.time)
-                        }
                     }
 
                     Color.clear
-                        .frame(height: focusSpacerHeight)
+                        .frame(height: trailingSpacerHeight)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .coordinateSpace(name: LyricsScrollCoordinateSpace.name)
@@ -1038,12 +1052,35 @@ private struct SyncedLyricsView: View {
             .onChange(of: highlightedLineID) { _, _ in
                 scrollToHighlightedLine(viewportHeight: geometry.size.height, animated: true)
             }
+            .onChange(of: geometry.size.height) { _, _ in
+                scrollToHighlightedLine(viewportHeight: geometry.size.height, animated: false)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func lyricRow(line: LyricLine, distanceFromActiveLine: Int, transitionAnimation: Animation) -> some View {
+        let row = LyricLineRow(
+            line: line,
+            distanceFromActiveLine: distanceFromActiveLine,
+            isBlurEnabled: settings.lyricsBlurEnabled,
+            transitionAnimation: transitionAnimation,
+            style: style
+        )
+        if style == .overlay {
+            row
+                .onTapGesture { audioPlayer.seek(to: line.time) }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { audioPlayer.seek(to: line.time) }
+        } else {
+            row
         }
     }
 
     private func scrollToHighlightedLine(viewportHeight: CGFloat, animated: Bool) {
-        guard let highlightedLineID,
-              let lineMidY = lineMidYByID[highlightedLineID],
+        let targetLineID = highlightedLineID ?? (style == .widget ? lines.first?.id : nil)
+        guard let targetLineID,
+              let lineMidY = lineMidYByID[targetLineID],
               let scrollView = lyricsScrollView
         else { return }
 
@@ -1054,7 +1091,7 @@ private struct SyncedLyricsView: View {
         let targetOffsetY = min(max(lineMidY - focusY, 0), maximumOffsetY)
         let targetOrigin = CGPoint(x: scrollView.contentView.bounds.origin.x, y: targetOffsetY)
 
-        guard animated else {
+        guard animated && !reducesMotion else {
             scrollView.contentView.scroll(to: targetOrigin)
             scrollView.reflectScrolledClipView(scrollView.contentView)
             return
@@ -1070,6 +1107,7 @@ private struct SyncedLyricsView: View {
     }
 
     private func focusSpacerHeight(for viewportHeight: CGFloat) -> CGFloat {
+        if style == .widget { return viewportHeight * lyricFocusAnchorY }
         let centeredSpacerHeight = viewportHeight * lyricFocusAnchorY
         let compactHeightLimit = min(compactFocusSpacerHeight, viewportHeight * 0.28)
         let compactRatio = min(max((viewportHeight - 600) / 180, 0), 1)
@@ -1083,20 +1121,26 @@ private struct LyricLineRow: View {
     let distanceFromActiveLine: Int
     let isBlurEnabled: Bool
     let transitionAnimation: Animation
+    let style: SyncedLyricsView.Style
 
     var body: some View {
         Text(line.text)
-            .font(.system(size: 24, weight: .semibold))
-            .lineSpacing(8)
-            .foregroundStyle(distanceFromActiveLine == 0 ? .primary : .secondary)
+            .font(.system(size: style == .widget ? 12 : 24, weight: .semibold))
+            .lineSpacing(style == .widget ? 2 : 8)
+            .foregroundStyle(distanceFromActiveLine == 0 ? Color.primary : Color.secondary)
             .opacity(opacity)
             .blur(radius: blurRadius)
+            .frame(minHeight: style == .widget ? 25 : nil, alignment: .leading)
             .contentShape(Rectangle())
             .animation(transitionAnimation, value: distanceFromActiveLine)
     }
 
     private var blurRadius: CGFloat {
         guard isBlurEnabled else { return 0 }
+        if style == .widget {
+            guard (2...5).contains(distanceFromActiveLine) else { return 0 }
+            return CGFloat(distanceFromActiveLine - 1) * 0.35
+        }
 
         switch distanceFromActiveLine {
         case 0:
