@@ -162,6 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        musicLibrary?.shutdownArtworkMaintenance()
         mcpService.update(enabled: false, port: AppConfiguration.defaultMCPPort, requiresToken: true)
     }
 

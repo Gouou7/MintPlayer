@@ -96,6 +96,35 @@ final class LibraryPersistenceStore {
         try stepDone(statement)
     }
 
+    struct ArtworkPathUpdate {
+        let songID: Song.ID
+        let oldPath: String
+        let newPath: String
+    }
+
+    func updateArtworkPaths(_ updates: [ArtworkPathUpdate]) throws -> Set<Song.ID> {
+        guard !updates.isEmpty else { return [] }
+        try execute("BEGIN IMMEDIATE TRANSACTION")
+        do {
+            let statement = try prepare("UPDATE songs SET coverPath = ? WHERE id = ? AND coverPath = ?")
+            defer { sqlite3_finalize(statement) }
+            var updatedIDs = Set<Song.ID>()
+            for update in updates {
+                sqlite3_reset(statement)
+                bindText(update.newPath, to: statement, at: 1)
+                bindText(update.songID.uuidString, to: statement, at: 2)
+                bindText(update.oldPath, to: statement, at: 3)
+                try stepDone(statement)
+                if sqlite3_changes(database) > 0 { updatedIDs.insert(update.songID) }
+            }
+            try execute("COMMIT")
+            return updatedIDs
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
+    }
+
     private func open() throws {
         if sqlite3_open(databaseURL.path, &database) != SQLITE_OK {
             let message = databaseErrorMessage

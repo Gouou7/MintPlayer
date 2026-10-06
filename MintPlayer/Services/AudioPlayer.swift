@@ -3,7 +3,9 @@ import AVFoundation
 import Combine
 
 class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
-    @Published var currentSong: Song?
+    @Published var currentSong: Song? {
+        didSet { ArtworkStore.shared.setCurrentArtworkPath(currentSong?.coverPath) }
+    }
     @Published var volume: Float = 0.7
     @Published var isPlaying: Bool = false
     @Published var currentTime: TimeInterval = 0
@@ -155,6 +157,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             }
         }
         updateRemoteCommandAvailability()
+        updateNowPlayingInfo()
         savePlaybackSession()
     }
 

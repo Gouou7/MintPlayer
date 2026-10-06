@@ -6,18 +6,7 @@ struct AlbumCardView: View {
     var body: some View {
         VStack(spacing: 12) {
             // 专辑封面
-            AsyncImage(url: URL(string: album.coverPath)) {
-                image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Image(systemName: "rectangle.stack.fill")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundColor(.secondary)
-            }
+            ArtworkImage(path: album.coverPath, cornerRadius: 8, targetSize: CGSize(width: 180, height: 180))
             .frame(width: 180, height: 180)
             .cornerRadius(8)
             .shadow(radius: 4)

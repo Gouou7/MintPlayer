@@ -300,7 +300,11 @@ private struct ArtistDetailView: View {
     }
 
     private var artistArtwork: some View {
-        ArtworkImage(path: artist.coverPath, cornerRadius: 82, targetSize: CGSize(width: 164, height: 164))
+        ArtworkImage(
+            path: musicLibrary.artistSummaries.first { $0.id == artist.id }?.coverPath,
+            cornerRadius: 82,
+            targetSize: CGSize(width: 164, height: 164)
+        )
             .frame(width: 164, height: 164)
             .clipShape(Circle())
             .matchedGeometryEffectIfPresent(id: artistArtworkTransitionID, in: artistArtworkTransitionNamespace, properties: .frame)
@@ -352,7 +356,7 @@ private struct ArtistAlbumTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ArtworkImage(path: album.coverPath, cornerRadius: 10)
+            ArtworkImage(path: album.coverPath, cornerRadius: 10, targetSize: CGSize(width: 140, height: 140))
                 .matchedGeometryEffectIfPresent(id: artworkTransitionID, in: artworkTransitionNamespace, properties: .frame)
                 .frame(width: 140, height: 140)
                 .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)

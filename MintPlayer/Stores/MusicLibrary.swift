@@ -21,7 +21,12 @@ class MusicLibrary: ObservableObject {
     private var persistenceStore: LibraryPersistenceStore?
     private var hasLoadedLibraryState = false
     private let supportedAudioFileExtensions = Set(["mp3", "m4a", "wav", "aac", "flac", "ogg", "aiff", "aif"])
-    private let artworkFolderName = "Artwork"
+    private let artworkStore = ArtworkStore.shared
+    private var persistedArtworkPaths: [Song.ID: String] = [:]
+    private var hasUnsavedLibraryState = false
+    private var artworkMaintenanceTask: Task<Void, Never>?
+    private var attemptedArtworkMigrations = Set<String>()
+    private var isShuttingDown = false
     private var albumSongIDs: [AlbumSummary.ID: [Song.ID]] = [:]
     private var artistSongIDs: [ArtistSummary.ID: [Song.ID]] = [:]
     private var artistAlbumIDs: [ArtistSummary.ID: [AlbumSummary.ID]] = [:]
@@ -39,6 +44,7 @@ class MusicLibrary: ObservableObject {
 
     func retryFailedOperations() {
         lastScanError = nil
+        attemptedArtworkMigrations.removeAll()
         if !hasLoadedLibraryState {
             loadLibraryState()
             rebuildAlbumsAndArtists()
@@ -68,6 +74,8 @@ class MusicLibrary: ObservableObject {
         if pendingImports == 0 { importedFileCount = 0 }
         pendingImports += 1
         let sourceSnapshot = librarySources
+        let fallbackCovers = artworkPathsByAudioPath()
+        let artworkWork = artworkStore.beginLibraryWork()
         scanQueue.async {
             var importedSongs: [Song] = []
             var failures: [URL: String] = [:]
@@ -81,12 +89,14 @@ class MusicLibrary: ObservableObject {
                 do {
                     if self.isDirectory(url) {
                         let baseCount = processed
-                        let result = try self.scanDirectoryForMusic(at: url, sourceId: nil) { progress(baseCount + $0) }
+                        let result = try self.scanDirectoryForMusic(at: url, sourceId: nil, fallbackCovers: fallbackCovers) { progress(baseCount + $0) }
                         importedSongs += result.songs
                         failures.merge(result.failures) { _, new in new }
                     } else if self.isSupportedMusicFile(url) {
                         defer { progress(processed + 1) }
-                        if let song = try self.createSong(from: url) { importedSongs.append(song) }
+                        if let song = try autoreleasepool(invoking: {
+                            try self.createSong(from: url, fallbackCoverPath: fallbackCovers[self.standardizedPath(url.path)])
+                        }) { importedSongs.append(song) }
                     } else {
                         failures[url] = L10n.current(.unsupportedAudio)
                     }
@@ -97,6 +107,7 @@ class MusicLibrary: ObservableObject {
             let completedSongs = importedSongs
             let completedFailures = failures
             DispatchQueue.main.async {
+                defer { self.finishArtworkWork(artworkWork) }
                 // Ignore results owned by a folder removed while this import was running.
                 let removedSources = sourceSnapshot.filter { old in !self.librarySources.contains { $0.id == old.id } }
                 let visibleSongs = completedSongs.compactMap { song -> Song? in
@@ -106,6 +117,7 @@ class MusicLibrary: ObservableObject {
                     return song.assigningLibrarySource(source?.id)
                 }
                 self.mergeSongs(visibleSongs)
+                self.artworkStore.refreshImages()
                 self.pendingImports -= 1
                 let succeededURLs = Set(urls).subtracting(completedFailures.keys)
                 self.failedImportURLs.removeAll { succeededURLs.contains($0) }
@@ -176,9 +188,12 @@ class MusicLibrary: ObservableObject {
         if let previousError = sourceErrors[source.id], lastScanError == previousError { lastScanError = nil }
         sourceErrors[source.id] = nil
 
+        let fallbackCovers = artworkPathsByAudioPath()
+        let artworkWork = artworkStore.beginLibraryWork()
+
         scanQueue.async {
             let result = Result {
-                try self.scanDirectoryForMusic(at: URL(fileURLWithPath: source.path), sourceId: source.id) { count in
+                try self.scanDirectoryForMusic(at: URL(fileURLWithPath: source.path), sourceId: source.id, fallbackCovers: fallbackCovers) { count in
                     DispatchQueue.main.async {
                         guard self.scanTokens[source.id] == token else { return }
                         self.scanProgress[source.id] = count
@@ -186,6 +201,7 @@ class MusicLibrary: ObservableObject {
                 }
             }
             DispatchQueue.main.async {
+                defer { self.finishArtworkWork(artworkWork) }
                 guard self.scanTokens[source.id] == token,
                       let index = self.librarySources.firstIndex(where: { $0.id == source.id }) else { return }
                 self.scanTokens[source.id] = nil
@@ -216,6 +232,7 @@ class MusicLibrary: ObservableObject {
                         self.lastScanError = message
                     }
                     self.saveLibraryState()
+                    self.artworkStore.refreshImages()
                 case .failure(let error):
                     let message = L10n.current(.folderScanFailed, source.name, error.localizedDescription)
                     self.sourceErrors[source.id] = message
@@ -230,7 +247,7 @@ class MusicLibrary: ObservableObject {
         var failures: [URL: String] = [:]
     }
 
-    private func scanDirectoryForMusic(at directory: URL, sourceId: UUID?, progress: (Int) -> Void) throws -> ScanResult {
+    private func scanDirectoryForMusic(at directory: URL, sourceId: UUID?, fallbackCovers: [String: String], progress: (Int) -> Void) throws -> ScanResult {
         let fileManager = FileManager.default
         guard try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true,
               fileManager.isReadableFile(atPath: directory.path) else {
@@ -253,7 +270,9 @@ class MusicLibrary: ObservableObject {
             guard isSupportedMusicFile(fileURL) else { continue }
             do {
                 guard try fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { continue }
-                if let song = try createSong(from: fileURL, librarySourceId: sourceId) { result.songs.append(song) }
+                if let song = try autoreleasepool(invoking: {
+                    try createSong(from: fileURL, librarySourceId: sourceId, fallbackCoverPath: fallbackCovers[standardizedPath(fileURL.path)])
+                }) { result.songs.append(song) }
             } catch {
                 result.failures[fileURL] = error.localizedDescription
             }
@@ -282,7 +301,7 @@ class MusicLibrary: ObservableObject {
     }
 
     // 从URL创建歌曲对象
-    private func createSong(from url: URL, librarySourceId: UUID? = nil) throws -> Song? {
+    private func createSong(from url: URL, librarySourceId: UUID? = nil, fallbackCoverPath: String? = nil) throws -> Song? {
         guard isSupportedMusicFile(url) else { return nil }
 
         let fileName = url.lastPathComponent
@@ -302,13 +321,18 @@ class MusicLibrary: ObservableObject {
         guard sampleRate > 0 else { throw CocoaError(.fileReadCorruptFile) }
         duration = Double(audioFile.length) / sampleRate
 
-        let metadata = metadataItems(for: AVURLAsset(url: url))
+        let loadedMetadata = metadataItems(for: AVURLAsset(url: url))
+        let metadata = loadedMetadata.items
         title = stringMetadata(for: [.commonIdentifierTitle], in: metadata) ?? title
         artist = stringMetadata(for: [.commonIdentifierArtist, .iTunesMetadataArtist, .id3MetadataLeadPerformer], in: metadata) ?? artist
         album = stringMetadata(for: [.commonIdentifierAlbumName, .iTunesMetadataAlbum, .id3MetadataAlbumTitle], in: metadata) ?? album
         genre = stringMetadata(for: [.quickTimeMetadataGenre, .iTunesMetadataUserGenre, .id3MetadataContentType], in: metadata)
         year = yearMetadata(in: metadata)
-        coverPath = artworkPath(for: url, metadata: metadata)
+        coverPath = artworkPath(for: url, metadata: metadata, fallbackCoverPath: fallbackCoverPath)
+        if coverPath == nil, loadedMetadata.hasReadFailure, let fallbackCoverPath,
+           FileManager.default.isReadableFile(atPath: fallbackCoverPath) {
+            coverPath = fallbackCoverPath
+        }
 
         // 没有元数据时，使用常见的 Artist/Album/Track 文件夹结构来兜底。
         let albumFolder = url.deletingLastPathComponent()
@@ -382,6 +406,8 @@ class MusicLibrary: ObservableObject {
                 self.artistAlbumIDs = indexes.artistAlbumIDs
                 self.songsByID = Dictionary(uniqueKeysWithValues: songsSnapshot.map { ($0.id, $0) })
                 self.albumSummariesByID = Dictionary(uniqueKeysWithValues: indexes.albumSummaries.map { ($0.id, $0) })
+                self.updateArtworkReferences()
+                self.artworkStore.scheduleCleanup()
             }
         }
     }
@@ -664,13 +690,21 @@ class MusicLibrary: ObservableObject {
             guard let persistenceStore else { throw LibraryPersistenceStore.StoreError.missingDatabase }
             let snapshot = try persistenceStore.loadSnapshot()
             hasLoadedLibraryState = true
+            hasUnsavedLibraryState = false
+            persistedArtworkPaths = Dictionary(uniqueKeysWithValues: snapshot.songs.compactMap { song in
+                song.coverPath.map { (song.id, $0) }
+            })
             songs = snapshot.songs
             playlists = snapshot.playlists
             blockedSongs = snapshot.blockedSongs
             librarySources = snapshot.librarySources.map {
                 MusicLibrarySource(id: $0.id, name: $0.name, path: $0.path, isScanning: false, lastScanned: $0.lastScanned)
             }
+            updateArtworkReferences()
+            scheduleArtworkMaintenance()
         } catch {
+            hasUnsavedLibraryState = true
+            updateArtworkReferences()
             lastScanError = L10n.current(.loadLibraryFailed, error.localizedDescription)
         }
     }
@@ -688,9 +722,100 @@ class MusicLibrary: ObservableObject {
         do {
             guard hasLoadedLibraryState, let persistenceStore else { throw LibraryPersistenceStore.StoreError.missingDatabase }
             try persistenceStore.saveSnapshot(snapshot)
+            persistedArtworkPaths = Dictionary(uniqueKeysWithValues: snapshot.songs.compactMap { song in
+                song.coverPath.map { (song.id, $0) }
+            })
+            hasUnsavedLibraryState = false
+            updateArtworkReferences()
+            artworkStore.scheduleCleanup()
+            scheduleArtworkMaintenance()
         } catch {
+            hasUnsavedLibraryState = true
+            updateArtworkReferences()
             lastScanError = L10n.current(.saveLibraryFailed, error.localizedDescription)
         }
+    }
+
+    private func artworkPathsByAudioPath() -> [String: String] {
+        Dictionary(uniqueKeysWithValues: songs.compactMap { song in
+            song.coverPath.map { (standardizedPath(song.path), $0) }
+        })
+    }
+
+    private func updateArtworkReferences() {
+        var paths = Set(persistedArtworkPaths.values)
+        paths.formUnion(songs.compactMap(\.coverPath))
+        paths.formUnion(albumSummaries.map(\.coverPath))
+        paths.formUnion(artistSummaries.compactMap(\.coverPath))
+        artworkStore.updateLibraryReferences(paths, allowCleanup: hasLoadedLibraryState && !hasUnsavedLibraryState && !isShuttingDown)
+    }
+
+    private func finishArtworkWork(_ id: UUID) {
+        updateArtworkReferences()
+        artworkStore.endLibraryWork(id)
+        artworkStore.scheduleCleanup()
+        scheduleArtworkMaintenance()
+    }
+
+    private func scheduleArtworkMaintenance() {
+        guard hasLoadedLibraryState, !hasUnsavedLibraryState, !isScanning, !isShuttingDown,
+              artworkMaintenanceTask == nil else { return }
+        artworkMaintenanceTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.artworkMaintenanceTask = nil }
+            while !Task.isCancelled, !self.isScanning, !self.hasUnsavedLibraryState, !self.isShuttingDown {
+                let paths = Set(self.songs.compactMap(\.coverPath))
+                    .filter { self.artworkStore.isLegacyArtworkPath($0) && !self.attemptedArtworkMigrations.contains($0) }
+                    .sorted()
+                guard !paths.isEmpty else { break }
+                await self.migrateArtworkBatch(Array(paths.prefix(20)))
+                await self.artworkStore.collectUnusedArtwork()
+            }
+        }
+    }
+
+    @MainActor
+    private func migrateArtworkBatch(_ paths: [String]) async {
+        let work = artworkStore.beginLibraryWork()
+        defer {
+            updateArtworkReferences()
+            artworkStore.endLibraryWork(work)
+        }
+        var replacements: [String: String] = [:]
+        for path in paths {
+            guard !Task.isCancelled, !isScanning, !isShuttingDown else { break }
+            attemptedArtworkMigrations.insert(path)
+            if let newPath = await artworkStore.migrateLegacyArtwork(at: path) { replacements[path] = newPath }
+        }
+        guard !Task.isCancelled, !isScanning, !hasUnsavedLibraryState, !isShuttingDown else {
+            attemptedArtworkMigrations.subtract(paths)
+            return
+        }
+        let updates = songs.compactMap { song -> LibraryPersistenceStore.ArtworkPathUpdate? in
+            guard let oldPath = song.coverPath, let newPath = replacements[oldPath] else { return nil }
+            return LibraryPersistenceStore.ArtworkPathUpdate(songID: song.id, oldPath: oldPath, newPath: newPath)
+        }
+        do {
+            guard let persistenceStore else { throw LibraryPersistenceStore.StoreError.missingDatabase }
+            let updatedIDs = try persistenceStore.updateArtworkPaths(updates)
+            guard !updatedIDs.isEmpty else { return }
+            songs = songs.map { song in
+                guard updatedIDs.contains(song.id), let oldPath = song.coverPath, let newPath = replacements[oldPath] else { return song }
+                persistedArtworkPaths[song.id] = newPath
+                return song.replacingCoverPath(newPath)
+            }
+            reconcilePlaylistSongs()
+            rebuildAlbumsAndArtists()
+        } catch {
+            hasUnsavedLibraryState = true
+            lastScanError = L10n.current(.saveLibraryFailed, error.localizedDescription)
+        }
+    }
+
+    func shutdownArtworkMaintenance() {
+        isShuttingDown = true
+        artworkMaintenanceTask?.cancel()
+        updateArtworkReferences()
     }
 
     private func reorder<T>(_ values: inout [T], from source: IndexSet, to destination: Int) {
@@ -918,7 +1043,7 @@ class MusicLibrary: ObservableObject {
         return Int(prefix)
     }
 
-    private func artworkPath(for url: URL, metadata: [AVMetadataItem]) -> String? {
+    private func artworkPath(for url: URL, metadata: [AVMetadataItem], fallbackCoverPath: String?) -> String? {
         let artworkItems = metadata.filter { item in
             item.commonKey == .commonKeyArtwork ||
                 item.identifier == .commonIdentifierArtwork ||
@@ -928,28 +1053,16 @@ class MusicLibrary: ObservableObject {
 
         for item in artworkItems {
             if let data = loadOptionalMetadataValue({ try await item.load(.dataValue) }) ?? loadOptionalMetadataValue({ try await item.load(.value) }) as? Data {
-                return saveArtwork(data, for: url)
+                do { return try artworkStore.cacheEmbeddedArtwork(data) }
+                catch { print("Error caching artwork: \(error)") }
             }
         }
 
+        if !artworkItems.isEmpty, let fallbackCoverPath,
+           FileManager.default.isReadableFile(atPath: fallbackCoverPath) {
+            return fallbackCoverPath
+        }
         return nearbyArtworkPath(for: url)
-    }
-
-    private func saveArtwork(_ data: Data, for url: URL) -> String? {
-        guard let directory = artworkDirectory() else { return nil }
-
-        let fileName = "\(abs(url.path.hashValue)).jpg"
-        let fileURL = directory.appendingPathComponent(fileName)
-
-        do {
-            if !FileManager.default.fileExists(atPath: fileURL.path) {
-                try data.write(to: fileURL, options: .atomic)
-            }
-            return fileURL.path
-        } catch {
-            print("Error saving artwork: \(error)")
-            return nil
-        }
     }
 
     private func nearbyArtworkPath(for url: URL) -> String? {
@@ -967,18 +1080,6 @@ class MusicLibrary: ObservableObject {
         }
 
         return nil
-    }
-
-    private func artworkDirectory() -> URL? {
-        do {
-            let directory = try AppConfiguration.applicationSupportDirectory()
-                .appendingPathComponent(artworkFolderName, isDirectory: true)
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            return directory
-        } catch {
-            print("Error creating artwork directory: \(error)")
-            return nil
-        }
     }
 
     private func isDirectory(_ url: URL) -> Bool {
@@ -1016,10 +1117,10 @@ class MusicLibrary: ObservableObject {
         "\(sourceId.uuidString)|\(standardizedPath(path))"
     }
 
-    private func metadataItems(for asset: AVURLAsset) -> [AVMetadataItem] {
-        let commonMetadata = loadMetadataValue { try await asset.load(.commonMetadata) } ?? []
-        let metadata = loadMetadataValue { try await asset.load(.metadata) } ?? []
-        return commonMetadata + metadata
+    private func metadataItems(for asset: AVURLAsset) -> (items: [AVMetadataItem], hasReadFailure: Bool) {
+        let commonMetadata = loadMetadataValue { try await asset.load(.commonMetadata) }
+        let metadata = loadMetadataValue { try await asset.load(.metadata) }
+        return ((commonMetadata ?? []) + (metadata ?? []), commonMetadata == nil || metadata == nil)
     }
 
     private func loadMetadataValue<T>(_ operation: @escaping () async throws -> T) -> T? {

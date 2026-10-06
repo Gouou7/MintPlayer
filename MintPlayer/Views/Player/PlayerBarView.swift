@@ -238,7 +238,7 @@ struct PlayerBarView: View {
 
     private func artwork(for song: Song) -> some View {
         Button(action: presentLyrics) {
-            ArtworkImage(path: song.coverPath, cornerRadius: 8)
+            ArtworkImage(path: song.coverPath, cornerRadius: 8, targetSize: CGSize(width: artworkSize, height: artworkSize))
                 .frame(width: artworkSize, height: artworkSize)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }

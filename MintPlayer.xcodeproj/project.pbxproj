@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A27000000000000000000001 /* MintPlayer/Services/ArtworkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27000000000000000000002 /* MintPlayer/Services/ArtworkStore.swift */; };
 		000000000000000000000101 /* MintPlayer/App/MintPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000201 /* MintPlayer/App/MintPlayerApp.swift */; };
 		000000000000000000000102 /* MintPlayer/Models/Song.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000202 /* MintPlayer/Models/Song.swift */; };
 		000000000000000000000103 /* MintPlayer/Models/Album.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000203 /* MintPlayer/Models/Album.swift */; };
@@ -70,6 +71,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A27000000000000000000002 /* MintPlayer/Services/ArtworkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/ArtworkStore.swift; sourceTree = "<group>"; };
 		000000000000000000000201 /* MintPlayer/App/MintPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/App/MintPlayerApp.swift; sourceTree = "<group>"; };
 		000000000000000000000202 /* MintPlayer/Models/Song.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Models/Song.swift; sourceTree = "<group>"; };
 		000000000000000000000203 /* MintPlayer/Models/Album.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Models/Album.swift; sourceTree = "<group>"; };
@@ -210,6 +212,7 @@
 		000000000000000000000507 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A27000000000000000000002 /* MintPlayer/Services/ArtworkStore.swift */,
 				00000000000000000000020B /* MintPlayer/Services/AudioPlayer.swift */,
 				00000000000000000000020C /* MintPlayer/Services/NowPlayingService.swift */,
 				000000000000000000000231 /* MintPlayer/Services/MCPToolRouter.swift */,
@@ -504,6 +507,7 @@
 				00000000000000000000012A /* MintPlayer/Services/LyricsService.swift in Sources */,
 				00000000000000000000012D /* MintPlayer/Views/Shared/ListPlaybackControls.swift in Sources */,
 				00000000000000000000012E /* MintPlayer/Services/LibraryPersistenceStore.swift in Sources */,
+				A27000000000000000000001 /* MintPlayer/Services/ArtworkStore.swift in Sources */,
 				00000000000000000000012B /* MintPlayer/Views/Player/LyricsOverlayView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

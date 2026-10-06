@@ -575,6 +575,7 @@ private struct LyricsOverlayLayout {
 private struct StaticLyricsBackground: View {
     let coverPath: String?
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var artworkStore = ArtworkStore.shared
     @State private var image: NSImage?
     @State private var displayedCacheKey: String?
     @State private var previousImage: NSImage?
@@ -616,7 +617,7 @@ private struct StaticLyricsBackground: View {
     }
 
     private var cacheKey: String {
-        "\(coverPath ?? "empty")|\(colorScheme == .dark ? "dark" : "light")"
+        "\(coverPath ?? "empty")|\(colorScheme == .dark ? "dark" : "light")|\(artworkStore.contentRevision)"
     }
 
     @MainActor
@@ -624,7 +625,7 @@ private struct StaticLyricsBackground: View {
         guard displayedCacheKey != requestedCacheKey else { return }
 
         let loadedImage = await LyricsBackdropCache.shared.image(for: coverPath, colorScheme: colorScheme)
-        guard cacheKey == requestedCacheKey else { return }
+        guard !Task.isCancelled, cacheKey == requestedCacheKey else { return }
         updateDisplayedImage(loadedImage, cacheKey: requestedCacheKey)
     }
 
@@ -695,6 +696,7 @@ private final class LyricsBackdropCache {
     static let shared = LyricsBackdropCache()
 
     private let cache = NSCache<NSString, NSImage>()
+    private var inFlight: [String: Task<NSImage, Never>] = [:]
     private let context = CIContext(options: [.cacheIntermediates: false])
     private let pointSize = CGSize(width: 900, height: 900)
     private let scale: CGFloat = 2
@@ -704,17 +706,24 @@ private final class LyricsBackdropCache {
         cache.totalCostLimit = 64 * 1024 * 1024
     }
 
+    @MainActor
     func image(for coverPath: String?, colorScheme: ColorScheme) async -> NSImage {
-        let key = cacheKey(path: coverPath, colorScheme: colorScheme) as NSString
-        if let cachedImage = cache.object(forKey: key) {
+        let key = cacheKey(path: coverPath, colorScheme: colorScheme)
+        if let cachedImage = cache.object(forKey: key as NSString) {
             return cachedImage
         }
-
-        return await Task.detached(priority: .utility) {
-            let image = self.renderBackdrop(path: coverPath, colorScheme: colorScheme)
-            self.cache.setObject(image, forKey: key, cost: self.cost)
-            return image
-        }.value
+        if let task = inFlight[key] { return await task.value }
+        let task = Task<NSImage, Never> {
+            await ArtworkWorkQueue.shared.perform {
+                let image = self.renderBackdrop(path: coverPath, colorScheme: colorScheme)
+                self.cache.setObject(image, forKey: key as NSString, cost: self.cost)
+                return image
+            }
+        }
+        inFlight[key] = task
+        let image = await task.value
+        inFlight[key] = nil
+        return image
     }
 
     private var pixelSize: CGSize {
@@ -725,8 +734,9 @@ private final class LyricsBackdropCache {
         Int(pixelSize.width * pixelSize.height * 4)
     }
 
+    @MainActor
     private func cacheKey(path: String?, colorScheme: ColorScheme) -> String {
-        "\(path ?? "empty")|\(colorScheme == .dark ? "dark" : "light")"
+        "\(path ?? "empty")|\(colorScheme == .dark ? "dark" : "light")|\(ArtworkStore.shared.contentRevision)"
     }
 
     private func renderBackdrop(path: String?, colorScheme: ColorScheme) -> NSImage {

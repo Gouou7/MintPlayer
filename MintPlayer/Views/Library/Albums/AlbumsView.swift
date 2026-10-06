@@ -99,7 +99,7 @@ private struct AlbumTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ArtworkImage(path: album.coverPath, cornerRadius: 10)
+            ArtworkImage(path: album.coverPath, cornerRadius: 10, targetSize: CGSize(width: 150, height: 150))
                 .matchedGeometryEffect(id: artworkTransitionID, in: artworkTransitionNamespace, properties: .frame)
                 .frame(width: 150, height: 150)
                 .shadow(color: .black.opacity(0.22), radius: 14, x: 0, y: 8)
@@ -202,7 +202,11 @@ struct AlbumDetailView: View {
     }
 
     private var albumArtwork: some View {
-        ArtworkImage(path: album.coverPath, cornerRadius: 16)
+        ArtworkImage(
+            path: musicLibrary.albumSummaries.first { $0.id == album.id }?.coverPath,
+            cornerRadius: 16,
+            targetSize: CGSize(width: 238, height: 238)
+        )
             .matchedGeometryEffectIfPresent(id: artworkTransitionID, in: artworkTransitionNamespace, properties: .frame)
             .frame(width: 238, height: 238)
             .shadow(color: .black.opacity(0.28), radius: 17, x: 0, y: 11)

@@ -8,6 +8,7 @@ struct ArtworkImage: View {
     var crossfadeChanges = false
     
     @Environment(\.displayScale) private var displayScale
+    @ObservedObject private var artworkStore = ArtworkStore.shared
     @State private var image: NSImage?
     @State private var displayedCacheKey: String?
     @State private var previousImage: NSImage?
@@ -51,7 +52,7 @@ struct ArtworkImage: View {
     
     private var cacheKey: String {
         guard let path, !path.isEmpty else { return "empty" }
-        return "\(path)|\(Int(targetSize.width))x\(Int(targetSize.height))|\(displayScale)"
+        return "\(path)|\(Int(targetSize.width))x\(Int(targetSize.height))|\(displayScale)|\(artworkStore.contentRevision)"
     }
     
     @MainActor
@@ -123,37 +124,45 @@ final class ArtworkCache {
     static let shared = ArtworkCache()
     
     private let cache = NSCache<NSString, NSImage>()
+    private var inFlight: [String: Task<NSImage?, Never>] = [:]
     
     private init() {
         cache.countLimit = 600
         cache.totalCostLimit = 96 * 1024 * 1024
     }
     
+    @MainActor
     func cachedImage(path: String, pointSize: CGSize, scale: CGFloat) -> NSImage? {
         let key = cacheKey(path: path, pointSize: pointSize, scale: scale) as NSString
         return cache.object(forKey: key)
     }
     
+    @MainActor
     func image(path: String, pointSize: CGSize, scale: CGFloat) async -> NSImage? {
-        let key = cacheKey(path: path, pointSize: pointSize, scale: scale) as NSString
-        if let cachedImage = cache.object(forKey: key) {
+        let key = cacheKey(path: path, pointSize: pointSize, scale: scale)
+        if let cachedImage = cache.object(forKey: key as NSString) {
             return cachedImage
         }
-        
-        return await Task.detached(priority: .utility) {
-            guard let image = Self.downsampledImage(path: path, pointSize: pointSize, scale: scale) else {
-                return nil
+        if let task = inFlight[key] { return await task.value }
+
+        let task = Task<NSImage?, Never> {
+            await ArtworkWorkQueue.shared.perform {
+                guard let image = Self.downsampledImage(path: path, pointSize: pointSize, scale: scale) else { return nil }
+                self.cache.setObject(image, forKey: key as NSString, cost: Self.cost(for: image, pointSize: pointSize, scale: scale))
+                return image
             }
-            
-            self.cache.setObject(image, forKey: key, cost: Self.cost(for: image, pointSize: pointSize, scale: scale))
-            return image
-        }.value
+        }
+        inFlight[key] = task
+        let image = await task.value
+        inFlight[key] = nil
+        return image
     }
     
+    @MainActor
     private func cacheKey(path: String, pointSize: CGSize, scale: CGFloat) -> String {
         let width = Int(pointSize.width * scale)
         let height = Int(pointSize.height * scale)
-        return "\(path)|\(width)x\(height)"
+        return "\(path)|\(width)x\(height)|\(ArtworkStore.shared.contentRevision)"
     }
     
     private static func downsampledImage(path: String, pointSize: CGSize, scale: CGFloat) -> NSImage? {

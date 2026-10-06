@@ -59,6 +59,16 @@ struct Song: Identifiable, Codable, Hashable {
 }
 
 extension Song {
+    func replacingCoverPath(_ path: String?) -> Song {
+        Song(
+            id: id, title: title, artist: artist, album: album, duration: duration,
+            path: self.path, coverPath: path, genre: genre, year: year,
+            librarySourceId: librarySourceId, dateAdded: dateAdded, playCount: playCount,
+            lastPlayedAt: lastPlayedAt, isFavorite: isFavorite, trackNumber: trackNumber,
+            discNumber: discNumber, albumArtist: albumArtist
+        )
+    }
+
     var effectiveAlbumArtist: String {
         let value = albumArtist?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return value.isEmpty ? artist : value

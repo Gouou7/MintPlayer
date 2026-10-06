@@ -4,6 +4,10 @@ import AppKit
 
 final class NowPlayingService {
     private var remoteCommandTokens: [(command: MPRemoteCommand, token: Any)] = []
+    private var artworkTask: Task<Void, Never>?
+    private var artworkRequestGeneration = 0
+    private var currentArtworkKey: String?
+    private var currentArtwork: MPMediaItemArtwork?
     
     var hasNowPlayingInfo: Bool {
         MPNowPlayingInfoCenter.default().nowPlayingInfo != nil
@@ -51,6 +55,12 @@ final class NowPlayingService {
     }
     
     func updateInfo(song: Song, duration: TimeInterval, elapsedTime: TimeInterval, isPlaying: Bool) {
+        let artworkKey = "\(song.id)|\(song.coverPath ?? "empty")|\(ArtworkStore.shared.contentRevision)"
+        let needsArtwork = artworkKey != currentArtworkKey
+        if needsArtwork {
+            cancelArtworkRequest()
+            currentArtworkKey = artworkKey
+        }
         var nowPlayingInfo: [String: Any] = [
             MPMediaItemPropertyTitle: song.title,
             MPMediaItemPropertyArtist: song.artist,
@@ -63,12 +73,23 @@ final class NowPlayingService {
             MPNowPlayingInfoPropertyAssetURL: URL(fileURLWithPath: song.path)
         ]
         
-        if let artwork = artwork(for: song) {
+        if let artwork = currentArtwork {
             nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
         }
         
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
         MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
+
+        guard needsArtwork, let path = song.coverPath, !path.isEmpty else { return }
+        let generation = artworkRequestGeneration
+        artworkTask = Task { @MainActor [weak self] in
+            let image = await ArtworkCache.shared.image(path: path, pointSize: CGSize(width: 512, height: 512), scale: 2)
+            guard !Task.isCancelled, let self, self.artworkRequestGeneration == generation,
+                  self.currentArtworkKey == artworkKey, let image else { return }
+            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            self.currentArtwork = artwork
+            MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyArtwork] = artwork
+        }
     }
     
     func updatePlaybackState(elapsedTime: TimeInterval, isPlaying: Bool) {
@@ -78,10 +99,12 @@ final class NowPlayingService {
     }
     
     func clear() {
+        cancelArtworkRequest()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
     
     func reset() {
+        cancelArtworkRequest()
         removeRemoteCommandHandlers()
         MPNowPlayingInfoCenter.default().playbackState = .stopped
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
@@ -109,16 +132,11 @@ final class NowPlayingService {
         remoteCommandTokens.removeAll()
     }
     
-    private func artwork(for song: Song) -> MPMediaItemArtwork? {
-        guard
-            let coverPath = song.coverPath,
-            let image = NSImage(contentsOfFile: coverPath)
-        else {
-            return nil
-        }
-        
-        return MPMediaItemArtwork(boundsSize: image.size) { _ in
-            image
-        }
+    private func cancelArtworkRequest() {
+        artworkTask?.cancel()
+        artworkTask = nil
+        artworkRequestGeneration += 1
+        currentArtworkKey = nil
+        currentArtwork = nil
     }
 }
