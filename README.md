@@ -51,10 +51,6 @@ Mint Player 是一款面向 macOS 的原生本地音乐播放器，采用 macOS 
 
 支持通过 macOS Now Playing、媒体键、控制中心和 Dock 菜单控制播放。
 
-### 数据位置
-
-资料库数据库与封面缓存保存在用户 Application Support 目录下的应用文件夹中，偏好设置保存在系统偏好设置中。Debug 与 Release 使用相互隔离的目录，两者资料库不互通；清除这些数据只会删除应用内的记录与缓存，不会影响音频文件。
-
 ## MCP 播放控制
 
 Mint Player 可选择性开启本机 MCP 服务，让本机的 MCP 客户端（例如 Agent）搜索资料库，并控制播放与待播队列。服务默认关闭，仅监听 `127.0.0.1`，默认要求访问令牌。
@@ -65,7 +61,7 @@ Mint Player 可选择性开启本机 MCP 服务，让本机的 MCP 客户端（�
 
 - Swift 5 与 SwiftUI，局部通过 AppKit 桥接原生控件
 - AVFoundation 播放音频，MediaPlayer 更新系统媒体信息
-- SQLite 保存资料库记录，`UserDefaults` 保存偏好设置
+- SQLite 保存资料库记录与 MCP 访问令牌，`UserDefaults` 保存其余偏好设置
 
 ## 构建
 

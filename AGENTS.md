@@ -84,7 +84,7 @@ Mint Player 是原生 macOS 本地音乐播放器，使用 Swift 与 SwiftUI，�
 
 - 新增或修改 MCP 工具时，同步 `MCPToolRouter.swift` 的路由与参数校验、`SettingsManager.swift` 的中英两份文案，以及 `README.md`、`docs/mcp.md` 与对应英文版的说明。
 - 服务默认关闭且仅监听 `127.0.0.1`；默认端口定义在 `AppConfiguration.swift`，Release 与 Debug 必须取不同值，改动时不要让两者冲突。
-- 令牌保存在 Application Support 下的 `MCP` 目录，不访问钥匙串：目录 `0700`、文件 `0600`。不要把令牌写入日志、错误信息或工具输出。
+- 令牌保存在 `MintPlayer.sqlite` 的配置表中，不访问钥匙串或单独创建令牌文件。数据库及 WAL/SHM 文件权限为 `0600`；不要把令牌写入日志、错误信息或工具输出。
 - 工具结果不得包含本地音频路径，只返回资料库 UUID 与搜索结果中的 ID。
 
 ## 构建与验证
@@ -118,11 +118,15 @@ Debug 使用 `Mint Player Debug.app`、Bundle ID `dev.govo.mintplayer.debug`、A
 
 ## 文档维护
 
-- `README.md` 为仓库默认入口，使用中文；`README.en.md` 是对应的英文版。用户要求或你认为非常有必要时可修改 `README.md`，内容要精简，并保持中英文两份文档内容同步。
-- README 面向使用者，不要在其中引用本文件；`AGENTS.md`（即本文档）面向改代码的人与 Agent。
-- 改动 README 后逐项核对两份的章节标题与条目数量；任一侧缺失时，以用户当前交流的语言版本为准补齐另一侧。
-- `CHANGELOG.md` 记录用户可感知的软件变更日志。每次修改代码后应同步在顶部 `Unreleased` 区写入变更；条目一条一改动，用短句描述用户可感知的结果，不写技术细节。已发布版本的条目不再改动。
-- 文档维护本身不写入 `CHANGELOG.md`，除非文档内容属于项目功能。
+- README.md
+    - `README.md` 为仓库默认入口，使用中文；`README.en.md` 是对应的英文翻译。
+    - 用户要求或你认为非常有必要时，可修改 `README.md`，内容要精简，并保持 README 中英文两份文档内容同步。
+    - 两份文档内容冲突时，以中文 `README.md` 为准。
+
+- CHANGELOG.md
+    - 不得更改已分配版本号的节中的内容，将所有更改写于 `Unreleased` 节中。
+    - 一个版本可包含多个提交，其中可能涉及对同一个功能的反复修改；应综合 `Unreleased` 节中的内容，记录自上一发版以来的累计变化，而不是分别记录多条修改。
+    - 更改条目应该是面向用户可感受的更改，不应写入技术细节。
 
 ## 版本与发布
 

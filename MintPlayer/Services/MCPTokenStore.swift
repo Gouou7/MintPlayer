@@ -1,46 +1,76 @@
 import Foundation
 import Security
 
+@MainActor
 enum MCPTokenStore {
+    private static let configurationKey = "mcp.accessToken"
+    private static var persistenceStore: LibraryPersistenceStore?
     private static let directoryName = "MCP"
     private static let fileName = "access-token"
 
     static func loadOrCreate() throws -> String {
-        let url = try tokenURL()
-        if FileManager.default.fileExists(atPath: url.path) {
-            let data = try Data(contentsOf: url)
-            guard let token = String(data: data, encoding: .utf8), isValid(token) else {
-                throw TokenError.invalid
-            }
+        let store = try database()
+        if let token = try store.configurationValue(for: configurationKey) {
+            guard isValid(token) else { throw TokenError.invalid }
+            removeLegacyToken()
             return token
         }
-        let token = try generate()
-        try save(token, to: url)
+        let token = try loadLegacyToken() ?? generate()
+        try store.setConfigurationValue(token, for: configurationKey)
+        removeLegacyToken()
         return token
     }
 
     static func rotate() throws -> String {
-        let url = try tokenURL()
+        let store = try database()
         let token = try generate()
-        try save(token, to: url)
+        try store.setConfigurationValue(token, for: configurationKey)
+        removeLegacyToken()
         return token
     }
 
-    private static func tokenURL() throws -> URL {
-        let directory = try AppConfiguration.applicationSupportDirectory()
-            .appendingPathComponent(directoryName, isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: directory,
-            withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700]
-        )
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
-        return directory.appendingPathComponent(fileName)
+    private static func database() throws -> LibraryPersistenceStore {
+        if let persistenceStore { return persistenceStore }
+        let store = try LibraryPersistenceStore()
+        persistenceStore = store
+        return store
     }
 
-    private static func save(_ token: String, to url: URL) throws {
-        try Data(token.utf8).write(to: url, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    private static func legacyTokenURL() throws -> URL {
+        try AppConfiguration.applicationSupportDirectory()
+            .appendingPathComponent(directoryName, isDirectory: true)
+            .appendingPathComponent(fileName)
+    }
+
+    private static func loadLegacyToken() throws -> String? {
+        let url = try legacyTokenURL()
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: url.path) else { return nil }
+        guard try fileManager.attributesOfItem(atPath: url.deletingLastPathComponent().path)[.type] as? FileAttributeType == .typeDirectory,
+              try fileManager.attributesOfItem(atPath: url.path)[.type] as? FileAttributeType == .typeRegular else {
+            throw TokenError.invalid
+        }
+        let data = try Data(contentsOf: url)
+        guard let token = String(data: data, encoding: .utf8), isValid(token) else { throw TokenError.invalid }
+        return token
+    }
+
+    private static func removeLegacyToken() {
+        // The database write must commit first; cleanup failure is retried on the next access.
+        guard let url = try? legacyTokenURL() else { return }
+        let fileManager = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        guard (try? fileManager.attributesOfItem(atPath: directory.path)[.type] as? FileAttributeType) == .typeDirectory else { return }
+        do {
+            if (try? fileManager.attributesOfItem(atPath: url.path)[.type] as? FileAttributeType) == .typeRegular {
+                try fileManager.removeItem(at: url)
+            }
+            if try fileManager.contentsOfDirectory(atPath: directory.path).isEmpty {
+                try fileManager.removeItem(at: directory)
+            }
+        } catch {
+            print("Could not remove the legacy MCP token file.")
+        }
     }
 
     private static func isValid(_ token: String) -> Bool {

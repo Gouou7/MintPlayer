@@ -51,10 +51,6 @@ Settings let you follow the system or pick English or Simplified Chinese, and fo
 
 Playback can also be controlled from macOS Now Playing, media keys, Control Center, and the Dock menu.
 
-### Data Locations
-
-The library database and cover cache live in the app's folder under your Application Support directory, and preferences live in the system preferences store. Debug and Release use separate, isolated locations and do not share a library; removing this data only clears records and caches inside the app and never touches your audio files.
-
 ## MCP Playback Control
 
 Mint Player can optionally expose a local MCP server so MCP clients on the same Mac, such as agents, can search your library and control playback and the upcoming queue. The server is off by default, listens only on `127.0.0.1`, and requires an access token by default.
@@ -65,7 +61,7 @@ See [MCP Playback Control](docs/mcp.en.md) for setup, tokens, ports, and availab
 
 - Swift 5 and SwiftUI, with AppKit bridges for native controls
 - AVFoundation for audio playback and MediaPlayer for system media information
-- SQLite for library records and `UserDefaults` for preferences
+- SQLite for library records and the MCP access token, and `UserDefaults` for other preferences
 
 ## Build
 

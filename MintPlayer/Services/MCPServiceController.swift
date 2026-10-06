@@ -45,11 +45,13 @@ final class MCPServiceController: ObservableObject {
     }
 
     func copyToken() throws -> String {
-        try MCPTokenStore.loadOrCreate()
+        guard musicLibrary?.isLibraryReady == true else { throw LibraryPersistenceStore.StoreError.missingDatabase }
+        return try MCPTokenStore.loadOrCreate()
     }
 
     func rotateToken() async {
         do {
+            guard musicLibrary?.isLibraryReady == true else { throw LibraryPersistenceStore.StoreError.missingDatabase }
             let token = try MCPTokenStore.rotate()
             operationError = nil
             await server?.updateToken(token)
@@ -79,7 +81,7 @@ final class MCPServiceController: ObservableObject {
             do {
                 let token: String?
                 if self.requiresToken {
-                    token = try MCPTokenStore.loadOrCreate()
+                    token = try self.copyToken()
                 } else {
                     token = nil
                 }

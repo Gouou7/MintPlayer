@@ -37,9 +37,17 @@ final class LibraryPersistenceStore {
         let appSupportURL = try AppConfiguration.applicationSupportDirectory()
         databaseURL = appSupportURL.appendingPathComponent("MintPlayer.sqlite")
 
-        try open()
-        try configureDatabase()
-        try createSchema()
+        do {
+            try open()
+            try restrictDatabasePermissions()
+            try configureDatabase()
+            try createSchema()
+            try restrictDatabasePermissions()
+        } catch {
+            sqlite3_close(database)
+            database = nil
+            throw error
+        }
     }
 
     deinit {
@@ -96,6 +104,33 @@ final class LibraryPersistenceStore {
         try stepDone(statement)
     }
 
+    func configurationValue(for key: String) throws -> String? {
+        let statement = try prepare("SELECT value FROM app_configuration WHERE key = ?")
+        defer { sqlite3_finalize(statement) }
+        bindText(key, to: statement, at: 1)
+        switch sqlite3_step(statement) {
+        case SQLITE_ROW:
+            return optionalText(statement, 0)
+        case SQLITE_DONE:
+            return nil
+        default:
+            throw StoreError.statementFailed(databaseErrorMessage)
+        }
+    }
+
+    func setConfigurationValue(_ value: String, for key: String) throws {
+        let statement = try prepare(
+            """
+            INSERT INTO app_configuration (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """
+        )
+        defer { sqlite3_finalize(statement) }
+        bindText(key, to: statement, at: 1)
+        bindText(value, to: statement, at: 2)
+        try stepDone(statement)
+    }
+
     struct ArtworkPathUpdate {
         let songID: Song.ID
         let oldPath: String
@@ -139,6 +174,14 @@ final class LibraryPersistenceStore {
         try execute("PRAGMA journal_mode = WAL")
     }
 
+    private func restrictDatabasePermissions() throws {
+        for path in [databaseURL.path, databaseURL.path + "-wal", databaseURL.path + "-shm"] {
+            if FileManager.default.fileExists(atPath: path) {
+                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
+            }
+        }
+    }
+
     private func createSchema() throws {
         let version = try userVersion()
         guard version == 0 || version == schemaVersion else {
@@ -155,6 +198,16 @@ final class LibraryPersistenceStore {
     }
 
     private func createTablesAndMetadataColumns() throws {
+        // Configuration survives full library snapshot replacement and extends schema 3 in place.
+        try execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_configuration (
+                key TEXT PRIMARY KEY NOT NULL,
+                value TEXT NOT NULL
+            )
+            """
+        )
+
         try execute(
             """
             CREATE TABLE IF NOT EXISTS songs (

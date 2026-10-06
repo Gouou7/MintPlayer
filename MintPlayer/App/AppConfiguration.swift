@@ -5,12 +5,12 @@ enum AppConfiguration {
     static let displayName = "Mint Player Debug"
     static let supportDirectoryName = "MintPlayer-Debug"
     static let userDefaultsPrefix = "mintPlayer.debug"
-    static let defaultMCPPort = 49432
+    static let defaultMCPPort = 31001
 #else
     static let displayName = "Mint Player"
     static let supportDirectoryName = "MintPlayer"
     static let userDefaultsPrefix = "mintPlayer"
-    static let defaultMCPPort = 49431
+    static let defaultMCPPort = 30001
 #endif
 
     static func userDefaultsKey(_ key: String) -> String {
