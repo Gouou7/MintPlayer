@@ -2,7 +2,7 @@
 
 [English](README.en.md) | 简体中文
 
-<img src="docs/images/MintPlayer-Light-iOS-Default-1024x1024@1x.png" alt="Mint Player logo" width="120">
+<img src="docs/images/MintPlayer-Icon-v2.png" alt="Mint Player logo" width="120">
 
 Mint Player 是一款面向 macOS 的原生本地音乐播放器，采用 macOS 26 的 Liquid Glass 设计语言。它直接扫描指定的本地文件夹建立资料库，只读取音频文件，不会修改、移动或删除它们。
 
@@ -53,9 +53,9 @@ Mint Player 是一款面向 macOS 的原生本地音乐播放器，采用 macOS 
 
 ## MCP 播放控制
 
-Mint Player 可选择性开启本机 MCP 服务，让本机的 MCP 客户端（例如 Agent）搜索资料库，并控制播放与待播队列。服务默认关闭，仅监听 `127.0.0.1`，默认要求访问令牌。
+本机 MCP 客户端可通过 stdio 按需启动 Mint Player、搜索资料库，并控制播放与待播队列。此功能默认关闭，启用后默认要求访问令牌。
 
-开启方式、令牌与端口设置、可用工具见 [MCP 播放控制](docs/mcp.md)。
+客户端配置、令牌和可用工具见 [MCP 播放控制](docs/mcp.md)。
 
 ## 技术栈
 
@@ -83,7 +83,7 @@ xcodebuild -project MintPlayer.xcodeproj -scheme MintPlayer -configuration Debug
 - **添加文件夹后没有歌曲**：确认文件夹内有受支持的音频文件；子目录会被递归扫描；被屏蔽的歌曲不会出现在资料库中。
 - **Debug 与 Release 的资料库不互通**：两者使用相互隔离的存储目录，属预期行为。
 - **没有歌词**：歌词取自与音频文件同名的 LRC 文件；也可在歌词界面手动指定其他文件与文本编码。
-- **MCP 客户端连不上**：确认服务开关已打开、地址与端口一致、令牌已更新，详见 [MCP 播放控制](docs/mcp.md)。
+- **MCP 客户端连不上**：确认 MCP 已启用、stdio 命令路径正确、令牌已更新，详见 [MCP 播放控制](docs/mcp.md)。
 
 ## 许可证
 

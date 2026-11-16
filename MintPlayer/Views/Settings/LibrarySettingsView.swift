@@ -195,27 +195,6 @@ struct LibrarySettingsView: View {
                 )
             )
 
-            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(settings.text(.mcpPort))
-                        .font(.body.weight(.semibold))
-                    Text(settings.text(.mcpPortHint))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 16)
-
-                TextField(settings.text(.mcpPort), value: Binding(
-                    get: { settings.mcpPort },
-                    set: { settings.updateMCPPort($0) }
-                ), format: .number.grouping(.never))
-                    .frame(width: 90)
-                    .multilineTextAlignment(.trailing)
-                    .accessibilityLabel(settings.text(.mcpPort))
-            }
-
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
                     Text(settings.text(.mcpStatus))
@@ -234,7 +213,7 @@ struct LibrarySettingsView: View {
 
                     Spacer(minLength: 8)
 
-                    Text(mcpService.endpoint)
+                    Text(mcpService.command)
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -242,14 +221,14 @@ struct LibrarySettingsView: View {
                         .textSelection(.enabled)
 
                     Button {
-                        copyToPasteboard(mcpService.endpoint)
+                        copyToPasteboard(mcpService.command)
                     } label: {
                         Image(systemName: "doc.on.doc")
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .help(settings.text(.mcpCopyAddress))
-                    .accessibilityLabel(settings.text(.mcpCopyAddress))
+                    .help(settings.text(.mcpCopyCommand))
+                    .accessibilityLabel(settings.text(.mcpCopyCommand))
                 }
 
                 if case .failed(let message) = mcpService.status {
@@ -271,7 +250,7 @@ struct LibrarySettingsView: View {
                             catch { mcpCopyError = error.localizedDescription }
                         }
                         Button(settings.text(.mcpRotateToken)) {
-                            Task { await mcpService.rotateToken() }
+                            mcpService.rotateToken()
                         }
                     }
                 }

@@ -1,24 +1,41 @@
 # MCP 播放控制
 
-Mint Player 可选择性开启本机 MCP 服务，让本机的 MCP 客户端（例如 Agent）搜索资料库，并控制播放与待播队列。服务默认关闭，仅监听回环地址 `127.0.0.1`。
+本机 MCP 客户端可以通过 stdio 搜索 Mint Player 的资料库，并控制播放与待播队列。Mint Player 退出后，客户端仍可连接并发现工具，首次调用工具时会自动打开播放器。
 
-## 开启服务
+## 配置客户端
 
-1. 打开设置中的「MCP」分区。
-2. 打开服务开关「启用 MCP」。
-3. 保持 Mint Player 运行，把设置页显示的地址填入本机 MCP 客户端。
+1. 在 Mint Player 设置的「MCP」分区打开「启用 MCP」。
+2. 点「复制命令路径」，将复制的完整路径设为客户端的 stdio 命令。路径需要指向 App 包内的 `mintplayer-mcp`。
+3. 点「复制令牌」，在客户端的命令环境变量中设置 `MINTPLAYER_MCP_TOKEN`。重新连接客户端以应用配置。
 
-关闭服务开关或退出 App 后，该地址立即失效。
+在使用 `mcpServers` 格式的客户端中，可以按下面的示例填写。请用设置页复制的命令路径和令牌替换示例值。
+
+```json
+{
+  "mcpServers": {
+    "mint-player": {
+      "command": "/Applications/Mint Player.app/Contents/MacOS/mintplayer-mcp",
+      "env": {
+        "MINTPLAYER_MCP_TOKEN": "替换为复制的令牌"
+      }
+    }
+  }
+}
+```
+
+在 Codex 中，将同样的命令和环境变量写入用户配置中的 `[mcp_servers.mint-player]` 和 `[mcp_servers.mint-player.env]`。
+
+从旧版迁移时，将原来的 HTTP 地址配置换成 stdio 命令。已有令牌可以继续使用。Debug 和 Release 各自使用对应 App 包内的命令及令牌；移动或重命名 App 后，需要更新客户端的命令路径。
 
 ## 访问令牌
 
-默认要求访问令牌：点「复制令牌」取得令牌，在客户端中配置 `Authorization: Bearer <令牌>` 请求头。关闭「要求访问令牌」后，本机任意进程都可以控制播放，且无需请求头。
+MCP 默认关闭，启用后默认要求访问令牌。关闭「要求访问令牌」时，可以省略 `MINTPLAYER_MCP_TOKEN`。当前 macOS 账户下的进程此时也可以控制播放。重新生成令牌后，需要更新客户端配置并重新连接。
 
-令牌保存在应用数据库 `MintPlayer.sqlite` 的配置表中。数据库及 WAL/SHM 文件权限为 `0600`；同一系统用户运行的进程仍可能读取令牌。
+Mint Player 将令牌保存在应用数据库的配置表中。请将真实令牌保存在个人客户端配置中，避免提交到仓库。
 
-## 端口
+## 启动与退出
 
-默认端口为 Release `30001`、Debug `31001`，可在设置中修改，取值范围 1024–65535，修改后会重启服务。端口被占用时，设置页会显示启动失败原因，可修改端口后重试。
+Mint Player 已经打开时，工具调用会控制同一个播放器实例。关闭客户端后，Mint Player 可以继续播放。关闭 App 设置中的 MCP 开关后，客户端的工具调用会被拒绝。
 
 ## 可用工具
 

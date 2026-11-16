@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import MCP
 
 enum MCPServiceStatus: Equatable {
     case off
@@ -14,14 +15,16 @@ final class MCPServiceController: ObservableObject {
     @Published private(set) var operationError: String?
     private var audioPlayer: AudioPlayer?
     private var musicLibrary: MusicLibrary?
-    private var server: MCPHTTPServer?
+    private var server: MCPIPCServer?
     private var transition: Task<Void, Never>?
     private var generation = 0
     private var enabled = false
     private var requiresToken = true
-    private var port = AppConfiguration.defaultMCPPort
 
-    var endpoint: String { "http://127.0.0.1:\(port)/mcp" }
+    var command: String {
+        Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS")
+            .appendingPathComponent(AppConfiguration.mcpHelperName).path
+    }
 
     private var settings: SettingsManager?
 
@@ -31,10 +34,9 @@ final class MCPServiceController: ObservableObject {
         self.settings = settings
     }
 
-    func update(enabled: Bool, port: Int, requiresToken: Bool) {
-        guard self.enabled != enabled || self.port != port || self.requiresToken != requiresToken || status == .off && enabled else { return }
+    func update(enabled: Bool, requiresToken: Bool) {
+        guard self.enabled != enabled || self.requiresToken != requiresToken else { return }
         self.enabled = enabled
-        self.port = port
         self.requiresToken = requiresToken
         restart()
     }
@@ -49,12 +51,11 @@ final class MCPServiceController: ObservableObject {
         return try MCPTokenStore.loadOrCreate()
     }
 
-    func rotateToken() async {
+    func rotateToken() {
         do {
             guard musicLibrary?.isLibraryReady == true else { throw LibraryPersistenceStore.StoreError.missingDatabase }
-            let token = try MCPTokenStore.rotate()
+            _ = try MCPTokenStore.rotate()
             operationError = nil
-            await server?.updateToken(token)
             if enabled { restart() }
         } catch {
             operationError = error.localizedDescription
@@ -74,19 +75,26 @@ final class MCPServiceController: ObservableObject {
                 await server.stop()
             }
             guard revision == self.generation, self.enabled else { return }
-            guard let audioPlayer = self.audioPlayer, let musicLibrary = self.musicLibrary, let settings = self.settings else {
+            guard let audioPlayer = self.audioPlayer, let musicLibrary = self.musicLibrary,
+                  let settings = self.settings else {
                 self.status = .failed(L10n.current(.mcpPlayerNotReady))
                 return
             }
+            let token: String?
             do {
-                let token: String?
-                if self.requiresToken {
-                    token = try self.copyToken()
-                } else {
-                    token = nil
-                }
+                token = self.requiresToken ? try self.copyToken() : nil
+            } catch {
+                self.status = .failed(error.localizedDescription)
+                return
+            }
+            do {
                 let router = MCPToolRouter(audioPlayer: audioPlayer, musicLibrary: musicLibrary, settings: settings)
-                let server = MCPHTTPServer(port: self.port, token: token, router: router)
+                let server = MCPIPCServer { [weak self] request in
+                    guard let self else {
+                        return MCPIPC.error("mcp_unavailable", L10n.current(.mcpPlayerNotReady))
+                    }
+                    return await self.call(request, router: router, token: token, revision: revision)
+                }
                 try await server.start()
                 if revision == self.generation {
                     self.server = server
@@ -95,8 +103,37 @@ final class MCPServiceController: ObservableObject {
                     await server.stop()
                 }
             } catch {
-                if revision == self.generation { self.status = .failed(error.localizedDescription) }
+                if revision == self.generation {
+                    self.status = .failed(settings.text(.mcpLocalConnectionFailed))
+                }
             }
         }
+    }
+
+    private func call(
+        _ request: MCPIPCRequest, router: MCPToolRouter, token: String?, revision: Int
+    ) async -> CallTool.Result {
+        guard enabled, settings?.mcpEnabled == true else {
+            return MCPIPC.error("mcp_disabled", L10n.current(.mcpDisabled))
+        }
+        guard revision == generation, requiresToken == settings?.mcpRequiresToken else {
+            return MCPIPC.error("mcp_unavailable", L10n.current(.mcpPlayerNotReady))
+        }
+        if let token, !Self.tokensMatch(token, request.token ?? "") {
+            return MCPIPC.error("mcp_unauthorized", L10n.current(.mcpUnauthorized))
+        }
+        guard musicLibrary?.isLibraryReady == true else {
+            return MCPIPC.error("library_unavailable", L10n.current(.databaseUnavailable))
+        }
+        return await router.call(request.parameters)
+    }
+
+    private static func tokensMatch(_ expected: String, _ supplied: String) -> Bool {
+        let left = Array(expected.utf8)
+        let right = Array(supplied.utf8)
+        guard left.count == right.count else { return false }
+        var difference: UInt8 = 0
+        for index in left.indices { difference |= left[index] ^ right[index] }
+        return difference == 0
     }
 }

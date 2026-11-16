@@ -154,16 +154,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         mcpService.configure(audioPlayer: audioPlayer, musicLibrary: musicLibrary, settings: settings)
-        mcpSettingsSubscription = settings.$mcpEnabled.combineLatest(settings.$mcpPort, settings.$mcpRequiresToken)
+        mcpSettingsSubscription = settings.$mcpEnabled.combineLatest(settings.$mcpRequiresToken)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] enabled, port, requiresToken in
-                self?.mcpService.update(enabled: enabled, port: port, requiresToken: requiresToken)
+            .sink { [weak self] enabled, requiresToken in
+                self?.mcpService.update(enabled: enabled, requiresToken: requiresToken)
             }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         musicLibrary?.shutdownArtworkMaintenance()
-        mcpService.update(enabled: false, port: AppConfiguration.defaultMCPPort, requiresToken: true)
+        mcpService.update(enabled: false, requiresToken: true)
     }
 
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {

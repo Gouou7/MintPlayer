@@ -2,7 +2,7 @@
 
 English | [简体中文](README.md)
 
-<img src="docs/images/MintPlayer-Light-iOS-Default-1024x1024@1x.png" alt="Mint Player logo" width="120">
+<img src="docs/images/MintPlayer-Icon-v2.png" alt="Mint Player logo" width="120">
 
 Mint Player is a native macOS local music player for macOS 26, using the Liquid Glass design language. It scans the local folders you choose to build its library and only reads audio files; it never modifies, moves, or deletes them.
 
@@ -53,9 +53,9 @@ Playback can also be controlled from macOS Now Playing, media keys, Control Cent
 
 ## MCP Playback Control
 
-Mint Player can optionally expose a local MCP server so MCP clients on the same Mac, such as agents, can search your library and control playback and the upcoming queue. The server is off by default, listens only on `127.0.0.1`, and requires an access token by default.
+MCP clients on the same Mac can use stdio to open Mint Player on demand, search your library, and control playback and the upcoming queue. This feature is off by default and requires an access token once enabled.
 
-See [MCP Playback Control](docs/mcp.en.md) for setup, tokens, ports, and available tools.
+See [MCP Playback Control](docs/mcp.en.md) for client configuration, tokens, and available tools.
 
 ## Tech Stack
 
@@ -83,7 +83,7 @@ xcodebuild -project MintPlayer.xcodeproj -scheme MintPlayer -configuration Debug
 - **No songs after adding a folder**: make sure the folder contains supported audio files; subfolders are scanned recursively; blocked songs do not appear in the library.
 - **Debug and Release do not share a library**: they use separate, isolated storage locations. This is expected.
 - **No lyrics**: lyrics come from an LRC file with the same name as the audio file. You can also pick another file and text encoding in the lyrics view.
-- **The MCP client cannot connect**: check that the server is on, the address and port match, and the token is current. See [MCP Playback Control](docs/mcp.en.md).
+- **The MCP client cannot connect**: check that MCP is enabled, the stdio command path is correct, and the token is current. See [MCP Playback Control](docs/mcp.en.md).
 
 ## License
 

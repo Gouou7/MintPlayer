@@ -82,9 +82,9 @@ Mint Player 是原生 macOS 本地音乐播放器，使用 Swift 与 SwiftUI，�
 
 ## MCP 服务
 
-- 新增或修改 MCP 工具时，同步 `MCPToolRouter.swift` 的路由与参数校验、`SettingsManager.swift` 的中英两份文案，以及 `README.md`、`docs/mcp.md` 与对应英文版的说明。
-- 服务默认关闭且仅监听 `127.0.0.1`；默认端口定义在 `AppConfiguration.swift`，Release 与 Debug 必须取不同值，改动时不要让两者冲突。
-- 令牌保存在 `MintPlayer.sqlite` 的配置表中，不访问钥匙串或单独创建令牌文件。数据库及 WAL/SHM 文件权限为 `0600`；不要把令牌写入日志、错误信息或工具输出。
+- 新增或修改 MCP 工具时，同步 `MCPToolCatalog.swift` 的工具定义和 `MCPToolRouter.swift` 的路由与参数校验、`SettingsManager.swift` 的中英两份文案，以及 `README.md`、`docs/mcp.md` 与对应英文版的说明。
+- MCP 默认关闭。客户端通过 App 包内的 `mintplayer-mcp` 使用 stdio。首次工具调用可按需启动播放器，通过当前 macOS 账户专用的 Unix socket 访问 App 内的工具路由。Release 与 Debug 使用独立的 socket。
+- 令牌保存在 `MintPlayer.sqlite` 的配置表中，不访问钥匙串或单独创建令牌文件。数据库及 WAL/SHM 文件权限为 `0600`；客户端为辅助程序设置 `MINTPLAYER_MCP_TOKEN` 环境变量。不要把令牌写入日志、错误信息或工具输出。
 - 工具结果不得包含本地音频路径，只返回资料库 UUID 与搜索结果中的 ID。
 
 ## 构建与验证

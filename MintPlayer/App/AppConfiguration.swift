@@ -5,26 +5,33 @@ enum AppConfiguration {
     static let displayName = "Mint Player Debug"
     static let supportDirectoryName = "MintPlayer-Debug"
     static let userDefaultsPrefix = "mintPlayer.debug"
-    static let defaultMCPPort = 31001
+    static let mcpDirectoryName = "mp-mcp-debug"
 #else
     static let displayName = "Mint Player"
     static let supportDirectoryName = "MintPlayer"
     static let userDefaultsPrefix = "mintPlayer"
-    static let defaultMCPPort = 30001
+    static let mcpDirectoryName = "mp-mcp"
 #endif
+
+    static let mcpHelperName = "mintplayer-mcp"
+    static let mcpEnabledKey = userDefaultsKey("settings.mcp.enabled")
 
     static func userDefaultsKey(_ key: String) -> String {
         "\(userDefaultsPrefix).\(key)"
     }
 
     static var displayVersion: String {
-        let displayVersion = Bundle.main.object(forInfoDictionaryKey: "MintDisplayVersion") as? String
+        displayVersion(in: .main)
+    }
+
+    static func displayVersion(in bundle: Bundle) -> String {
+        let displayVersion = bundle.object(forInfoDictionaryKey: "MintDisplayVersion") as? String
         let trimmedDisplayVersion = displayVersion?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let trimmedDisplayVersion, !trimmedDisplayVersion.isEmpty {
             return trimmedDisplayVersion
         }
 
-        let bundleVersion = Bundle.main.object(
+        let bundleVersion = bundle.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String
         let trimmedBundleVersion = bundleVersion?.trimmingCharacters(in: .whitespacesAndNewlines)
