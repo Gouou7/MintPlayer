@@ -246,6 +246,17 @@ enum L10n {
         case mcpStdioStartError
         case mcpAppLaunchError
         case mcpRequestTooLarge
+        case mcpUnexpectedArguments
+        case mcpInvalidUUID
+        case mcpInvalidPage
+        case mcpInvalidPlaylistName
+        case mcpInvalidPlaylistDescription
+        case mcpInvalidSongIDs
+        case mcpSongNotFound
+        case mcpSongNotInPlaylist
+        case mcpBlockedSongNotFound
+        case mcpSongSourceUnavailable
+        case mcpLibrarySaveFailed
 
         case general
         case appearance
@@ -482,9 +493,9 @@ enum L10n {
         .showDetails: "Show Details",
         .mcpSection: "MCP",
         .mcpEnable: "Enable MCP",
-        .mcpDescription: "Let local MCP clients open Mint Player, search your library, and control playback.",
+        .mcpDescription: "Let local MCP clients open Mint Player, search your library, control playback, manage playlists, and block songs.",
         .mcpRequireToken: "Require Access Token",
-        .mcpRequireTokenDescription: "When off, processes running under your macOS account can control playback without a token.",
+        .mcpRequireTokenDescription: "When off, processes running under your macOS account can use all MCP tools without a token.",
         .mcpStatus: "Status",
         .mcpOff: "Off",
         .mcpStarting: "Starting…",
@@ -504,6 +515,17 @@ enum L10n {
         .mcpStdioStartError: "The MCP command could not start its standard input and output connection.",
         .mcpAppLaunchError: "Mint Player could not be opened.",
         .mcpRequestTooLarge: "The MCP request is too large.",
+        .mcpUnexpectedArguments: "The tool does not accept one or more supplied arguments.",
+        .mcpInvalidUUID: "%@ must be a UUID.",
+        .mcpInvalidPage: "offset must be a nonnegative integer and limit must be an integer from 1 to %ld.",
+        .mcpInvalidPlaylistName: "Enter a playlist name.",
+        .mcpInvalidPlaylistDescription: "description must be a string.",
+        .mcpInvalidSongIDs: "song_ids must be a nonempty array of song UUIDs.",
+        .mcpSongNotFound: "One or more songs are no longer in the library.",
+        .mcpSongNotInPlaylist: "Every song in the move request must be in the playlist.",
+        .mcpBlockedSongNotFound: "The blocked song record no longer exists.",
+        .mcpSongSourceUnavailable: "Only songs associated with a library folder can be blocked.",
+        .mcpLibrarySaveFailed: "The library change could not be saved.",
         .general: "General",
         .appearance: "Appearance",
         .interfaceTheme: "Interface Theme",
@@ -727,9 +749,9 @@ enum L10n {
         .showDetails: "查看详情",
         .mcpSection: "MCP",
         .mcpEnable: "启用 MCP",
-        .mcpDescription: "允许本机 MCP 客户端启动 Mint Player、搜索资料库并控制播放。",
+        .mcpDescription: "允许本机 MCP 客户端启动 Mint Player、搜索资料库、控制播放、管理播放列表和屏蔽歌曲。",
         .mcpRequireToken: "要求访问令牌",
-        .mcpRequireTokenDescription: "关闭后，在当前 macOS 账户下运行的进程无需令牌即可控制播放。",
+        .mcpRequireTokenDescription: "关闭后，在当前 macOS 账户下运行的进程无需令牌即可使用全部 MCP 工具。",
         .mcpStatus: "状态",
         .mcpOff: "已关闭",
         .mcpStarting: "正在启动…",
@@ -749,6 +771,17 @@ enum L10n {
         .mcpStdioStartError: "MCP 命令无法启动标准输入输出连接。",
         .mcpAppLaunchError: "无法打开 Mint Player。",
         .mcpRequestTooLarge: "MCP 请求过大。",
+        .mcpUnexpectedArguments: "工具不接受请求中的一个或多个参数。",
+        .mcpInvalidUUID: "%@ 必须是 UUID。",
+        .mcpInvalidPage: "offset 必须是非负整数，limit 必须是 1 到 %ld 之间的整数。",
+        .mcpInvalidPlaylistName: "请输入播放列表名称。",
+        .mcpInvalidPlaylistDescription: "description 必须是字符串。",
+        .mcpInvalidSongIDs: "song_ids 必须是包含至少一个歌曲 UUID 的数组。",
+        .mcpSongNotFound: "资料库中找不到一首或多首指定歌曲。",
+        .mcpSongNotInPlaylist: "要移动的歌曲及作为目标的歌曲都必须在播放列表中。",
+        .mcpBlockedSongNotFound: "找不到指定的屏蔽记录。",
+        .mcpSongSourceUnavailable: "只有关联到资料库文件夹的歌曲才能屏蔽。",
+        .mcpLibrarySaveFailed: "无法保存资料库更改。",
         .general: "通用",
         .appearance: "外观",
         .interfaceTheme: "界面主题",

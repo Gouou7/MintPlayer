@@ -297,11 +297,8 @@ struct SidebarView: View {
                 name: name,
                 description: description
             )
-        } else {
-            musicLibrary.createPlaylist(name: name, description: description)
-            if let playlist = musicLibrary.playlists.last {
-                selection = .playlist(playlist.id)
-            }
+        } else if let playlist = musicLibrary.createPlaylist(name: name, description: description) {
+            selection = .playlist(playlist.id)
         }
 
         playlistEditorDraft = nil

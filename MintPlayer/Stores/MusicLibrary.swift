@@ -525,50 +525,70 @@ class MusicLibrary: ObservableObject {
     }
 
     // 屏蔽歌曲：只从 Mint Player 资料库隐藏，不删除本地文件。
-    func blockSongs(withIds ids: Set<UUID>) {
-        let songsToBlock = songs.filter { ids.contains($0.id) }
-        guard !songsToBlock.isEmpty else { return }
-
-        var existingKeys = Set(blockedSongs.map { blockedKey(path: $0.path, sourceId: $0.sourceId) })
-        for song in songsToBlock {
-            guard let sourceId = song.librarySourceId ?? source(containing: song.path)?.id else { continue }
-            let key = blockedKey(path: song.path, sourceId: sourceId)
-            guard existingKeys.insert(key).inserted else { continue }
-            blockedSongs.append(
-                BlockedSong(
-                    sourceId: sourceId,
-                    path: song.path,
-                    title: song.title,
-                    artist: song.artist,
-                    album: song.album
-                )
-            )
+    @discardableResult
+    func blockSongs(withIds ids: Set<UUID>) -> [Song.ID: BlockedSong]? {
+        guard requireLoadedLibrary() else { return nil }
+        var updatedBlockedSongs = blockedSongs
+        var recordsByKey: [String: BlockedSong] = [:]
+        for record in blockedSongs {
+            recordsByKey[blockedKey(path: record.path, sourceId: record.sourceId)] = record
         }
+        var records: [Song.ID: BlockedSong] = [:]
+        for song in songs where ids.contains(song.id) {
+            guard let sourceId = source(containing: song.path)?.id else { continue }
+            let key = blockedKey(path: song.path, sourceId: sourceId)
+            if let record = recordsByKey[key] {
+                records[song.id] = record
+                continue
+            }
+            let record = BlockedSong(
+                sourceId: sourceId,
+                path: song.path,
+                title: song.title,
+                artist: song.artist,
+                album: song.album
+            )
+            updatedBlockedSongs.append(record)
+            recordsByKey[key] = record
+            records[song.id] = record
+        }
+        guard !records.isEmpty else { return [:] }
 
-        removeSongsFromVisibleLibrary(withIds: ids)
+        let blockedIDs = Set(records.keys)
+        guard commitLibraryChanges(
+            songs: songs.filter { !blockedIDs.contains($0.id) },
+            playlists: playlists.map { removingSongs(blockedIDs, from: $0) },
+            blockedSongs: updatedBlockedSongs
+        ) else { return nil }
+        for id in blockedIDs {
+            songsByID.removeValue(forKey: id)
+        }
+        return records
     }
 
-    func unblockSong(_ blockedSong: BlockedSong) {
-        blockedSongs.removeAll { $0.id == blockedSong.id }
-        saveLibraryState()
+    @discardableResult
+    func unblockSong(_ blockedSong: BlockedSong) -> Bool {
+        guard blockedSongs.contains(where: { $0.id == blockedSong.id }),
+              commitLibraryChanges(blockedSongs: blockedSongs.filter { $0.id != blockedSong.id }) else { return false }
 
         if let source = librarySources.first(where: { $0.id == blockedSong.sourceId }) {
             scanLibrarySource(source)
         }
+        return true
     }
 
     // 创建新播放列表
-    func createPlaylist(name: String, description: String = "") {
-        guard requireLoadedLibrary() else { return }
+    func createPlaylist(name: String, description: String = "") -> Playlist? {
+        let now = Date()
         let playlist = Playlist(
             name: name,
             description: description,
             songs: [],
-            createdAt: Date(),
-            updatedAt: Date()
+            createdAt: now,
+            updatedAt: now
         )
-        playlists.append(playlist)
-        saveLibraryState()
+        guard commitLibraryChanges(playlists: playlists + [playlist]) else { return nil }
+        return playlist
     }
 
     // 更新播放列表信息
@@ -598,32 +618,32 @@ class MusicLibrary: ObservableObject {
     }
 
     // 批量添加歌曲到播放列表
-    func addSongsToPlaylist(_ songsToAdd: [Song], playlistId: UUID) {
+    @discardableResult
+    func addSongsToPlaylist(_ songsToAdd: [Song], playlistId: UUID) -> Int? {
         guard !songsToAdd.isEmpty, let index = playlists.firstIndex(where: { $0.id == playlistId }) else {
-            return
+            return 0
         }
 
         var playlist = playlists[index]
+        let originalCount = playlist.songs.count
         var existingIDs = Set(playlist.songs.map(\.id))
-        var didAddSongs = false
+        let now = Date()
 
         for song in songsToAdd where existingIDs.insert(song.id).inserted {
             playlist.songs.append(song)
             playlist.songEntries.append(
                 PlaylistSong(
                     songId: song.id,
-                    addedAt: Date(),
+                    addedAt: now,
                     sortOrder: playlist.songEntries.count
                 )
             )
-            didAddSongs = true
         }
 
-        guard didAddSongs else { return }
-
-        playlist.updatedAt = Date()
-        playlists[index] = playlist
-        saveLibraryState()
+        let addedCount = playlist.songs.count - originalCount
+        guard addedCount > 0 else { return 0 }
+        playlist.updatedAt = now
+        return commitPlaylist(playlist, at: index) ? addedCount : nil
     }
 
     // 从播放列表移除歌曲
@@ -632,22 +652,51 @@ class MusicLibrary: ObservableObject {
     }
 
     // 从播放列表批量移除歌曲
-    func removeSongsFromPlaylist(songIds ids: Set<UUID>, playlistId: UUID) {
+    @discardableResult
+    func removeSongsFromPlaylist(songIds ids: Set<UUID>, playlistId: UUID) -> Int? {
         guard !ids.isEmpty, let index = playlists.firstIndex(where: { $0.id == playlistId }) else {
-            return
+            return 0
         }
 
+        let current = playlists[index]
+        let updated = removingSongs(ids, from: current)
+        let removedCount = current.songs.count - updated.songs.count
+        guard removedCount > 0 else { return 0 }
+        return commitPlaylist(updated, at: index) ? removedCount : nil
+    }
+
+    func movePlaylistSong(_ songID: UUID, in playlistID: UUID, before targetID: UUID?) -> Bool {
+        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return false }
         var playlist = playlists[index]
-        let originalCount = playlist.songs.count
-        playlist.songs.removeAll { ids.contains($0.id) }
-        playlist.songEntries.removeAll { ids.contains($0.songId) }
-        playlist.songEntries = normalizedPlaylistEntries(playlist.songEntries)
+        guard let source = playlist.songs.firstIndex(where: { $0.id == songID }) else { return false }
+        let destination: Int
+        if let targetID {
+            guard let target = playlist.songs.firstIndex(where: { $0.id == targetID }) else { return false }
+            destination = target
+        } else {
+            destination = playlist.songs.count
+        }
+        guard destination != source, destination != source + 1 else { return true }
 
-        guard playlist.songs.count != originalCount else { return }
-
+        reorder(&playlist.songs, from: IndexSet(integer: source), to: destination)
+        playlist.songEntries = playlist.orderedSongEntries
         playlist.updatedAt = Date()
-        playlists[index] = playlist
-        saveLibraryState()
+        return commitPlaylist(playlist, at: index)
+    }
+
+    private func removingSongs(_ ids: Set<UUID>, from playlist: Playlist) -> Playlist {
+        var updated = playlist
+        updated.songs.removeAll { ids.contains($0.id) }
+        guard updated.songs.count != playlist.songs.count else { return playlist }
+        updated.songEntries = updated.orderedSongEntries
+        updated.updatedAt = Date()
+        return updated
+    }
+
+    private func commitPlaylist(_ playlist: Playlist, at index: Int) -> Bool {
+        var updatedPlaylists = playlists
+        updatedPlaylists[index] = playlist
+        return commitLibraryChanges(playlists: updatedPlaylists)
     }
 
     private func incrementPlaybackStats(for songId: Song.ID) {
@@ -709,8 +758,8 @@ class MusicLibrary: ObservableObject {
         }
     }
 
-    private func saveLibraryState() {
-        let snapshot = LibraryPersistentSnapshot(
+    private func librarySnapshot() -> LibraryPersistentSnapshot {
+        LibraryPersistentSnapshot(
             songs: songs,
             playlists: playlists,
             librarySources: librarySources.map {
@@ -719,21 +768,61 @@ class MusicLibrary: ObservableObject {
             blockedSongs: blockedSongs
         )
 
+    }
+
+    private func saveLibraryState() {
+        let snapshot = librarySnapshot()
         do {
-            guard hasLoadedLibraryState, let persistenceStore else { throw LibraryPersistenceStore.StoreError.missingDatabase }
-            try persistenceStore.saveSnapshot(snapshot)
-            persistedArtworkPaths = Dictionary(uniqueKeysWithValues: snapshot.songs.compactMap { song in
-                song.coverPath.map { (song.id, $0) }
-            })
-            hasUnsavedLibraryState = false
-            updateArtworkReferences()
-            artworkStore.scheduleCleanup()
-            scheduleArtworkMaintenance()
+            try persistLibrarySnapshot(snapshot)
+            didSaveLibrarySnapshot(snapshot)
         } catch {
             hasUnsavedLibraryState = true
             updateArtworkReferences()
             lastScanError = L10n.current(.saveLibraryFailed, error.localizedDescription)
         }
+    }
+
+    private func commitLibraryChanges(
+        songs updatedSongs: [Song]? = nil,
+        playlists updatedPlaylists: [Playlist]? = nil,
+        blockedSongs updatedBlockedSongs: [BlockedSong]? = nil
+    ) -> Bool {
+        guard requireLoadedLibrary() else { return false }
+        var snapshot = librarySnapshot()
+        if let updatedSongs { snapshot.songs = updatedSongs }
+        if let updatedPlaylists { snapshot.playlists = updatedPlaylists }
+        if let updatedBlockedSongs { snapshot.blockedSongs = updatedBlockedSongs }
+
+        do {
+            try persistLibrarySnapshot(snapshot)
+        } catch {
+            lastScanError = L10n.current(.saveLibraryFailed, error.localizedDescription)
+            return false
+        }
+
+        if let updatedBlockedSongs { blockedSongs = updatedBlockedSongs }
+        if let updatedPlaylists { playlists = updatedPlaylists }
+        if let updatedSongs {
+            songs = updatedSongs
+            rebuildAlbumsAndArtists()
+        }
+        didSaveLibrarySnapshot(snapshot)
+        return true
+    }
+
+    private func persistLibrarySnapshot(_ snapshot: LibraryPersistentSnapshot) throws {
+        guard hasLoadedLibraryState, let persistenceStore else { throw LibraryPersistenceStore.StoreError.missingDatabase }
+        try persistenceStore.saveSnapshot(snapshot)
+    }
+
+    private func didSaveLibrarySnapshot(_ snapshot: LibraryPersistentSnapshot) {
+        persistedArtworkPaths = Dictionary(uniqueKeysWithValues: snapshot.songs.compactMap { song in
+            song.coverPath.map { (song.id, $0) }
+        })
+        hasUnsavedLibraryState = false
+        updateArtworkReferences()
+        artworkStore.scheduleCleanup()
+        scheduleArtworkMaintenance()
     }
 
     private func artworkPathsByAudioPath() -> [String: String] {

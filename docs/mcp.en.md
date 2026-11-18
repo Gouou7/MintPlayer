@@ -1,6 +1,6 @@
-# MCP Playback Control
+# MCP Client Setup
 
-MCP clients on the same Mac can use stdio to search the Mint Player library and control playback and the upcoming queue. The client can connect and discover tools while Mint Player is closed. The first tool call opens the player automatically.
+MCP clients on the same Mac can connect to Mint Player over stdio. The client can connect and discover tools while Mint Player is closed. The first tool call opens the player automatically.
 
 ## Configure the client
 
@@ -29,7 +29,7 @@ When upgrading, replace the previous HTTP URL configuration with the stdio comma
 
 ## Access token
 
-MCP is off by default and requires an access token once enabled. If you turn off **Require Access Token**, omit `MINTPLAYER_MCP_TOKEN`. Processes running under your macOS account can then control playback without a token. After rotating the token, update your client configuration and reconnect.
+MCP is off by default. When enabled, it requires an access token by default. If you turn off **Require Access Token**, you can omit `MINTPLAYER_MCP_TOKEN`. Processes running under your macOS account can then use all MCP tools without a token. After rotating the token, update your client configuration and reconnect.
 
 Mint Player stores the token in its application database. Keep actual tokens in your personal client configuration and out of the repository.
 
@@ -37,14 +37,6 @@ Mint Player stores the token in its application database. Keep actual tokens in 
 
 When Mint Player is already open, tool calls control the same player instance. Mint Player can keep playing after you close the client. Turning off MCP in the app settings blocks tool calls.
 
-## Available tools
+## MCP tools
 
-| Capability | Tool behavior |
-| --- | --- |
-| Search | Search for songs, artists, and albums |
-| Play | Play a song or play an artist or album in order or shuffled |
-| Read | Read the current song's full lyrics, playback state, and upcoming queue |
-| Control | Resume, pause, go to the previous or next song, set volume, or seek |
-| Queue | Add, remove, reorder, and clear upcoming songs, or undo the last clear |
-
-Select songs by library UUID and select artists and albums by ID from search results. Tool results omit local audio paths.
+See the [MCP Tool Reference](mcp-tools.en.md) for the full list, arguments, and examples.

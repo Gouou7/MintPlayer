@@ -34,8 +34,7 @@ struct PlaylistDropDestination: NSViewRepresentable {
             guard let playlistId, let musicLibrary else { return false }
             let songs = SongDragPayload.songs(from: sender.draggingPasteboard, musicLibrary: musicLibrary)
             guard !songs.isEmpty else { return false }
-            musicLibrary.addSongsToPlaylist(songs, playlistId: playlistId)
-            return true
+            return musicLibrary.addSongsToPlaylist(songs, playlistId: playlistId) != nil
         }
         
         private func canAccept(_ sender: NSDraggingInfo) -> Bool {

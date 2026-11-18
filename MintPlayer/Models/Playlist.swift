@@ -21,6 +21,15 @@ struct Playlist: Identifiable, Codable, Hashable {
     let createdAt: Date
     var updatedAt: Date
 
+    var orderedSongEntries: [PlaylistSong] {
+        let entriesByID = Dictionary(uniqueKeysWithValues: songEntries.map { ($0.songId, $0) })
+        return songs.enumerated().map { index, song in
+            var entry = entriesByID[song.id] ?? PlaylistSong(songId: song.id, addedAt: updatedAt, sortOrder: index)
+            entry.sortOrder = index
+            return entry
+        }
+    }
+
     init(
         id: UUID = UUID(),
         name: String,

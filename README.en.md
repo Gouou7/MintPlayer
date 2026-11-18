@@ -17,7 +17,7 @@ Mint Player is a native macOS local music player for macOS 26, using the Liquid 
 - Browses tracks by album or artist, and supports custom playlists
 - Favorites or blocks songs, and keeps play counts
 - Shows lyrics inside the main window or in a separate window, with LRC scrolling highlights and timing adjustment
-- Can optionally expose a local MCP server so agents can search songs and control playback and the upcoming queue
+- Can optionally expose a local MCP server so agents can search the library, control playback, manage playlists, and block songs
 
 ## Screenshots
 
@@ -51,11 +51,11 @@ Settings let you follow the system or pick English or Simplified Chinese, and fo
 
 Playback can also be controlled from macOS Now Playing, media keys, Control Center, and the Dock menu.
 
-## MCP Playback Control
+## MCP
 
-MCP clients on the same Mac can use stdio to open Mint Player on demand, search your library, and control playback and the upcoming queue. This feature is off by default and requires an access token once enabled.
+MCP clients on the same Mac can use stdio to open Mint Player on demand. The server is off by default and requires an access token by default when enabled.
 
-See [MCP Playback Control](docs/mcp.en.md) for client configuration, tokens, and available tools.
+See [MCP Client Setup](docs/mcp.en.md) for connection and token settings and the [MCP Tool Reference](docs/mcp-tools.en.md) for the full tool list and examples.
 
 ## Tech Stack
 
@@ -83,7 +83,7 @@ xcodebuild -project MintPlayer.xcodeproj -scheme MintPlayer -configuration Debug
 - **No songs after adding a folder**: make sure the folder contains supported audio files; subfolders are scanned recursively; blocked songs do not appear in the library.
 - **Debug and Release do not share a library**: they use separate, isolated storage locations. This is expected.
 - **No lyrics**: lyrics come from an LRC file with the same name as the audio file. You can also pick another file and text encoding in the lyrics view.
-- **The MCP client cannot connect**: check that MCP is enabled, the stdio command path is correct, and the token is current. See [MCP Playback Control](docs/mcp.en.md).
+- **The MCP client cannot connect**: check that MCP is enabled, the stdio command path is correct, and the token is current. See [MCP Client Setup](docs/mcp.en.md).
 
 ## License
 

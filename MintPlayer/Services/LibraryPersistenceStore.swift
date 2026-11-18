@@ -485,8 +485,7 @@ final class LibraryPersistenceStore {
             bindInt(playlistIndex, to: playlistStatement, at: 6)
             try stepDone(playlistStatement)
 
-            let entries = normalizedEntries(for: playlist)
-            for entry in entries {
+            for entry in playlist.orderedSongEntries {
                 sqlite3_reset(entryStatement)
                 bindText(playlist.id.uuidString, to: entryStatement, at: 1)
                 bindText(entry.songId.uuidString, to: entryStatement, at: 2)
@@ -542,15 +541,6 @@ final class LibraryPersistenceStore {
         try readRows("PRAGMA user_version") { statement in
             sqlite3_column_int(statement, 0)
         }.first ?? 0
-    }
-
-    private func normalizedEntries(for playlist: Playlist) -> [PlaylistSong] {
-        let entriesByID = Dictionary(uniqueKeysWithValues: playlist.songEntries.map { ($0.songId, $0) })
-        return playlist.songs.enumerated().map { index, song in
-            var entry = entriesByID[song.id] ?? PlaylistSong(songId: song.id, addedAt: playlist.updatedAt, sortOrder: index)
-            entry.sortOrder = index
-            return entry
-        }
     }
 
     private func execute(_ sql: String) throws {

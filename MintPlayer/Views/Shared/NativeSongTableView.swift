@@ -783,12 +783,13 @@ extension NativeSongTableView {
                     self?.parent.musicLibrary.addSongsToPlaylist(songs, playlistId: playlistId)
                 },
                 onBlockSongs: { [weak self] ids in
-                    self?.parent.musicLibrary.blockSongs(withIds: ids)
-                    self?.parent.selectedSongIDs.subtract(ids)
+                    guard let self, let records = self.parent.musicLibrary.blockSongs(withIds: ids) else { return }
+                    self.parent.selectedSongIDs.subtract(records.keys)
                 },
                 onRemoveFromPlaylist: { [weak self] ids, playlistId in
-                    self?.parent.musicLibrary.removeSongsFromPlaylist(songIds: ids, playlistId: playlistId)
-                    self?.parent.selectedSongIDs.subtract(ids)
+                    guard let self,
+                          self.parent.musicLibrary.removeSongsFromPlaylist(songIds: ids, playlistId: playlistId) != nil else { return }
+                    self.parent.selectedSongIDs.subtract(ids)
                 }
             )
             songContextMenuController = controller
