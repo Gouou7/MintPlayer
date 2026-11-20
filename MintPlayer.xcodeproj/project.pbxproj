@@ -40,6 +40,7 @@
 		00000000000000000000011A /* MintPlayer/Views/Library/Albums/AlbumCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000021A /* MintPlayer/Views/Library/Albums/AlbumCardView.swift */; };
 		00000000000000000000011B /* MintPlayer/Views/Library/Artists/ArtistsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000021B /* MintPlayer/Views/Library/Artists/ArtistsView.swift */; };
 		00000000000000000000011D /* MintPlayer/Views/Player/PlayerBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000021D /* MintPlayer/Views/Player/PlayerBarView.swift */; };
+		00000000000000000000013B /* MintPlayer/Views/Player/PlaybackProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000023B /* MintPlayer/Views/Player/PlaybackProgressView.swift */; };
 		00000000000000000000011E /* MintPlayer/Views/Player/QueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000021E /* MintPlayer/Views/Player/QueueView.swift */; };
 		00000000000000000000011F /* MintPlayer/Views/Settings/LibrarySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000021F /* MintPlayer/Views/Settings/LibrarySettingsView.swift */; };
 		000000000000000000000120 /* MintPlayer/Views/Shared/MintTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000220 /* MintPlayer/Views/Shared/MintTheme.swift */; };
@@ -142,6 +143,7 @@
 		00000000000000000000021A /* MintPlayer/Views/Library/Albums/AlbumCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Library/Albums/AlbumCardView.swift; sourceTree = "<group>"; };
 		00000000000000000000021B /* MintPlayer/Views/Library/Artists/ArtistsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Library/Artists/ArtistsView.swift; sourceTree = "<group>"; };
 		00000000000000000000021D /* MintPlayer/Views/Player/PlayerBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Player/PlayerBarView.swift; sourceTree = "<group>"; };
+		00000000000000000000023B /* MintPlayer/Views/Player/PlaybackProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Player/PlaybackProgressView.swift; sourceTree = "<group>"; };
 		00000000000000000000021E /* MintPlayer/Views/Player/QueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Player/QueueView.swift; sourceTree = "<group>"; };
 		00000000000000000000021F /* MintPlayer/Views/Settings/LibrarySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Settings/LibrarySettingsView.swift; sourceTree = "<group>"; };
 		000000000000000000000220 /* MintPlayer/Views/Shared/MintTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Shared/MintTheme.swift; sourceTree = "<group>"; };
@@ -376,6 +378,7 @@
 			isa = PBXGroup;
 			children = (
 				00000000000000000000021D /* MintPlayer/Views/Player/PlayerBarView.swift */,
+				00000000000000000000023B /* MintPlayer/Views/Player/PlaybackProgressView.swift */,
 				00000000000000000000021E /* MintPlayer/Views/Player/QueueView.swift */,
 				00000000000000000000022C /* MintPlayer/Views/Player/LyricsOverlayView.swift */,
 			);
@@ -574,6 +577,7 @@
 				00000000000000000000011A /* MintPlayer/Views/Library/Albums/AlbumCardView.swift in Sources */,
 				00000000000000000000011B /* MintPlayer/Views/Library/Artists/ArtistsView.swift in Sources */,
 				00000000000000000000011D /* MintPlayer/Views/Player/PlayerBarView.swift in Sources */,
+				00000000000000000000013B /* MintPlayer/Views/Player/PlaybackProgressView.swift in Sources */,
 				00000000000000000000011E /* MintPlayer/Views/Player/QueueView.swift in Sources */,
 				00000000000000000000011F /* MintPlayer/Views/Settings/LibrarySettingsView.swift in Sources */,
 				000000000000000000000120 /* MintPlayer/Views/Shared/MintTheme.swift in Sources */,

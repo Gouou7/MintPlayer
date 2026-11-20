@@ -74,7 +74,6 @@ struct NativeSongTableView: NSViewRepresentable {
         context.coordinator.configureScrollBehavior(scrollView, for: style)
         context.coordinator.observeClipView(scrollView.contentView)
         context.coordinator.resizeColumnsToFit()
-        context.coordinator.lastSongIDs = songs.map(\.id)
         context.coordinator.lastSongs = songs
         context.coordinator.syncSortDescriptorsToTable()
         context.coordinator.syncSelectionToTable()
@@ -88,22 +87,18 @@ struct NativeSongTableView: NSViewRepresentable {
         configureBackground(for: style, tableView: tableView, scrollView: scrollView)
         let configurationChanged = context.coordinator.currentStyle != style ||
             context.coordinator.currentColumnPreferenceScope != columnPreferenceScope
+        let coordinator = context.coordinator
         if configurationChanged {
-            context.coordinator.configureColumns(for: style)
-            context.coordinator.configureScrollBehavior(scrollView, for: style)
+            coordinator.configureColumns(for: style)
+            coordinator.configureScrollBehavior(scrollView, for: style)
+        } else {
+            coordinator.updateColumnTitles()
         }
-        context.coordinator.configureContentInsets(scrollView)
-
-        let songIDs = songs.map(\.id)
-        if configurationChanged || context.coordinator.lastSongIDs != songIDs || context.coordinator.lastSongs != songs {
-            context.coordinator.lastSongIDs = songIDs
-            context.coordinator.lastSongs = songs
-            tableView.reloadData()
-        }
-
-        context.coordinator.resizeColumnsToFit()
-        context.coordinator.syncSortDescriptorsToTable()
-        context.coordinator.syncSelectionToTable()
+        coordinator.configureContentInsets(scrollView)
+        coordinator.reloadSongs(in: tableView, configurationChanged: configurationChanged)
+        coordinator.resizeColumnsToFit()
+        coordinator.syncSortDescriptorsToTable()
+        coordinator.syncSelectionToTable()
     }
 
     private func configureBackground(for style: Style, tableView: NSTableView, scrollView: NSScrollView) {
@@ -493,8 +488,8 @@ extension NativeSongTableView {
         var currentStyle: Style?
         var currentColumnPreferenceScope: ColumnPreferenceScope?
         private var isConfiguringColumns = false
-        var lastSongIDs: [Song.ID] = []
         var lastSongs: [Song] = []
+        private var columnLanguage: AppLanguage?
         private var isSyncingSelection = false
         private var isApplyingColumnWidths = false
         private var isApplyingSortDescriptors = false
@@ -523,6 +518,38 @@ extension NativeSongTableView {
 
             currentStyle = style
             currentColumnPreferenceScope = parent.columnPreferenceScope
+            columnLanguage = parent.settings.effectiveLanguage
+        }
+
+        func updateColumnTitles() {
+            let language = parent.settings.effectiveLanguage
+            guard let tableView, columnLanguage != language else { return }
+            columnLanguage = language
+
+            for column in tableView.tableColumns {
+                guard let id = NativeSongColumn(rawValue: column.identifier.rawValue) else { continue }
+                column.title = title(for: id, style: parent.style)
+            }
+            tableView.headerView?.needsDisplay = true
+        }
+
+        func reloadSongs(in tableView: NSTableView, configurationChanged: Bool) {
+            let songs = parent.songs
+            guard configurationChanged || lastSongs != songs else { return }
+            let previousSongs = lastSongs
+            lastSongs = songs
+
+            isSyncingSelection = true
+            defer { isSyncingSelection = false }
+
+            guard !configurationChanged, previousSongs.elementsEqual(songs, by: { $0.id == $1.id }) else {
+                tableView.reloadData()
+                return
+            }
+
+            let changedRows = IndexSet(songs.indices.filter { previousSongs[$0] != songs[$0] })
+            let columns = IndexSet(integersIn: 0..<tableView.numberOfColumns)
+            tableView.reloadData(forRowIndexes: changedRows, columnIndexes: columns)
         }
 
         deinit {

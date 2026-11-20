@@ -46,7 +46,7 @@ struct LyricsOverlayView: View {
             let fileURL = settings.lyricsFileURL(for: song)
             let offset = settings.lyricsTimingOffset(for: song)
             let encoding = settings.lyricsEncoding(for: song)
-            let source = song.id.uuidString + (fileURL?.path ?? song.path)
+            let source = lyricsSource
             if loadedLyricsSource != source { lyricsState = .loading }
             let result = await Task.detached(priority: .userInitiated) {
                 LyricsService.loadLyrics(for: song, fileURL: fileURL, timingOffset: offset, encoding: encoding)
@@ -118,7 +118,8 @@ struct LyricsOverlayView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
 
-            progressInfo
+            PlaybackProgressView(player: audioPlayer, songID: song.id, style: .lyrics)
+                .id(song.id)
                 .fixedSize(horizontal: false, vertical: true)
 
             playbackControls
@@ -142,6 +143,10 @@ struct LyricsOverlayView: View {
         LyricsRequest(songID: song.id, path: settings.lyricsFileURL(for: song)?.path ?? song.path,
                       offset: settings.lyricsTimingOffset(for: song), reloadGeneration: lyricsReloadGeneration,
                       language: settings.effectiveLanguage, encoding: settings.lyricsEncoding(for: song))
+    }
+
+    private var lyricsSource: String {
+        song.id.uuidString + (settings.lyricsFileURL(for: song)?.path ?? song.path)
     }
 
     private var lyricsOptions: some View {
@@ -190,29 +195,6 @@ struct LyricsOverlayView: View {
         }
     }
 
-    private var progressInfo: some View {
-        VStack(spacing: 8) {
-            FullscreenProgressSlider(
-                value: Binding(
-                    get: { min(audioPlayer.currentTime, max(audioPlayer.duration, 0)) },
-                    set: { audioPlayer.seek(to: $0) }
-                ),
-                range: 0...max(audioPlayer.duration, 1)
-            )
-            .frame(height: 18)
-
-            HStack {
-                Text(formatTime(audioPlayer.currentTime))
-                Spacer()
-                Text(formatTime(audioPlayer.duration))
-            }
-            .font(.caption.weight(.semibold))
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     private var playbackControls: some View {
         HStack(spacing: 0) {
             Button {
@@ -224,6 +206,8 @@ struct LyricsOverlayView: View {
             }
             .buttonStyle(PlaybackToggleButtonStyle(isActive: audioPlayer.isShuffleEnabled))
             .help(settings.text(.shuffle))
+            .accessibilityLabel(settings.text(.shuffle))
+            .accessibilityAddTraits(audioPlayer.isShuffleEnabled ? .isSelected : [])
 
             Spacer(minLength: 24)
 
@@ -239,6 +223,7 @@ struct LyricsOverlayView: View {
             }
             .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 58, height: 58)))
             .help(settings.text(.previous))
+            .accessibilityLabel(settings.text(.previous))
 
             Spacer(minLength: 24)
 
@@ -251,6 +236,7 @@ struct LyricsOverlayView: View {
             }
             .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 58, height: 58)))
             .help(audioPlayer.isPlaying ? settings.text(.pause) : settings.text(.play))
+            .accessibilityLabel(audioPlayer.isPlaying ? settings.text(.pause) : settings.text(.play))
 
             Spacer(minLength: 24)
 
@@ -266,6 +252,7 @@ struct LyricsOverlayView: View {
             }
             .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 58, height: 58)))
             .help(settings.text(.next))
+            .accessibilityLabel(settings.text(.next))
 
             Spacer(minLength: 24)
 
@@ -278,6 +265,8 @@ struct LyricsOverlayView: View {
             }
             .buttonStyle(PlaybackToggleButtonStyle(isActive: audioPlayer.isRepeatEnabled))
             .help(settings.text(.repeatMode))
+            .accessibilityLabel(settings.text(.repeatMode))
+            .accessibilityAddTraits(audioPlayer.isRepeatEnabled ? .isSelected : [])
         }
         .foregroundStyle(.primary)
         .frame(maxWidth: .infinity)
@@ -285,13 +274,17 @@ struct LyricsOverlayView: View {
 
     @ViewBuilder
     private var lyricsContent: some View {
-        switch lyricsState {
+        switch loadedLyricsSource == lyricsSource ? lyricsState : .loading {
         case .loading:
             ProgressView(settings.text(.lyricsLoading))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .synced(let lines):
-            SyncedLyricsView(lines: lines)
-                .environmentObject(audioPlayer)
+            LyricsPlaybackFollower(lines: lines, progress: audioPlayer.progress) { activeLineIndex in
+                SyncedLyricsView(lines: lines, activeLineIndex: activeLineIndex) { time in
+                    guard audioPlayer.currentSong?.id == song.id else { return }
+                    audioPlayer.seek(to: time)
+                }
+            }
         case .plainText(let lines):
             PlainLyricsView(lines: lines)
         case .missing:
@@ -305,12 +298,6 @@ struct LyricsOverlayView: View {
                 detail: message
             )
         }
-    }
-
-    private func formatTime(_ time: TimeInterval) -> String {
-        guard time.isFinite else { return "0:00" }
-        let totalSeconds = max(0, Int(time.rounded(.down)))
-        return "\(totalSeconds / 60):\(String(format: "%02d", totalSeconds % 60))"
     }
 }
 
@@ -357,7 +344,6 @@ private struct NativeLyricsOptionsMenu: NSViewRepresentable {
         button.menu = menu
         button.isBordered = false
         button.controlSize = .regular
-        button.focusRingType = .none
         button.imagePosition = .imageLeading
         button.preferredEdge = .minY
         button.autoenablesItems = false
@@ -822,76 +808,6 @@ private extension CIImage {
     }
 }
 
-private struct FullscreenProgressSlider: View {
-    @Binding var value: TimeInterval
-    let range: ClosedRange<TimeInterval>
-
-    @State private var isHovering = false
-    @State private var isDragging = false
-
-    private let trackHeight: CGFloat = 7
-    private let knobDiameter: CGFloat = 15
-    private let hitHeight: CGFloat = 22
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = max(proxy.size.width, 1)
-            let progress = normalizedProgress
-            let progressWidth = width * progress
-            let showsKnob = isHovering || isDragging
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.white.opacity(0.22))
-                    .frame(height: trackHeight)
-
-                Capsule()
-                    .fill(Color.white.opacity(0.74))
-                    .frame(width: max(progressWidth, progress > 0 ? trackHeight : 0), height: trackHeight)
-
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: knobDiameter, height: knobDiameter)
-                    .shadow(color: .black.opacity(0.22), radius: 4, x: 0, y: 2)
-                    .position(x: progressWidth, y: hitHeight / 2)
-                    .opacity(showsKnob ? 1 : 0)
-            }
-            .frame(height: hitHeight)
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                isHovering = hovering
-            }
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { gestureValue in
-                        isDragging = true
-                        updateValue(locationX: gestureValue.location.x, width: width)
-                    }
-                    .onEnded { gestureValue in
-                        updateValue(locationX: gestureValue.location.x, width: width)
-                        isDragging = false
-                    }
-            )
-        }
-        .frame(height: hitHeight)
-        .modifier(PlaybackProgressAccessibility(value: $value, range: range))
-    }
-
-    private var normalizedProgress: CGFloat {
-        let span = range.upperBound - range.lowerBound
-        guard span > 0 else { return 0 }
-
-        let clampedValue = min(max(value, range.lowerBound), range.upperBound)
-        return CGFloat((clampedValue - range.lowerBound) / span)
-    }
-
-    private func updateValue(locationX: CGFloat, width: CGFloat) {
-        let progress = min(max(locationX / max(width, 1), 0), 1)
-        let span = range.upperBound - range.lowerBound
-        value = range.lowerBound + TimeInterval(progress) * span
-    }
-}
-
 private struct PlaybackToggleButtonStyle: ButtonStyle {
     let isActive: Bool
     private let hoverSize: CGFloat = 38
@@ -926,6 +842,47 @@ private struct PlaybackToggleButtonStyle: ButtonStyle {
     }
 }
 
+struct LyricsPlaybackFollower<Content: View>: View {
+    let lines: [LyricLine]
+    let progress: PlaybackProgress
+    @ViewBuilder let content: (Int?) -> Content
+
+    @State private var activeLine: ActiveLine? = nil
+
+    private struct ActiveLine: Equatable {
+        let index: Int
+        let id: LyricLine.ID
+    }
+
+    var body: some View {
+        let activeIndex: Int? = activeLine.flatMap {
+            lines.indices.contains($0.index) && lines[$0.index].id == $0.id ? $0.index : nil
+        }
+        content(activeIndex)
+            .onReceive(progress.$time) { updateActiveLine(at: $0) }
+            .onChange(of: lines, initial: true) { updateActiveLine(at: progress.time) }
+    }
+
+    private func updateActiveLine(at time: TimeInterval) {
+        var lowerBound = 0
+        var upperBound = lines.count
+        while lowerBound < upperBound {
+            let middle = lowerBound + (upperBound - lowerBound) / 2
+            if lines[middle].time <= time {
+                lowerBound = middle + 1
+            } else {
+                upperBound = middle
+            }
+        }
+
+        let index = lowerBound - 1
+        let nextLine: ActiveLine? = index >= 0 ? ActiveLine(index: index, id: lines[index].id) : nil
+        if activeLine != nextLine {
+            activeLine = nextLine
+        }
+    }
+}
+
 struct SyncedLyricsView: View {
     enum Style {
         case overlay
@@ -933,40 +890,18 @@ struct SyncedLyricsView: View {
     }
 
     let lines: [LyricLine]
-    let style: Style
+    let activeLineIndex: Int?
+    var style: Style = .overlay
+    var onSeek: ((TimeInterval) -> Void)?
 
-    init(lines: [LyricLine], style: Style = .overlay) {
-        self.lines = lines
-        self.style = style
-    }
-
-    @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var settings: SettingsManager
     @Environment(\.accessibilityReduceMotion) private var reducesMotion
-    @State private var lyricsScrollView: NSScrollView?
+    @StateObject private var scrollController = LyricsScrollController()
     @State private var lineMidYByID: [LyricLine.ID: CGFloat] = [:]
 
     private var lineSpacing: CGFloat { style == .widget ? 0 : 18 }
     private var lyricFocusAnchorY: CGFloat { style == .widget ? 0.3 : 0.18 }
     private let compactFocusSpacerHeight: CGFloat = 132
-
-    private var activeLineIndex: Int? {
-        guard !lines.isEmpty else { return nil }
-
-        let currentTime = audioPlayer.currentTime
-        var activeIndex: Int?
-
-        for index in lines.indices {
-            let line = lines[index]
-            if line.time <= currentTime {
-                activeIndex = index
-            } else {
-                break
-            }
-        }
-
-        return activeIndex
-    }
 
     private var highlightedLineID: LyricLine.ID? {
         guard let activeLineIndex, lines.indices.contains(activeLineIndex) else { return nil }
@@ -974,7 +909,7 @@ struct SyncedLyricsView: View {
     }
 
     private var activeLineLyricWindow: TimeInterval {
-        guard let activeLineIndex else { return 0.32 }
+        guard let activeLineIndex, lines.indices.contains(activeLineIndex) else { return 0.32 }
 
         let activeLine = lines[activeLineIndex]
         let nextLineTime = lines.indices.contains(activeLineIndex + 1)
@@ -1008,7 +943,7 @@ struct SyncedLyricsView: View {
 
     private func distanceFromActiveLine(for index: Int, activeLineIndex: Int?) -> Int {
         guard let activeLineIndex else { return 4 }
-        return abs(index - activeLineIndex)
+        return min(abs(index - activeLineIndex), 12)
     }
 
     var body: some View {
@@ -1017,7 +952,6 @@ struct SyncedLyricsView: View {
             let trailingSpacerHeight = style == .widget
                 ? geometry.size.height * (1 - lyricFocusAnchorY)
                 : focusSpacerHeight
-            let activeIndex = activeLineIndex
             let transitionAnimation = activeLineTransitionAnimation(duration: highlightTransitionDuration)
 
             ScrollView(.vertical, showsIndicators: false) {
@@ -1025,10 +959,10 @@ struct SyncedLyricsView: View {
                     Color.clear
                         .frame(height: focusSpacerHeight)
 
-                    ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
+                    ForEach(lines.enumerated(), id: \.element.id) { index, line in
                         lyricRow(
                             line: line,
-                            distanceFromActiveLine: distanceFromActiveLine(for: index, activeLineIndex: activeIndex),
+                            distanceFromActiveLine: distanceFromActiveLine(for: index, activeLineIndex: activeLineIndex),
                             transitionAnimation: transitionAnimation
                         )
                         .id(line.id)
@@ -1043,9 +977,7 @@ struct SyncedLyricsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .coordinateSpace(name: LyricsScrollCoordinateSpace.name)
                 .background {
-                    LyricsScrollViewResolver { scrollView in
-                        lyricsScrollView = scrollView
-                    }
+                    LyricsScrollViewResolver(controller: scrollController)
                 }
             }
             .onPreferenceChange(LyricsLinePositionPreferenceKey.self) { positions in
@@ -1055,8 +987,7 @@ struct SyncedLyricsView: View {
             .onAppear {
                 scrollToHighlightedLine(viewportHeight: geometry.size.height, animated: false)
             }
-            .onChange(of: lyricsScrollView != nil) { _, hasScrollView in
-                guard hasScrollView else { return }
+            .onChange(of: scrollController.attachmentRevision) {
                 scrollToHighlightedLine(viewportHeight: geometry.size.height, animated: false)
             }
             .onChange(of: highlightedLineID) { _, _ in
@@ -1077,43 +1008,24 @@ struct SyncedLyricsView: View {
             transitionAnimation: transitionAnimation,
             style: style
         )
-        if style == .overlay {
-            row
-                .onTapGesture { audioPlayer.seek(to: line.time) }
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction { audioPlayer.seek(to: line.time) }
+        if let onSeek {
+            Button { onSeek(line.time) } label: { row }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(distanceFromActiveLine == 0 ? .isSelected : [])
         } else {
             row
         }
     }
 
     private func scrollToHighlightedLine(viewportHeight: CGFloat, animated: Bool) {
+        let duration: TimeInterval? = animated && !reducesMotion ? scrollTransitionDuration : nil
         let targetLineID = highlightedLineID ?? (style == .widget ? lines.first?.id : nil)
-        guard let targetLineID,
-              let lineMidY = lineMidYByID[targetLineID],
-              let scrollView = lyricsScrollView
-        else { return }
-
-        let documentHeight = scrollView.documentView?.bounds.height ?? 0
-        let visibleHeight = scrollView.contentView.bounds.height
-        let focusY = viewportHeight * lyricFocusAnchorY
-        let maximumOffsetY = max(documentHeight - visibleHeight, 0)
-        let targetOffsetY = min(max(lineMidY - focusY, 0), maximumOffsetY)
-        let targetOrigin = CGPoint(x: scrollView.contentView.bounds.origin.x, y: targetOffsetY)
-
-        guard animated && !reducesMotion else {
-            scrollView.contentView.scroll(to: targetOrigin)
-            scrollView.reflectScrolledClipView(scrollView.contentView)
+        guard let targetLineID else {
+            scrollController.scroll(to: 0, duration: duration)
             return
         }
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = scrollTransitionDuration
-            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.45, 0.0, 0.20, 1.0)
-            scrollView.contentView.animator().setBoundsOrigin(targetOrigin)
-        } completionHandler: {
-            scrollView.reflectScrolledClipView(scrollView.contentView)
-        }
+        guard let lineMidY = lineMidYByID[targetLineID] else { return }
+        scrollController.scroll(to: lineMidY - viewportHeight * lyricFocusAnchorY, duration: duration)
     }
 
     private func focusSpacerHeight(for viewportHeight: CGFloat) -> CGFloat {
@@ -1251,19 +1163,87 @@ private struct LyricsLinePositionReader: View {
 }
 
 private struct LyricsScrollViewResolver: NSViewRepresentable {
-    let onResolve: (NSScrollView?) -> Void
+    let controller: LyricsScrollController
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        DispatchQueue.main.async {
-            onResolve(view.enclosingScrollView)
-        }
+    func makeNSView(context: Context) -> HostView {
+        let view = HostView()
+        view.controller = controller
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            onResolve(nsView.enclosingScrollView)
+    func updateNSView(_ nsView: HostView, context: Context) {}
+
+    static func dismantleNSView(_ nsView: HostView, coordinator: ()) {
+        nsView.controller?.detach(from: nsView)
+        nsView.controller = nil
+    }
+
+    final class HostView: NSView {
+        weak var controller: LyricsScrollController?
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            updateAttachment()
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            updateAttachment()
+        }
+
+        private func updateAttachment() {
+            if window != nil, let scrollView = enclosingScrollView {
+                controller?.attach(to: scrollView, from: self)
+            } else {
+                controller?.detach(from: self)
+            }
+        }
+    }
+}
+
+private final class LyricsScrollController: ObservableObject {
+    @Published private(set) var attachmentRevision = 0
+    private weak var host: NSView?
+    private weak var scrollView: NSScrollView?
+
+    func attach(to scrollView: NSScrollView, from host: NSView) {
+        guard self.host !== host || self.scrollView !== scrollView else { return }
+        self.host = host
+        self.scrollView = scrollView
+
+        // Publish after AppKit finishes attaching the view to the SwiftUI hierarchy.
+        DispatchQueue.main.async { [weak self, weak host, weak scrollView] in
+            guard let self, let host, let scrollView,
+                  self.host === host, self.scrollView === scrollView else { return }
+            self.attachmentRevision += 1
+        }
+    }
+
+    func detach(from host: NSView) {
+        guard self.host === host else { return }
+        self.host = nil
+        scrollView = nil
+    }
+
+    func scroll(to offset: CGFloat, duration: TimeInterval?) {
+        guard let scrollView, let documentView = scrollView.documentView else { return }
+        let clipView = scrollView.contentView
+        let maximumOffset = max(documentView.bounds.height - clipView.bounds.height, 0)
+        let origin = CGPoint(x: clipView.bounds.origin.x, y: min(max(offset, 0), maximumOffset))
+
+        guard let duration else {
+            clipView.scroll(to: origin)
+            scrollView.reflectScrolledClipView(clipView)
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.45, 0.0, 0.20, 1.0)
+            clipView.animator().setBoundsOrigin(origin)
+        } completionHandler: { [weak scrollView] in
+            guard let scrollView else { return }
+            scrollView.reflectScrolledClipView(scrollView.contentView)
         }
     }
 }
@@ -1396,8 +1376,10 @@ private struct LyricsWindowConfigurator: NSViewRepresentable {
         HostView()
     }
 
-    func updateNSView(_ nsView: HostView, context: Context) {
-        nsView.configureSoon()
+    func updateNSView(_ nsView: HostView, context: Context) {}
+
+    static func dismantleNSView(_ nsView: HostView, coordinator: ()) {
+        nsView.stopObservingWindow()
     }
 
     final class HostView: NSView {
@@ -1410,43 +1392,26 @@ private struct LyricsWindowConfigurator: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            configureSoon()
-        }
-
-        func configureSoon() {
-            DispatchQueue.main.async { [weak self] in
-                self?.configureWindow()
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.configureWindow()
-            }
-        }
-
-        private func configureWindow() {
+            guard configuredWindow !== window else { return }
+            stopObservingWindow()
             guard let window else { return }
 
-            if configuredWindow !== window {
-                removeFrameObservers()
-                configuredWindow = window
-            }
-
-            window.identifier = NSUserInterfaceItemIdentifier("mintPlayer.lyricsWindow")
-            window.styleMask.insert(.resizable)
+            configuredWindow = window
             window.collectionBehavior.insert(.fullScreenPrimary)
             window.collectionBehavior.remove(.fullScreenAuxiliary)
-            window.minSize = NSSize(width: 980, height: 600)
             window.titlebarAppearsTransparent = true
             window.isOpaque = false
             window.backgroundColor = .clear
-            window.standardWindowButton(.zoomButton)?.isEnabled = true
 
             observeFrameChanges(for: window)
         }
 
-        private func observeFrameChanges(for window: NSWindow) {
-            guard frameObservers.isEmpty else { return }
+        func stopObservingWindow() {
+            removeFrameObservers()
+            configuredWindow = nil
+        }
 
+        private func observeFrameChanges(for window: NSWindow) {
             let center = NotificationCenter.default
             let notifications: [NSNotification.Name] = [
                 NSWindow.didMoveNotification,

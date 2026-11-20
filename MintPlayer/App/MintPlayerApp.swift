@@ -8,10 +8,11 @@ struct MintPlayerApp: App {
     @StateObject private var audioPlayer = AudioPlayer()
     @StateObject private var musicLibrary = MusicLibrary()
     @StateObject private var settings = SettingsManager()
+    @State private var isLyricsWindowOpen = false
 
     var body: some Scene {
         WindowGroup {
-            MainView()
+            MainView(isLyricsWindowOpen: isLyricsWindowOpen)
                 .environmentObject(audioPlayer)
                 .environmentObject(musicLibrary)
                 .environmentObject(settings)
@@ -25,7 +26,7 @@ struct MintPlayerApp: App {
             PlayerCommands(audioPlayer: audioPlayer, musicLibrary: musicLibrary, settings: settings)
         }
 
-        WindowGroup(settings.text(.lyrics), id: "lyrics") {
+        Window(settings.text(.lyrics), id: "lyrics") {
             LyricsWindowView()
                 .environmentObject(audioPlayer)
                 .environmentObject(settings)
@@ -33,8 +34,10 @@ struct MintPlayerApp: App {
                 .toolbar(removing: .title)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .onAppear {
+                    isLyricsWindowOpen = true
                     appDelegate.configure(audioPlayer: audioPlayer, musicLibrary: musicLibrary, settings: settings)
                 }
+                .onDisappear { isLyricsWindowOpen = false }
         }
         .defaultSize(width: 1180, height: 760)
         .defaultWindowPlacement { _, context in
@@ -53,6 +56,8 @@ struct MintPlayerApp: App {
             return WindowPlacement(frame.origin, size: frame.size)
         }
         .windowBackgroundDragBehavior(.enabled)
+        .windowResizability(.contentMinSize)
+        .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
 
         Settings {
@@ -247,18 +252,18 @@ struct PlaybackSpaceKeyHandler: NSViewRepresentable {
 
     func makeNSView(context: Context) -> HostView {
         let view = HostView()
-        view.coordinator = context.coordinator
         context.coordinator.audioPlayer = audioPlayer
-        context.coordinator.hostView = view
-        context.coordinator.installMonitorIfNeeded()
+        view.coordinator = context.coordinator
         return view
     }
 
     func updateNSView(_ nsView: HostView, context: Context) {
-        nsView.coordinator = context.coordinator
         context.coordinator.audioPlayer = audioPlayer
-        context.coordinator.hostView = nsView
-        context.coordinator.installMonitorIfNeeded()
+    }
+
+    static func dismantleNSView(_ nsView: HostView, coordinator: Coordinator) {
+        coordinator.detach()
+        nsView.coordinator = nil
     }
 
     final class HostView: NSView {
@@ -266,60 +271,57 @@ struct PlaybackSpaceKeyHandler: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            coordinator?.hostView = self
+            coordinator?.attach(to: window)
         }
     }
 
-    final class Coordinator {
+    final class Coordinator: NSResponder {
         weak var audioPlayer: AudioPlayer?
-        weak var hostView: HostView?
-        private var eventMonitor: Any?
+        private weak var window: NSWindow?
 
-        deinit {
-            if let eventMonitor {
-                NSEvent.removeMonitor(eventMonitor)
-            }
+        func attach(to window: NSWindow?) {
+            guard self.window !== window else { return }
+            detach()
+            guard let window else { return }
+
+            self.window = window
+            // Place playback after the window so focused controls handle their own keys first.
+            nextResponder = window.nextResponder
+            window.nextResponder = self
         }
 
-        func installMonitorIfNeeded() {
-            guard eventMonitor == nil else { return }
-            eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.handle(event) ?? event
+        func detach() {
+            var responder: NSResponder? = window
+            while let current = responder {
+                if current.nextResponder === self {
+                    current.nextResponder = nextResponder
+                    break
+                }
+                responder = current.nextResponder
             }
+            nextResponder = nil
+            window = nil
         }
 
-        private func handle(_ event: NSEvent) -> NSEvent? {
+        override func keyDown(with event: NSEvent) {
             let modifiers = event.modifierFlags
                 .intersection(.deviceIndependentFlagsMask)
                 .subtracting(.capsLock)
 
-            guard event.keyCode == 49,
+            guard event.charactersIgnoringModifiers == " ",
                   modifiers.isEmpty,
-                  NSApp.isActive,
-                  let window = hostView?.window,
+                  let window,
                   event.window === window,
                   window.isKeyWindow,
-                  !isTextInputFocused(in: window)
-            else { return event }
-
-            audioPlayer?.togglePlayPause()
-            return nil
-        }
-
-        private func isTextInputFocused(in window: NSWindow) -> Bool {
-            if window.firstResponder is NSTextView {
-                return true
+                  let audioPlayer,
+                  audioPlayer.currentSong != nil else {
+                super.keyDown(with: event)
+                return
             }
 
-            var view = window.firstResponder as? NSView
-            while let currentView = view {
-                if currentView is NSTextField {
-                    return true
-                }
-                view = currentView.superview
+            if !event.isARepeat {
+                audioPlayer.togglePlayPause()
             }
-
-            return false
         }
     }
 }

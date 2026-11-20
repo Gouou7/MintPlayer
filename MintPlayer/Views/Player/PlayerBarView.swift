@@ -100,7 +100,8 @@ struct PlayerBarView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
 
-                    progressBar
+                    PlaybackProgressView(player: audioPlayer, songID: currentSong.id, style: .bar)
+                        .id(currentSong.id)
                         .padding(.top, 2)
                 }
                 .frame(minWidth: infoMinWidth, idealWidth: infoIdealWidth, maxWidth: infoMaxWidth, alignment: .leading)
@@ -137,7 +138,8 @@ struct PlayerBarView: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    progressBar
+                    PlaybackProgressView(player: audioPlayer, songID: nil, style: .bar)
+                        .opacity(0.45)
                         .padding(.top, 2)
                 }
                 .frame(minWidth: infoMinWidth, idealWidth: infoIdealWidth, maxWidth: infoMaxWidth, alignment: .leading)
@@ -181,19 +183,6 @@ struct PlayerBarView: View {
                     .padding(14)
             }
         }
-    }
-
-    private var progressBar: some View {
-        HoverProgressSlider(
-            value: Binding(
-                get: { min(audioPlayer.currentTime, max(audioPlayer.duration, 0)) },
-                set: { audioPlayer.seek(to: $0) }
-            ),
-            range: 0...max(audioPlayer.duration, 1),
-            isEnabled: audioPlayer.currentSong != nil
-        )
-        .frame(height: 5)
-        .opacity(audioPlayer.currentSong == nil ? 0.45 : 1)
     }
 
     private var volumeControl: some View {
@@ -399,124 +388,5 @@ private struct PlayerBarIconButtonStyle: ButtonStyle {
                 .contentShape(Circle())
                 .onHover { isHovered = $0 }
         }
-    }
-}
-
-private struct HoverProgressSlider: View {
-    @Environment(\.colorScheme) private var colorScheme
-    @Binding var value: TimeInterval
-    let range: ClosedRange<TimeInterval>
-    let isEnabled: Bool
-
-    @State private var isHovering = false
-    @State private var isDragging = false
-
-    private let trackHeight: CGFloat = 3
-    private let knobDiameter: CGFloat = 9
-    private let hitHeight: CGFloat = 14
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = max(proxy.size.width, 1)
-            let progress = normalizedProgress
-            let progressWidth = width * progress
-            let showsKnob = isEnabled && (isHovering || isDragging)
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.primary.opacity(0.16))
-                    .frame(height: trackHeight)
-
-                Capsule()
-                    .fill(Color.primary.opacity(0.65))
-                    .frame(width: max(progressWidth, progress > 0 ? trackHeight : 0), height: trackHeight)
-
-                Circle()
-                    .fill(colorScheme == .dark ? Color.white : Color.black)
-                    .frame(width: knobDiameter, height: knobDiameter)
-                    .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
-                    .position(x: progressWidth, y: hitHeight / 2)
-                    .opacity(showsKnob ? 1 : 0)
-            }
-            .frame(height: hitHeight)
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                isHovering = hovering
-            }
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { gestureValue in
-                        guard isEnabled else { return }
-                        isDragging = true
-                        updateValue(locationX: gestureValue.location.x, width: width)
-                    }
-                    .onEnded { gestureValue in
-                        guard isEnabled else { return }
-                        updateValue(locationX: gestureValue.location.x, width: width)
-                        isDragging = false
-                    }
-            )
-        }
-        .frame(height: hitHeight)
-        .modifier(PlaybackProgressAccessibility(value: $value, range: range, isEnabled: isEnabled))
-    }
-
-    private var normalizedProgress: CGFloat {
-        let span = range.upperBound - range.lowerBound
-        guard span > 0 else { return 0 }
-
-        let clampedValue = min(max(value, range.lowerBound), range.upperBound)
-        return CGFloat((clampedValue - range.lowerBound) / span)
-    }
-
-    private func updateValue(locationX: CGFloat, width: CGFloat) {
-        let progress = min(max(locationX / max(width, 1), 0), 1)
-        let span = range.upperBound - range.lowerBound
-        value = range.lowerBound + TimeInterval(progress) * span
-    }
-}
-
-struct PlaybackProgressAccessibility: ViewModifier {
-    @EnvironmentObject private var settings: SettingsManager
-    @Binding var value: TimeInterval
-    let range: ClosedRange<TimeInterval>
-    var isEnabled = true
-
-    func body(content: Content) -> some View {
-        content
-            .focusable(isEnabled)
-            .focusEffectDisabled()
-            .onMoveCommand { direction in
-                guard isEnabled else { return }
-                switch direction {
-                case .left, .down: adjust(by: -5)
-                case .right, .up: adjust(by: 5)
-                default: break
-                }
-            }
-            .accessibilityRepresentation {
-                Slider(value: $value, in: range) {
-                    Text(settings.text(.playbackPosition))
-                }
-                .accessibilityValue(String(format: settings.text(.positionValue), timeText(value), timeText(range.upperBound)))
-                .accessibilityAdjustableAction { direction in
-                    guard isEnabled else { return }
-                    switch direction {
-                    case .increment: adjust(by: 5)
-                    case .decrement: adjust(by: -5)
-                    @unknown default: break
-                    }
-                }
-                .disabled(!isEnabled)
-            }
-    }
-
-    private func adjust(by seconds: TimeInterval) {
-        value = min(max(value + seconds, range.lowerBound), range.upperBound)
-    }
-
-    private func timeText(_ time: TimeInterval) -> String {
-        let seconds = time.isFinite ? max(0, Int(time)) : 0
-        return "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
     }
 }

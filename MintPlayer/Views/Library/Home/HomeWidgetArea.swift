@@ -248,6 +248,7 @@ private struct HomeListeningWidget: View {
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
     @Environment(\.accessibilityReduceMotion) private var reducesMotion
+    @State private var pausedTime: TimeInterval = 0
     let suggestedSong: Song?
 
     private var song: Song? {
@@ -306,6 +307,16 @@ private struct HomeListeningWidget: View {
         }
         .padding(16)
         .frame(width: HomeWidgetKind.resume.size.width, height: HomeWidgetKind.resume.size.height, alignment: .leading)
+        .onReceive(audioPlayer.progress.$time) { time in
+            if !audioPlayer.isPlaying {
+                pausedTime = time
+            }
+        }
+        .onChange(of: audioPlayer.isPlaying) { _, isPlaying in
+            if !isPlaying {
+                pausedTime = audioPlayer.progress.time
+            }
+        }
     }
 
     private var buttonTitle: String {
@@ -314,8 +325,8 @@ private struct HomeListeningWidget: View {
 
     private var playbackCaption: String {
         if audioPlayer.isPlaying { return settings.text(.nowPlaying) }
-        if audioPlayer.currentSong == nil || audioPlayer.currentTime >= audioPlayer.duration { return settings.text(.startListening) }
-        let seconds = Int(max(audioPlayer.currentTime, 0))
+        if audioPlayer.currentSong == nil || pausedTime >= audioPlayer.duration { return settings.text(.startListening) }
+        let seconds = Int(max(pausedTime, 0))
         let time = String(format: "%d:%02d", seconds / 60, seconds % 60)
         return String(format: settings.text(.resumeFromTime), time)
     }

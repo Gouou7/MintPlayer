@@ -2,13 +2,16 @@ import Foundation
 import AVFoundation
 import Combine
 
+final class PlaybackProgress: ObservableObject {
+    @Published fileprivate(set) var time: TimeInterval = 0
+}
+
 class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published var currentSong: Song? {
         didSet { ArtworkStore.shared.setCurrentArtworkPath(currentSong?.coverPath) }
     }
     @Published var volume: Float = 0.7
     @Published var isPlaying: Bool = false
-    @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
     @Published var playbackError: String?
     @Published var isShuffleEnabled = false
@@ -16,6 +19,16 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var queue: [Song] = []
     @Published private(set) var history: [Song] = []
     @Published private(set) var canUndoClearQueue = false
+    let progress = PlaybackProgress()
+    private(set) var currentTime: TimeInterval {
+        get { progress.time }
+        set {
+            if newValue != progress.time {
+                progress.time = newValue
+            }
+        }
+    }
+
     private var clearedQueue: (queue: [Song], source: [Song], currentID: Song.ID?)?
 
     private var audioPlayer: AVAudioPlayer?
@@ -323,6 +336,9 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private func start(song: Song) {
         cancelPendingPause()
         updatePlaybackCounting()
+        if currentSong?.id != song.id {
+            pendingStartTime = nil
+        }
 
         if let previousSong = currentSong, previousSong.id != song.id {
             history.insert(previousSong, at: 0)
@@ -405,12 +421,13 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func resume() {
         cancelPendingPause()
 
-        if let audioPlayer {
-            if currentTime >= duration, let currentSong {
-                play(song: currentSong)
-                return
-            }
+        if currentTime >= duration, let currentSong {
+            pendingStartTime = nil
+            play(song: currentSong)
+            return
+        }
 
+        if let audioPlayer {
             audioPlayer.volume = 0
             guard audioPlayer.play() else {
                 reportPlaybackFailure()
@@ -445,6 +462,7 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         audioPlayer?.stop()
         audioPlayer?.currentTime = 0
         playbackTimer?.invalidate()
+        pendingStartTime = nil
         currentTime = 0
         updateNowPlayingPlaybackState()
         savePlaybackSession()
@@ -536,9 +554,13 @@ class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // 跳转到指定时间
     func seek(to time: TimeInterval) {
+        guard time.isFinite else { return }
         updatePlaybackCounting()
         let normalizedTime = min(max(time, 0), duration)
         audioPlayer?.currentTime = normalizedTime
+        if audioPlayer == nil, currentSong != nil {
+            pendingStartTime = normalizedTime
+        }
         currentTime = normalizedTime
         updateNowPlayingPlaybackState()
         savePlaybackSession()

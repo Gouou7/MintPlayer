@@ -2,6 +2,8 @@ import SwiftUI
 import AppKit
 
 struct MainView: View {
+    let isLyricsWindowOpen: Bool
+
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @EnvironmentObject private var audioPlayer: AudioPlayer
@@ -225,18 +227,10 @@ struct MainView: View {
     private func showLyrics() {
         guard audioPlayer.currentSong != nil else { return }
 
-        if let lyricsWindow = NSApp.windows.first(where: { window in
-            window.identifier?.rawValue == "mintPlayer.lyricsWindow" || window.title == "Lyrics"
-        }) {
-            NSApp.activate()
-            lyricsWindow.makeKeyAndOrderFront(nil)
-            return
-        }
-
         switch settings.lyricsPresentationMode {
-        case .embedded:
+        case .embedded where !isLyricsWindowOpen:
             presentEmbeddedLyrics()
-        case .separateWindow:
+        case .embedded, .separateWindow:
             openWindow(id: "lyrics")
         }
     }

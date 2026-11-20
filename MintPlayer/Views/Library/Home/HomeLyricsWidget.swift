@@ -12,8 +12,33 @@ struct HomeLyricsWidget: View {
     @State private var loadedRequest: LyricsRequest?
 
     var body: some View {
+        LyricsPlaybackFollower(lines: syncedLines, progress: audioPlayer.progress) { activeLineIndex in
+            lyricsButton(activeLineIndex: activeLineIndex)
+        }
+        .task(id: lyricsRequest) {
+            guard let song = audioPlayer.currentSong, let request = lyricsRequest else {
+                lyricsState = .loading
+                loadedRequest = nil
+                return
+            }
+            let fileURL = settings.lyricsFileURL(for: song)
+            let result = await Task.detached(priority: .userInitiated) {
+                LyricsService.loadLyrics(
+                    for: song,
+                    fileURL: fileURL,
+                    timingOffset: request.offset,
+                    encoding: request.encoding
+                )
+            }.value
+            guard !Task.isCancelled else { return }
+            lyricsState = result
+            loadedRequest = request
+        }
+    }
+
+    private func lyricsButton(activeLineIndex: Int?) -> some View {
         Button(action: onShowLyrics) {
-            content
+            content(activeLineIndex: activeLineIndex)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background {
                     GeometryReader { geometry in
@@ -42,30 +67,16 @@ struct HomeLyricsWidget: View {
         .disabled(audioPlayer.currentSong == nil)
         .help(settings.text(.showFullScreenLyrics))
         .accessibilityLabel(settings.text(.showFullScreenLyrics))
-        .accessibilityValue(lyricsAccessibilityValue)
-        .task(id: lyricsRequest) {
-            guard let song = audioPlayer.currentSong, let request = lyricsRequest else {
-                lyricsState = .loading
-                loadedRequest = nil
-                return
-            }
-            let fileURL = settings.lyricsFileURL(for: song)
-            let result = await Task.detached(priority: .userInitiated) {
-                LyricsService.loadLyrics(
-                    for: song,
-                    fileURL: fileURL,
-                    timingOffset: request.offset,
-                    encoding: request.encoding
-                )
-            }.value
-            guard !Task.isCancelled else { return }
-            lyricsState = result
-            loadedRequest = request
-        }
+        .accessibilityValue(lyricsAccessibilityValue(activeLineIndex: activeLineIndex))
+    }
+
+    private var syncedLines: [LyricLine] {
+        guard loadedRequest == lyricsRequest, case .synced(let lines) = lyricsState else { return [] }
+        return lines
     }
 
     @ViewBuilder
-    private var content: some View {
+    private func content(activeLineIndex: Int?) -> some View {
         if audioPlayer.currentSong == nil {
             message(title: settings.text(.lyrics), detail: settings.text(.lyricsWidgetIdle))
         } else if loadedRequest != lyricsRequest {
@@ -75,7 +86,7 @@ struct HomeLyricsWidget: View {
             case .loading:
                 loading
             case .synced(let lines):
-                SyncedLyricsView(lines: lines, style: .widget)
+                SyncedLyricsView(lines: lines, activeLineIndex: activeLineIndex, style: .widget)
                     .padding(.horizontal, 16)
                     .mask(edgeFade)
             case .plainText(let lines):
@@ -118,13 +129,14 @@ struct HomeLyricsWidget: View {
         colorScheme == .dark ? .white : .black
     }
 
-    private var lyricsAccessibilityValue: String {
+    private func lyricsAccessibilityValue(activeLineIndex: Int?) -> String {
         guard audioPlayer.currentSong != nil else { return settings.text(.lyricsWidgetIdle) }
         guard loadedRequest == lyricsRequest else { return settings.text(.lyricsLoading) }
         switch lyricsState {
         case .loading: return settings.text(.lyricsLoading)
         case .synced(let lines):
-            return lines.last(where: { $0.time <= audioPlayer.currentTime })?.text ?? settings.text(.lyrics)
+            guard let activeLineIndex, lines.indices.contains(activeLineIndex) else { return settings.text(.lyrics) }
+            return lines[activeLineIndex].text
         case .plainText(let lines): return lines.first ?? settings.text(.noLyrics)
         case .missing: return settings.text(.noLyrics)
         case .failed: return settings.text(.lyricsUnavailable)
