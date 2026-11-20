@@ -14,8 +14,8 @@ Mint Player 是原生 macOS 本地音乐播放器，使用 Swift 与 SwiftUI，�
 | `MintPlayer/Services/` | 音频播放、SQLite 持久化、歌词解析及 Now Playing |
 | `MintPlayer/Views/` | `Root`、`Sidebar`、`Library`、`Player`、`Settings` 及可复用的 `Shared` 视图和 AppKit 桥接 |
 | `Scripts/embed-git-version.sh` | 在构建阶段根据 Git 标签生成版本信息 |
-| `docs/mcp.md`、`docs/mcp.en.md` | MCP 播放控制使用说明，中英成对 |
-| [docs/home-widgets.md](docs/home-widgets.md)、[英文版](docs/home-widgets.en.md) | 首页小组件的网格尺寸、间隙、固定排列与卡片样式规范 |
+| [docs/mcp.md](docs/mcp.md)、[英文版](docs/mcp.en.md) | MCP 客户端配置、连接验证与工具参考 |
+| [docs/home-widgets.md](docs/home-widgets.md) | 首页小组件的网格尺寸、间隙、固定排列与卡片样式规范 |
 | `docs/images/` | README 截图与图片资源 |
 
 `MintPlayerApp` 用 `@StateObject` 创建共享状态，并通过 `@EnvironmentObject` 注入主窗口、歌词窗口和设置场景。`MusicLibrary` 扫描文件、汇总专辑和艺人，并通过 `LibraryPersistenceStore` 保存资料库状态。`AudioPlayer` 负责 `AVAudioPlayer`、队列、播放状态恢复、有效播放次数统计及系统媒体信息更新。SQLite 保存资料库记录；带命名空间的偏好设置保存设置和界面状态；Application Support 保存数据库和封面缓存。
@@ -82,7 +82,7 @@ Mint Player 是原生 macOS 本地音乐播放器，使用 Swift 与 SwiftUI，�
 
 ## MCP 服务
 
-- 新增或修改 MCP 工具时，同步 `MCPToolCatalog.swift` 的工具定义和 `MCPToolRouter.swift` 的路由与参数校验、`SettingsManager.swift` 的中英两份文案，以及 `README.md`、`docs/mcp.md` 与对应英文版的说明。
+- 新增或修改 MCP 工具时，同步 `MCPToolCatalog.swift` 的工具定义、`MCPToolRouter.swift` 的路由与参数校验，以及 `docs/mcp.md` 和 `docs/mcp.en.md` 的工具参考。文案变更同时更新 `SettingsManager.swift` 的中英两张表。功能概述或客户端配置有变化时，同步中英文 README 或 MCP 指南的配置章节。
 - MCP 默认关闭。客户端通过 App 包内的 `mintplayer-mcp` 使用 stdio。首次工具调用可按需启动播放器，通过当前 macOS 账户专用的 Unix socket 访问 App 内的工具路由。Release 与 Debug 使用独立的 socket。
 - 令牌保存在 `MintPlayer.sqlite` 的配置表中，不访问钥匙串或单独创建令牌文件。数据库及 WAL/SHM 文件权限为 `0600`；客户端为辅助程序设置 `MINTPLAYER_MCP_TOKEN` 环境变量。不要把令牌写入日志、错误信息或工具输出。
 - 工具结果不得包含本地音频路径，只返回资料库 UUID 与搜索结果中的 ID。

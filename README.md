@@ -17,7 +17,7 @@ Mint Player 是一款面向 macOS 的原生本地音乐播放器，采用 macOS 
 - 按专辑或艺人浏览曲目，支持自建播放列表
 - 收藏或屏蔽歌曲，并统计播放次数
 - 显示内嵌或独立窗口歌词，支持 LRC 滚动高亮与时间调整
-- 可选择性开启本机 MCP 服务，让 Agent 搜索资料库、控制播放、管理歌单和屏蔽歌曲
+- 可选择性开启本机 MCP 服务，让 Agent 搜索资料库和控制播放
 
 ## 应用截图
 
@@ -32,7 +32,8 @@ Mint Player 是一款面向 macOS 的原生本地音乐播放器，采用 macOS 
 ### 首次启动
 
 1. 打开设置，添加本地音乐文件夹；也可按 `⌘⇧O` 或直接把文件夹拖入窗口导入。
-2. 通过侧栏浏览歌曲、专辑、艺人、喜欢、播放列表或资料库文件夹。
+2. 在首页继续播放、随机播放资料库中的歌曲，或查看最近播放。
+3. 通过侧栏浏览歌曲、专辑、艺人、喜欢、播放列表或资料库文件夹。
 
 ### 键盘快捷键
 
@@ -53,9 +54,9 @@ Mint Player 是一款面向 macOS 的原生本地音乐播放器，采用 macOS 
 
 ## MCP
 
-本机 MCP 客户端可通过 stdio 按需启动 Mint Player。服务默认关闭，启用后默认要求访问令牌。
+自 `v0.18.0` 起，本机 MCP 客户端可通过 stdio 按需启动 Mint Player。服务默认关闭，启用后默认要求访问令牌。
 
-连接方式和令牌见 [MCP 客户端配置](docs/mcp.md)，完整的工具列表及用法见 [MCP 功能参考](docs/mcp-tools.md)。
+客户端配置、工具列表和调用示例见 [MCP 使用指南](docs/mcp.md)。
 
 ## 技术栈
 
@@ -65,7 +66,8 @@ Mint Player 是一款面向 macOS 的原生本地音乐播放器，采用 macOS 
 
 ## 构建
 
-在 Xcode 中打开 `MintPlayer.xcodeproj`，选择 `MintPlayer` scheme 与 `My Mac`，然后按 `Command + R` 运行。首次构建需要联网解析 SwiftPM 依赖。
+1. 通过 Git 克隆本仓库并保留版本标签。Debug 构建需要一个可达的 `vMAJOR.MINOR.PATCH` 标签，Release 构建要求该标签指向当前提交。构建脚本从 Git 读取版本信息。
+2. 在 Xcode 中打开 `MintPlayer.xcodeproj`，选择 `MintPlayer` scheme 与 `My Mac`，然后按 `Command + R` 运行。首次构建需要联网解析 SwiftPM 依赖。
 
 ### 命令行
 
@@ -83,7 +85,7 @@ xcodebuild -project MintPlayer.xcodeproj -scheme MintPlayer -configuration Debug
 - **添加文件夹后没有歌曲**：确认文件夹内有受支持的音频文件；子目录会被递归扫描；被屏蔽的歌曲不会出现在资料库中。
 - **Debug 与 Release 的资料库不互通**：两者使用相互隔离的存储目录，属预期行为。
 - **没有歌词**：歌词取自与音频文件同名的 LRC 文件；也可在歌词界面手动指定其他文件与文本编码。
-- **MCP 客户端连不上**：确认 MCP 已启用、stdio 命令路径正确、令牌已更新，详见 [MCP 客户端配置](docs/mcp.md)。
+- **MCP 客户端连不上**：确认 MCP 已启用、stdio 命令路径正确、令牌已更新，详见 [MCP 连接验证](docs/mcp.md#验证连接)。
 
 ## 许可证
 

@@ -17,7 +17,7 @@ Mint Player is a native macOS local music player for macOS 26, using the Liquid 
 - Browses tracks by album or artist, and supports custom playlists
 - Favorites or blocks songs, and keeps play counts
 - Shows lyrics inside the main window or in a separate window, with LRC scrolling highlights and timing adjustment
-- Can optionally expose a local MCP server so agents can search the library, control playback, manage playlists, and block songs
+- Can optionally expose a local MCP server so agents can search the library and control playback
 
 ## Screenshots
 
@@ -32,7 +32,8 @@ Mint Player is a native macOS local music player for macOS 26, using the Liquid 
 ### Getting Started
 
 1. Open Settings and add a local music folder; you can also press `⌘⇧O` or drag a folder into the window.
-2. Use the sidebar to browse Songs, Albums, Artists, Favorites, playlists, or library folders.
+2. Use Home to resume playback, shuffle your library, or see what you played recently.
+3. Use the sidebar to browse Songs, Albums, Artists, Favorites, playlists, or library folders.
 
 ### Keyboard Shortcuts
 
@@ -53,9 +54,9 @@ Playback can also be controlled from macOS Now Playing, media keys, Control Cent
 
 ## MCP
 
-MCP clients on the same Mac can use stdio to open Mint Player on demand. The server is off by default and requires an access token by default when enabled.
+Starting with `v0.18.0`, MCP clients on the same Mac can use stdio to open Mint Player on demand. The server is off by default and requires an access token by default when enabled.
 
-See [MCP Client Setup](docs/mcp.en.md) for connection and token settings and the [MCP Tool Reference](docs/mcp-tools.en.md) for the full tool list and examples.
+See the [MCP Guide](docs/mcp.en.md) for client setup, the tool list, and examples.
 
 ## Tech Stack
 
@@ -65,7 +66,8 @@ See [MCP Client Setup](docs/mcp.en.md) for connection and token settings and the
 
 ## Build
 
-Open `MintPlayer.xcodeproj` in Xcode, select the `MintPlayer` scheme and `My Mac`, then press `Command + R`. The first build resolves SwiftPM dependencies and needs network access.
+1. Clone this repository with Git and keep the version tags. A Debug build needs a reachable `vMAJOR.MINOR.PATCH` tag. A Release build needs that tag on the current commit. The build script reads version information from Git.
+2. Open `MintPlayer.xcodeproj` in Xcode, select the `MintPlayer` scheme and `My Mac`, then press `Command + R`. The first build resolves SwiftPM dependencies and needs network access.
 
 ### Command Line
 
@@ -83,7 +85,7 @@ xcodebuild -project MintPlayer.xcodeproj -scheme MintPlayer -configuration Debug
 - **No songs after adding a folder**: make sure the folder contains supported audio files; subfolders are scanned recursively; blocked songs do not appear in the library.
 - **Debug and Release do not share a library**: they use separate, isolated storage locations. This is expected.
 - **No lyrics**: lyrics come from an LRC file with the same name as the audio file. You can also pick another file and text encoding in the lyrics view.
-- **The MCP client cannot connect**: check that MCP is enabled, the stdio command path is correct, and the token is current. See [MCP Client Setup](docs/mcp.en.md).
+- **The MCP client cannot connect**: check that MCP is enabled, the stdio command path is correct, and the token is current. See [Verify the MCP connection](docs/mcp.en.md#verify-the-connection).
 
 ## License
 
