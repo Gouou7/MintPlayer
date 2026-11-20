@@ -62,6 +62,8 @@ struct MainView: View {
                 song: isLyricsMounted ? audioPlayer.currentSong : nil,
                 isPresented: embeddedLyricsPhase == .presented,
                 showsImmersiveControls: isLyricsImmersiveFullScreen,
+                audioPlayer: audioPlayer,
+                settings: settings,
                 onClose: dismissEmbeddedLyrics,
                 onDismissed: finishDismissingEmbeddedLyrics
             )

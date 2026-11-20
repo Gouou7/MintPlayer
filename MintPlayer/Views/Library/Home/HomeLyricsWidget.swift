@@ -22,14 +22,12 @@ struct HomeLyricsWidget: View {
                 return
             }
             let fileURL = settings.lyricsFileURL(for: song)
-            let result = await Task.detached(priority: .userInitiated) {
-                LyricsService.loadLyrics(
-                    for: song,
-                    fileURL: fileURL,
-                    timingOffset: request.offset,
-                    encoding: request.encoding
-                )
-            }.value
+            let result = await LyricsService.loadLyrics(
+                for: song,
+                fileURL: fileURL,
+                timingOffset: request.offset,
+                encoding: request.encoding
+            )
             guard !Task.isCancelled else { return }
             lyricsState = result
             loadedRequest = request

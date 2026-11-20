@@ -49,9 +49,7 @@ struct LyricsOverlayView: View {
             let encoding = settings.lyricsEncoding(for: song)
             let source = lyricsSource
             if loadedLyricsSource != source { lyricsState = .loading }
-            let result = await Task.detached(priority: .userInitiated) {
-                LyricsService.loadLyrics(for: song, fileURL: fileURL, timingOffset: offset, encoding: encoding)
-            }.value
+            let result = await LyricsService.loadLyrics(for: song, fileURL: fileURL, timingOffset: offset, encoding: encoding)
             guard !Task.isCancelled else { return }
             lyricsState = result
             loadedLyricsSource = source
@@ -612,7 +610,7 @@ private struct StaticLyricsBackground: View {
 
     @MainActor
     private func loadImage(for requestedCacheKey: String) async {
-        guard displayedCacheKey != requestedCacheKey else { return }
+        guard !Task.isCancelled, displayedCacheKey != requestedCacheKey else { return }
 
         let loadedImage = await LyricsBackdropCache.shared.image(for: coverPath, colorScheme: colorScheme)
         guard !Task.isCancelled, cacheKey == requestedCacheKey else { return }
@@ -692,8 +690,8 @@ private final class LyricsBackdropCache {
     private let scale: CGFloat = 2
 
     private init() {
-        cache.countLimit = 12
-        cache.totalCostLimit = 64 * 1024 * 1024
+        cache.countLimit = 2
+        cache.totalCostLimit = 32 * 1024 * 1024
     }
 
     @MainActor

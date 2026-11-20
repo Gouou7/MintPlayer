@@ -47,7 +47,14 @@ enum LyricsTextEncoding: String, CaseIterable {
 }
 
 enum LyricsService {
-    static func loadLyrics(for song: Song, fileURL: URL? = nil, timingOffset: TimeInterval = 0, encoding: LyricsTextEncoding = .automatic) -> LyricsLoadState {
+    @concurrent
+    static func loadLyrics(
+        for song: Song,
+        fileURL: URL? = nil,
+        timingOffset: TimeInterval = 0,
+        encoding: LyricsTextEncoding = .automatic
+    ) async -> LyricsLoadState {
+        guard !Task.isCancelled else { return .loading }
         let lyricsURL = fileURL ?? lyricsURL(for: song)
         guard FileManager.default.fileExists(atPath: lyricsURL.path) else {
             return fileURL == nil ? .missing(lyricsURL) : .failed(L10n.current(.selectedLyricsMissing, lyricsURL.lastPathComponent))
@@ -55,6 +62,7 @@ enum LyricsService {
         
         do {
             let data = try Data(contentsOf: lyricsURL)
+            guard !Task.isCancelled else { return .loading }
             let decoded: String?
             if let explicitEncoding = encoding.stringEncoding {
                 decoded = String(data: data, encoding: explicitEncoding)
@@ -64,7 +72,8 @@ enum LyricsService {
             guard let content = decoded else {
                 return .failed(L10n.current(.lyricsEncodingFailed))
             }
-            
+
+            guard !Task.isCancelled else { return .loading }
             return parse(content, timingOffset: timingOffset)
         } catch {
             return .failed(L10n.current(.lyricsFileReadFailed, error.localizedDescription))
@@ -104,6 +113,7 @@ enum LyricsService {
         let offsetRegex = try? NSRegularExpression(pattern: #"^\[offset\s*:\s*([+-]?\d+)\s*\]$"#, options: .caseInsensitive)
         var fileOffset: TimeInterval = 0
         for rawLine in lines {
+            guard !Task.isCancelled else { return .loading }
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             if let match = offsetRegex?.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
                let range = Range(match.range(at: 1), in: line), let value = Double(line[range]), value.isFinite {
@@ -119,6 +129,7 @@ enum LyricsService {
         var plainLines: [String] = []
         
         for (lineIndex, rawLine) in lines.enumerated() {
+            guard !Task.isCancelled else { return .loading }
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !line.isEmpty else { continue }
             

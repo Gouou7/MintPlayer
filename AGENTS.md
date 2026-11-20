@@ -124,9 +124,8 @@ Debug 使用 `Mint Player Debug.app`、Bundle ID `dev.govo.mintplayer.debug`、A
     - 两份文档内容冲突时，以中文 `README.md` 为准。
 
 - CHANGELOG.md
-    - 不得更改已分配版本号的节中的内容，将所有更改写于 `Unreleased` 节中。
-    - 一个版本可包含多个提交，其中可能涉及对同一个功能的反复修改；应综合 `Unreleased` 节中的内容，记录自上一发版以来的累计变化，而不是分别记录多条修改。
-    - 更改条目应该是面向用户可感受的更改，不应写入技术细节。
+    - 每次对代码进行实质性改动后应该在 CHANGELOG.md 的 Unrelease（未发布）区写下记录。
+    - 当 Unrelease 区已有内容的时候，把 Unreleased 中同一功能的多轮调整合并为最终效果，而不是简单机械添加条目。删去构建、调试和实现细节，保留用户能感知的变化。
 
 ## 版本与发布
 

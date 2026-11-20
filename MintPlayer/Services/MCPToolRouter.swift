@@ -92,9 +92,12 @@ final class MCPToolRouter {
             let fileURL = settings.lyricsFileURL(for: song)
             let timingOffset = settings.lyricsTimingOffset(for: song)
             let encoding = settings.lyricsEncoding(for: song)
-            let lyrics = await Task.detached(priority: .userInitiated) {
-                LyricsService.loadLyrics(for: song, fileURL: fileURL, timingOffset: timingOffset, encoding: encoding)
-            }.value
+            let lyrics = await LyricsService.loadLyrics(
+                for: song,
+                fileURL: fileURL,
+                timingOffset: timingOffset,
+                encoding: encoding
+            )
             switch lyrics {
             case .synced(let lines):
                 return result([

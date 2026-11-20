@@ -5,11 +5,11 @@ struct EmbeddedLyricsPresentationLayer: NSViewRepresentable {
     let song: Song?
     let isPresented: Bool
     let showsImmersiveControls: Bool
+    let audioPlayer: AudioPlayer
+    let settings: SettingsManager
     let onClose: () -> Void
     let onDismissed: () -> Void
 
-    @EnvironmentObject private var audioPlayer: AudioPlayer
-    @EnvironmentObject private var settings: SettingsManager
     @Environment(\.accessibilityReduceMotion) private var reducesMotion
 
     func makeNSView(context: Context) -> Viewport {
@@ -76,6 +76,11 @@ struct EmbeddedLyricsPresentationLayer: NSViewRepresentable {
             clipsToBounds = true
             surface.wantsLayer = true
             surface.clipsToBounds = true
+            // Both layers position and clip their children without drawing content of their own.
+            layerContentsRedrawPolicy = .never
+            layerContentsPlacement = .scaleAxesIndependently
+            surface.layerContentsRedrawPolicy = .never
+            surface.layerContentsPlacement = .scaleAxesIndependently
             addSubview(surface)
         }
 
