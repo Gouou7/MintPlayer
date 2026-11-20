@@ -2,10 +2,15 @@ import SwiftUI
 import AppKit
 
 struct MainView: View {
+    private enum EmbeddedLyricsPhase {
+        case closed
+        case presented
+        case dismissing
+    }
+
     let isLyricsWindowOpen: Bool
 
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @EnvironmentObject private var audioPlayer: AudioPlayer
     @EnvironmentObject private var musicLibrary: MusicLibrary
     @EnvironmentObject private var settings: SettingsManager
@@ -13,59 +18,57 @@ struct MainView: View {
     @StateObject private var sidebarState = LibrarySidebarState()
     @State private var selection: LibrarySelection = .home
     @StateObject private var libraryToolbar = LibraryToolbarState()
-    @State private var isLyricsMounted = false
-    @State private var isLyricsVisible = false
+    @State private var embeddedLyricsPhase: EmbeddedLyricsPhase = .closed
     @State private var isLyricsImmersiveFullScreen = false
-    @State private var lyricsPresentationGeneration = 0
 
     private let playerBarWidth: CGFloat = 648
+    private var isLyricsMounted: Bool { embeddedLyricsPhase != .closed }
 
     var body: some View {
-        ZStack {
-            NativeLibrarySplitView(
-                sidebarState: sidebarState,
-                minimumDetailWidth: playerBarWidth,
-                toolbar: libraryToolbar
-            ) {
-                SidebarView(selection: $selection)
-                    .toolbar(removing: isLyricsMounted ? .sidebarToggle : nil)
-            } detail: {
-                ZStack(alignment: .bottom) {
-                    contentView
-                        .safeAreaInset(edge: .top, spacing: 0) { LibraryActivityView() }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        NativeLibrarySplitView(
+            sidebarState: sidebarState,
+            minimumDetailWidth: playerBarWidth,
+            toolbar: libraryToolbar
+        ) {
+            SidebarView(selection: $selection)
+                .toolbar(removing: isLyricsMounted ? .sidebarToggle : nil)
+        } detail: {
+            ZStack(alignment: .bottom) {
+                contentView
+                    .safeAreaInset(edge: .top, spacing: 0) { LibraryActivityView() }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    PlayerBarView {
-                        showLyrics()
-                    }
-                    .frame(width: playerBarWidth)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.bottom, 20)
+                PlayerBarView {
+                    showLyrics()
                 }
-                .background(MintTheme.contentBackground)
-                .navigationTitle(isLyricsMounted ? "" : currentTitle)
-                .toolbar {
-                    if !isLyricsMounted {
-                        libraryToolbarItems
-                    }
+                .frame(width: playerBarWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.bottom, 20)
+            }
+            .background(MintTheme.contentBackground)
+            .navigationTitle(isLyricsMounted ? "" : currentTitle)
+            .toolbar {
+                if !isLyricsMounted {
+                    libraryToolbarItems
                 }
             }
-            .scrollEdgeEffectStyle(.automatic, for: .top)
-            .scrollEdgeEffectHidden(false, for: .top)
-            .disabled(isLyricsMounted)
-            .accessibilityHidden(isLyricsMounted)
-
-            if isLyricsMounted, let currentSong = audioPlayer.currentSong {
-                EmbeddedLyricsPresentationLayer(
-                    song: currentSong,
-                    isVisible: isLyricsVisible,
-                    reducesMotion: accessibilityReduceMotion,
-                    showsImmersiveControls: isLyricsImmersiveFullScreen
-                ) {
-                    dismissEmbeddedLyrics()
-                }
-                .zIndex(1)
-            }
+        }
+        .scrollEdgeEffectStyle(.automatic, for: .top)
+        .scrollEdgeEffectHidden(false, for: .top)
+        .disabled(isLyricsMounted)
+        .accessibilityHidden(isLyricsMounted)
+        .overlay {
+            EmbeddedLyricsPresentationLayer(
+                song: isLyricsMounted ? audioPlayer.currentSong : nil,
+                isPresented: embeddedLyricsPhase == .presented,
+                showsImmersiveControls: isLyricsImmersiveFullScreen,
+                onClose: dismissEmbeddedLyrics,
+                onDismissed: finishDismissingEmbeddedLyrics
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(isLyricsMounted)
+            .accessibilityHidden(!isLyricsMounted)
+            .ignoresSafeArea(.container, edges: .top)
         }
         .environment(\.isPlayerOverlayPresented, isLyricsMounted)
         .toolbarBackgroundVisibility(isLyricsMounted ? .hidden : .automatic, for: .windowToolbar)
@@ -98,9 +101,10 @@ struct MainView: View {
         }
         .onChange(of: audioPlayer.currentSong?.id) { _, songID in
             if songID == nil, isLyricsMounted {
-                dismissEmbeddedLyrics()
+                embeddedLyricsPhase = .closed
             }
         }
+        .onExitCommand(perform: isLyricsMounted ? dismissEmbeddedLyrics : nil)
         .onChange(of: musicLibrary.favoriteSongs.isEmpty) { _, isEmpty in
             if isEmpty, selection == .favorites {
                 selection = .home
@@ -137,10 +141,6 @@ struct MainView: View {
                 NativeToolbarSearchField(text: libraryToolbar.searchText, prompt: prompt)
             }
         }
-    }
-
-    private var lyricsPresentationAnimation: Animation {
-        .easeInOut(duration: accessibilityReduceMotion ? 0.16 : 0.38)
     }
 
     private var currentTitle: String {
@@ -236,44 +236,18 @@ struct MainView: View {
     }
 
     private func presentEmbeddedLyrics() {
-        guard !isLyricsMounted else { return }
-
-        lyricsPresentationGeneration += 1
-        let generation = lyricsPresentationGeneration
-
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            isLyricsVisible = false
-            isLyricsMounted = true
-        }
-
-        DispatchQueue.main.async {
-            DispatchQueue.main.async {
-                guard isLyricsMounted, lyricsPresentationGeneration == generation else { return }
-                withAnimation(lyricsPresentationAnimation) {
-                    isLyricsVisible = true
-                }
-            }
-        }
+        guard embeddedLyricsPhase == .closed, audioPlayer.currentSong != nil else { return }
+        embeddedLyricsPhase = .presented
     }
 
     private func dismissEmbeddedLyrics() {
-        guard isLyricsMounted else { return }
+        guard embeddedLyricsPhase == .presented else { return }
+        embeddedLyricsPhase = .dismissing
+    }
 
-        lyricsPresentationGeneration += 1
-        let generation = lyricsPresentationGeneration
-        guard isLyricsVisible else {
-            isLyricsMounted = false
-            return
-        }
-
-        withAnimation(lyricsPresentationAnimation, completionCriteria: .logicallyComplete) {
-            isLyricsVisible = false
-        } completion: {
-            guard lyricsPresentationGeneration == generation, !isLyricsVisible else { return }
-            isLyricsMounted = false
-        }
+    private func finishDismissingEmbeddedLyrics() {
+        guard embeddedLyricsPhase == .dismissing else { return }
+        embeddedLyricsPhase = .closed
     }
 }
 

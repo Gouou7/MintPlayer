@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 
 struct LyricsOverlayView: View {
     let song: Song
+    var extendsBackgroundIntoSafeArea = true
     let onClose: () -> Void
 
     @EnvironmentObject private var audioPlayer: AudioPlayer
@@ -31,14 +32,14 @@ struct LyricsOverlayView: View {
                 maximumLyricsWidth: lyricsColumnWidth
             )
 
-            ZStack {
-                StaticLyricsBackground(coverPath: song.coverPath)
-
-                Color.black.opacity(colorScheme == .dark ? 0.28 : 0.18)
-                    .ignoresSafeArea()
-
-                mainContent(layout: layout)
-            }
+            mainContent(layout: layout)
+        }
+        .background {
+            StaticLyricsBackground(coverPath: song.coverPath)
+                .overlay {
+                    Color.black.opacity(colorScheme == .dark ? 0.28 : 0.18)
+                }
+                .ignoresSafeArea(edges: extendsBackgroundIntoSafeArea ? .all : [])
         }
         .contentShape(Rectangle())
         .task(id: lyricsRequest) {
@@ -571,23 +572,27 @@ private struct StaticLyricsBackground: View {
     private let imageTransitionDuration: TimeInterval = 0.36
 
     var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(Color(nsColor: .windowBackgroundColor))
+        GeometryReader { geometry in
+            ZStack {
+                Rectangle()
+                    .fill(Color(nsColor: .windowBackgroundColor))
 
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .id(displayedCacheKey)
-            }
+                if let image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .id(displayedCacheKey)
+                }
 
-            if let previousImage {
-                Image(nsImage: previousImage)
-                    .resizable()
-                    .scaledToFill()
-                    .opacity(showsPreviousImage ? 1 : 0)
+                if let previousImage {
+                    Image(nsImage: previousImage)
+                        .resizable()
+                        .scaledToFill()
+                        .opacity(showsPreviousImage ? 1 : 0)
+                }
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
         }
         .animation(.easeInOut(duration: imageTransitionDuration), value: showsPreviousImage)
         .overlay {
@@ -596,7 +601,6 @@ private struct StaticLyricsBackground: View {
         .overlay {
             LyricsBackgroundEdgeFade(colorScheme: colorScheme)
         }
-        .ignoresSafeArea()
         .task(id: cacheKey) {
             await loadImage(for: cacheKey)
         }
@@ -1292,52 +1296,6 @@ private struct LyricsInfoStateView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-    }
-}
-
-struct EmbeddedLyricsPresentationLayer: View {
-    let song: Song
-    let isVisible: Bool
-    let reducesMotion: Bool
-    let showsImmersiveControls: Bool
-    let onClose: () -> Void
-
-    var body: some View {
-        GeometryReader { geometry in
-            LyricsOverlayView(song: song, onClose: onClose)
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .overlay(alignment: .topTrailing) {
-                    if showsImmersiveControls {
-                        ImmersiveLyricsControls(onClose: onClose)
-                            .padding(.top, 20)
-                            .padding(.trailing, 24)
-                    }
-                }
-                .compositingGroup()
-                .offset(y: reducesMotion || isVisible ? 0 : geometry.size.height)
-                .opacity(reducesMotion ? (isVisible ? 1 : 0) : 1)
-        }
-        .clipped()
-        .ignoresSafeArea(.container, edges: .top)
-        .environment(\.colorScheme, .dark)
-    }
-}
-
-private struct ImmersiveLyricsControls: View {
-    @EnvironmentObject private var settings: SettingsManager
-    let onClose: () -> Void
-
-    var body: some View {
-        Button(action: onClose) {
-            Image(systemName: "chevron.down")
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 36, height: 36)
-                .contentShape(Circle())
-        }
-        .buttonStyle(MintPlainIconButtonStyle(hoverSize: CGSize(width: 36, height: 36)))
-        .modifier(CircleGlassButtonSurface())
-        .help(settings.text(.close))
-        .accessibilityLabel(settings.text(.close))
     }
 }
 

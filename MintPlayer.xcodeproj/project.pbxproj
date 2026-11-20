@@ -55,6 +55,7 @@
 		000000000000000000000129 /* MintPlayer/Views/Shared/NativeArtistTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022A /* MintPlayer/Views/Shared/NativeArtistTableView.swift */; };
 		00000000000000000000012A /* MintPlayer/Services/LyricsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022B /* MintPlayer/Services/LyricsService.swift */; };
 		00000000000000000000012B /* MintPlayer/Views/Player/LyricsOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022C /* MintPlayer/Views/Player/LyricsOverlayView.swift */; };
+		00000000000000000000013C /* MintPlayer/Views/Player/EmbeddedLyricsPresentationLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000023C /* MintPlayer/Views/Player/EmbeddedLyricsPresentationLayer.swift */; };
 		00000000000000000000012C /* MintPlayer/Views/Sidebar/PlaylistDropDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022D /* MintPlayer/Views/Sidebar/PlaylistDropDestination.swift */; };
 		00000000000000000000012D /* MintPlayer/Views/Shared/ListPlaybackControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022E /* MintPlayer/Views/Shared/ListPlaybackControls.swift */; };
 		00000000000000000000012E /* MintPlayer/Services/LibraryPersistenceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000022F /* MintPlayer/Services/LibraryPersistenceStore.swift */; };
@@ -159,6 +160,7 @@
 		00000000000000000000022A /* MintPlayer/Views/Shared/NativeArtistTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Shared/NativeArtistTableView.swift; sourceTree = "<group>"; };
 		00000000000000000000022B /* MintPlayer/Services/LyricsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/LyricsService.swift; sourceTree = "<group>"; };
 		00000000000000000000022C /* MintPlayer/Views/Player/LyricsOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Player/LyricsOverlayView.swift; sourceTree = "<group>"; };
+		00000000000000000000023C /* MintPlayer/Views/Player/EmbeddedLyricsPresentationLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Player/EmbeddedLyricsPresentationLayer.swift; sourceTree = "<group>"; };
 		00000000000000000000022D /* MintPlayer/Views/Sidebar/PlaylistDropDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Sidebar/PlaylistDropDestination.swift; sourceTree = "<group>"; };
 		00000000000000000000022E /* MintPlayer/Views/Shared/ListPlaybackControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Views/Shared/ListPlaybackControls.swift; sourceTree = "<group>"; };
 		00000000000000000000022F /* MintPlayer/Services/LibraryPersistenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintPlayer/Services/LibraryPersistenceStore.swift; sourceTree = "<group>"; };
@@ -381,6 +383,7 @@
 				00000000000000000000023B /* MintPlayer/Views/Player/PlaybackProgressView.swift */,
 				00000000000000000000021E /* MintPlayer/Views/Player/QueueView.swift */,
 				00000000000000000000022C /* MintPlayer/Views/Player/LyricsOverlayView.swift */,
+				00000000000000000000023C /* MintPlayer/Views/Player/EmbeddedLyricsPresentationLayer.swift */,
 			);
 			name = Player;
 			sourceTree = "<group>";
@@ -595,6 +598,7 @@
 				00000000000000000000012E /* MintPlayer/Services/LibraryPersistenceStore.swift in Sources */,
 				A27000000000000000000001 /* MintPlayer/Services/ArtworkStore.swift in Sources */,
 				00000000000000000000012B /* MintPlayer/Views/Player/LyricsOverlayView.swift in Sources */,
+				00000000000000000000013C /* MintPlayer/Views/Player/EmbeddedLyricsPresentationLayer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
