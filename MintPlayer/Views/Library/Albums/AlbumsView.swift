@@ -58,7 +58,7 @@ struct AlbumsView: View {
             VStack(alignment: .leading, spacing: 24) {
                 if filteredAlbums.isEmpty {
                     EmptyStateView(
-                        title: searchText.isEmpty ? settings.text(.noAlbumsYet) : settings.text(.noMatchingMusic),
+                        title: searchText.isEmpty ? settings.text(.noAlbumsYet) : settings.text(.noMatchingAlbums),
                         systemImage: "square.stack",
                         detail: searchText.isEmpty ? settings.text(.importPrompt) : nil,
                         actionTitle: searchText.isEmpty ? settings.text(.addMusicFolder) : nil,
@@ -105,11 +105,11 @@ private struct AlbumTile: View {
                 .shadow(color: .black.opacity(0.22), radius: 14, x: 0, y: 8)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(album.title)
+                Text(settings.albumName(album.title))
                     .font(.headline)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Text(album.artist)
+                Text(settings.artistName(album.artist))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -122,7 +122,7 @@ private struct AlbumTile: View {
     }
 
     private func songCountText(_ count: Int) -> String {
-        "\(count) \(settings.text(.songs).lowercased())"
+        settings.songCount(count)
     }
 }
 
@@ -183,14 +183,10 @@ struct AlbumDetailView: View {
             key: LibraryToolbarPreferenceKey.self,
             value: LibraryToolbarConfiguration(
                 id: "album.\(album.id)",
-                backTitle: backButtonTitle,
+                backTitle: settings.text(.back),
                 onBack: onBack
             )
         )
-    }
-
-    private var backButtonTitle: String {
-        settings.effectiveLanguage == .chinese ? "返回" : "Back"
     }
 
     private var albumHeader: some View {
@@ -214,11 +210,11 @@ struct AlbumDetailView: View {
 
     private var albumHeaderInfo: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text(album.title)
+            Text(settings.albumName(album.title))
                 .font(.system(size: 28, weight: .bold))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(album.artist)
+            Text(settings.artistName(album.artist))
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
                 .lineLimit(1)
@@ -245,12 +241,12 @@ struct AlbumDetailView: View {
         if album.year > 0 {
             values.append("\(album.year)")
         }
-        values.append("\(album.songCount) \(settings.text(.songs).lowercased())")
+        values.append(settings.songCount(album.songCount))
         return values.joined(separator: " · ")
     }
 
     private var footerText: String {
-        "\(albumSongs.count) \(settings.text(.items)), \(formatDuration(albumSongs.reduce(0) { $0 + $1.duration }))"
+        "\(settings.songCount(albumSongs.count)) · \(formatDuration(albumSongs.reduce(0) { $0 + $1.duration }))"
     }
 
     private func playAlbum() {

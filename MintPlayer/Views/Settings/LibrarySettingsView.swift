@@ -70,7 +70,7 @@ struct LibrarySettingsView: View {
                 folderPendingDeletion = nil
             }
         } message: { source in
-            Text(String(format: settings.text(.deleteFolderMessage), source.name))
+            Text(settings.text(.deleteFolderMessage, source.name))
         }
         .fileImporter(
             isPresented: $showFolderPicker,
@@ -140,7 +140,7 @@ struct LibrarySettingsView: View {
             Button {
                 showFolderPicker = true
             } label: {
-                Label(settings.text(.addMusicLibrary), systemImage: "plus")
+                Label(settings.text(.addMusicFolder), systemImage: "plus")
             }
             .buttonStyle(.borderedProminent)
 
@@ -252,6 +252,8 @@ struct LibrarySettingsView: View {
                         Button(settings.text(.mcpRotateToken)) {
                             mcpService.rotateToken()
                         }
+                        .help(settings.text(.mcpRotateTokenHint))
+                        .accessibilityHint(settings.text(.mcpRotateTokenHint))
                     }
                 }
                 Text(settings.text(settings.mcpRequiresToken ? .mcpAuthenticationHint : .mcpNoAuthenticationHint))
@@ -308,7 +310,7 @@ struct LibrarySettingsView: View {
                         Text(source.name)
                             .font(.body.weight(.medium))
 
-                        Text("(\(source.path))")
+                        Text(source.path)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -321,7 +323,7 @@ struct LibrarySettingsView: View {
                 }
 
                 if source.isScanning {
-                    Text(String(format: settings.text(.scanningFiles), musicLibrary.scanProgress[source.id] ?? 0))
+                    Text(settings.text(.scanningFiles, musicLibrary.scanProgress[source.id] ?? 0))
                         .font(.caption).foregroundStyle(.secondary)
                 } else if let message = musicLibrary.sourceErrors[source.id] {
                     Label(settings.text(.folderUnavailable), systemImage: "exclamationmark.triangle")
@@ -330,7 +332,7 @@ struct LibrarySettingsView: View {
                 }
 
                 if let lastScanned = source.lastScanned {
-                    Text("\(settings.text(.lastScanned)): \(formattedDate(lastScanned))")
+                    Text(settings.text(.lastScanned, formattedDate(lastScanned)))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -346,6 +348,7 @@ struct LibrarySettingsView: View {
             .buttonStyle(.borderless)
             .disabled(source.isScanning)
             .help(settings.text(.rescan))
+            .accessibilityLabel(settings.text(.rescan))
 
             Button(role: .destructive) {
                 folderPendingDeletion = source
@@ -353,7 +356,8 @@ struct LibrarySettingsView: View {
                 Image(systemName: "trash.fill")
             }
             .buttonStyle(.borderless)
-            .help(settings.text(.remove))
+            .help(settings.text(.deleteFolder))
+            .accessibilityLabel(settings.text(.deleteFolder))
         }
         .padding(.vertical, 4)
         .mintRowHover()
@@ -361,7 +365,7 @@ struct LibrarySettingsView: View {
 
     private func blockedSongsList(_ songs: [BlockedSong]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("\(settings.text(.blockedSongs)):", systemImage: "eye.slash")
+            Label(settings.text(.blockedSongs), systemImage: "eye.slash")
                 .font(.callout.weight(.medium))
                 .foregroundStyle(.primary)
 
@@ -383,7 +387,7 @@ struct LibrarySettingsView: View {
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
 
-                Text("\(song.artist) - \(song.album)")
+                Text(settings.songSubtitle(artist: song.artist, album: song.album))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -445,6 +449,7 @@ struct LibrarySettingsView: View {
 
         let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         textField.stringValue = url.lastPathComponent
+        textField.setAccessibilityLabel(settings.text(.name))
         alert.accessoryView = textField
 
         guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -477,9 +482,9 @@ struct LibrarySettingsView: View {
         case .system:
             return settings.text(.systemLanguage)
         case .english:
-            return "English"
+            return settings.text(.englishLanguage)
         case .chinese:
-            return settings.effectiveLanguage == .chinese ? "中文简体" : "Simplified Chinese"
+            return settings.text(.chineseLanguage)
         }
     }
 
@@ -505,7 +510,7 @@ private struct SettingsPickerRow<SelectionValue: Hashable, Content: View>: View 
 
             Spacer(minLength: 16)
 
-            Picker("", selection: $selection) {
+            Picker(title, selection: $selection) {
                 content()
             }
             .pickerStyle(.menu)
@@ -546,7 +551,7 @@ private struct SettingsToggleRow: View {
 
             Spacer(minLength: 16)
 
-            Toggle("", isOn: $isOn)
+            Toggle(title, isOn: $isOn)
                 .labelsHidden()
                 .fixedSize()
         }

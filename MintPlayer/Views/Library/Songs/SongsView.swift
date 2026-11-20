@@ -24,7 +24,7 @@ struct SongsView: View {
     @State private var displayedSongs: [Song] = []
 
     init(
-        title: String = "Songs",
+        title: String,
         subtitle: String? = nil,
         description: String? = nil,
         scopedSongs: [Song]? = nil,

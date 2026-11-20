@@ -112,7 +112,7 @@ struct PlaybackProgressView: View {
             Slider(value: Binding(get: { displayedTime }, set: onSeek), in: range) {
                 Text(settings.text(.playbackPosition))
             }
-            .accessibilityValue(String(format: settings.text(.positionValue), timeText(displayedTime), timeText(duration)))
+            .accessibilityValue(settings.text(.positionValue, timeText(displayedTime), timeText(duration)))
             .accessibilityAdjustableAction { direction in
                 switch direction {
                 case .increment: adjust(by: 5)

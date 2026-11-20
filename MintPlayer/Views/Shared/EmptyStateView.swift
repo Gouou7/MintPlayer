@@ -40,7 +40,7 @@ struct OperationErrorView: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            Text(message).font(.callout).lineLimit(2)
+            Text(String(message.prefix(while: { !$0.isNewline }))).font(.callout).lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button(settings.text(.showDetails)) { showsDetails = true }
                 .popover(isPresented: $showsDetails) {
@@ -78,9 +78,9 @@ struct LibraryActivityView: View {
                 HStack {
                     ProgressView().controlSize(.small)
                     if musicLibrary.pendingImports > 0 {
-                        Text(String(format: settings.text(.importingFiles), musicLibrary.importedFileCount))
+                        Text(settings.text(.importingFiles, musicLibrary.importedFileCount))
                     } else {
-                        Text(String(format: settings.text(.scanningFiles), processedCount))
+                        Text(settings.text(.scanningFiles, processedCount))
                     }
                     Spacer()
                 }

@@ -152,8 +152,7 @@ struct HomeView: View {
             if recentSongs.isEmpty {
                 EmptyStateView(
                     title: settings.text(.noRecentlyPlayed),
-                    systemImage: "clock",
-                    detail: settings.text(.recentlyPlayedHint)
+                    systemImage: "clock"
                 )
                 .frame(height: 180)
             } else {
@@ -187,7 +186,7 @@ struct HomeView: View {
                 .font(.title2.bold())
             HStack(spacing: 16) {
                 HomeSearchPlaybackControls(songs: displayedRecentSongs)
-                Text("\(displayedRecentSongs.count) \(settings.text(.tracks))")
+                Text(settings.songCount(displayedRecentSongs.count))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -214,7 +213,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 16) {
                 HomeSearchPlaybackControls(songs: displayedSongs)
-                Text("\(displayedSongs.count) \(settings.text(.tracks))")
+                Text(settings.songCount(displayedSongs.count))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

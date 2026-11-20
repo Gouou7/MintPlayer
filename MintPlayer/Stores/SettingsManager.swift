@@ -134,12 +134,32 @@ class SettingsManager: ObservableObject {
         language.resolved
     }
 
-    func text(_ key: L10n.Key) -> String {
-        L10n.text(key, language: effectiveLanguage)
+    func text(_ key: L10n.Key, _ arguments: CVarArg...) -> String {
+        L10n.text(key, language: effectiveLanguage, arguments: arguments)
+    }
+
+    func songCount(_ count: Int) -> String {
+        text(count == 1 ? .oneSong : .songCount, count)
+    }
+
+    func albumCount(_ count: Int) -> String {
+        text(count == 1 ? .oneAlbum : .albumCount, count)
+    }
+
+    func artistName(_ name: String) -> String {
+        name.isEmpty || name == Song.unknownArtistName ? text(.unknownArtist) : name
+    }
+
+    func albumName(_ name: String) -> String {
+        name.isEmpty || name == Song.unknownAlbumName ? text(.unknownAlbum) : name
+    }
+
+    func songSubtitle(artist: String, album: String) -> String {
+        "\(artistName(artist)) · \(albumName(album))"
     }
 
     var versionText: String {
-        String(format: text(.version), AppConfiguration.displayVersion)
+        text(.version, AppConfiguration.displayVersion)
     }
 }
 
@@ -168,6 +188,19 @@ enum AppLanguage: String, CaseIterable {
 
 enum L10n {
     enum Key: String {
+        case back
+        case englishLanguage
+        case chineseLanguage
+        case songCount
+        case oneSong
+        case albumCount
+        case oneAlbum
+        case playbackQueue
+        case queueSummary
+        case oneScanFailure
+        case mcpRotateTokenHint
+        case noMatchingArtistMusic
+        case choose
         case lyricsEncoding
         case automaticEncoding
         case utf8Encoding
@@ -195,7 +228,6 @@ enum L10n {
         case audioFileUnreadable
         case audioDecodeFailed
         case undoClearQueue
-        case removeSelectedQueue
         case playbackMenu
         case playPause
         case focusSearch
@@ -296,7 +328,6 @@ enum L10n {
         case home
         case startListening
         case resumePlayback
-        case nextTrack
         case resumeFromTime
         case quickPlay
         case favoriteWidgetSubtitle
@@ -308,7 +339,6 @@ enum L10n {
         case browseAlbums
         case recentlyPlayed
         case noRecentlyPlayed
-        case recentlyPlayedHint
         case showMore
         case songs
         case albums
@@ -320,7 +350,6 @@ enum L10n {
         case noFolders
         case newPlaylist
         case editPlaylist
-        case editPlaylistAction
         case deletePlaylist
         case deleteFolder
         case deletePlaylistQuestion
@@ -330,7 +359,6 @@ enum L10n {
         case settings
         case playlistNotFound
         case folderNotFound
-        case tracks
         case noSongsYet
         case noMatchingSongs
         case importPrompt
@@ -339,8 +367,7 @@ enum L10n {
         case searchInAlbum
         case searchArtists
         case searchInArtist
-        case noMatchingMusic
-        case artistSearchHint
+        case noMatchingAlbums
         case noArtistsYet
         case noMatchingArtists
         case play
@@ -359,7 +386,6 @@ enum L10n {
         case clearQueue
         case closeUpNext
         case history
-        case upNextLower
         case sortSongs
         case ascending
         case descending
@@ -414,7 +440,6 @@ enum L10n {
         case lightTheme
         case darkTheme
         case systemLanguage
-        case items
         case minutesShort
         case unknownArtist
         case unknownAlbum
@@ -424,16 +449,29 @@ enum L10n {
     static func current(_ key: Key, _ arguments: CVarArg...) -> String {
         let storedLanguage = UserDefaults.standard.string(forKey: AppConfiguration.userDefaultsKey("settings.language"))
         let language = (storedLanguage.flatMap(AppLanguage.init(rawValue:)) ?? .system).resolved
-        let format = text(key, language: language)
+        return text(key, language: language, arguments: arguments)
+    }
+
+    static func text(_ key: Key, language: AppLanguage, arguments: [CVarArg] = []) -> String {
+        let table = language == .chinese ? zh : en
+        let format = table[key] ?? en[key] ?? key.rawValue
         return arguments.isEmpty ? format : String(format: format, arguments: arguments)
     }
 
-    static func text(_ key: Key, language: AppLanguage) -> String {
-        let table = language == .chinese ? zh : en
-        return table[key] ?? en[key] ?? key.rawValue
-    }
-
     private static let en: [Key: String] = [
+        .noMatchingArtistMusic: "No matching albums or songs",
+        .choose: "Choose",
+        .back: "Back",
+        .englishLanguage: "English",
+        .chineseLanguage: "简体中文",
+        .songCount: "%ld songs",
+        .oneSong: "%ld song",
+        .albumCount: "%ld albums",
+        .oneAlbum: "%ld album",
+        .playbackQueue: "Playback Queue",
+        .queueSummary: "%ld in history · %ld up next",
+        .oneScanFailure: "Could not process %ld file.",
+        .mcpRotateTokenHint: "Generating a new token invalidates the current token.",
         .lyricsEncoding: "Text Encoding",
         .automaticEncoding: "Automatic",
         .utf8Encoding: "UTF-8",
@@ -441,57 +479,56 @@ enum L10n {
         .gb18030Encoding: "GB18030 / GBK",
         .big5Encoding: "Big5",
         .retry: "Retry",
-        .scanningFiles: "Scanning · %d files processed",
-        .importingFiles: "Importing · %d files processed",
-        .folderUnavailable: "Folder offline or scan incomplete",
-        .folderScanFailed: "Could not scan “%@”: %@. Existing songs have been kept.",
-        .scanFailureCount: "%d files could not be imported or refreshed.",
-        .unsupportedAudio: "Unsupported audio file type.",
-        .saveStatsFailed: "Could not save play counts: %@",
-        .loadLibraryFailed: "Could not load the library: %@",
-        .saveLibraryFailed: "Could not save the library: %@",
-        .databaseOpenFailed: "Could not open the library database: %@",
-        .databaseOperationFailed: "Database operation failed: %@",
-        .unsupportedDatabase: "This database version is not supported. The existing database has been kept.",
+        .scanningFiles: "Scanning · %ld processed",
+        .importingFiles: "Importing · %ld processed",
+        .folderUnavailable: "Scan incomplete",
+        .folderScanFailed: "Could not scan “%@”. Existing songs were kept.\n%@",
+        .scanFailureCount: "Could not process %ld files.",
+        .unsupportedAudio: "This audio format is not supported.",
+        .saveStatsFailed: "Could not save play counts.\n%@",
+        .loadLibraryFailed: "Could not load the library.\n%@",
+        .saveLibraryFailed: "Could not save the library.\n%@",
+        .databaseOpenFailed: "Could not open the library database.\n%@",
+        .databaseOperationFailed: "A library database operation failed.\n%@",
+        .unsupportedDatabase: "This database version is not supported. The existing database was kept.",
         .databaseUnavailable: "The library database is unavailable.",
         .unknownError: "Unknown error",
-        .playbackFailed: "Could not play “%@”: %@",
-        .audioFileMissing: "The audio file is missing. Reconnect its drive or rescan its folder.",
-        .audioFileUnreadable: "The audio file cannot be read. Check folder permissions.",
-        .audioDecodeFailed: "The audio file could not be decoded or playback could not start.",
-        .undoClearQueue: "Undo Clear Queue",
-        .removeSelectedQueue: "Remove Selected Songs",
+        .playbackFailed: "Could not play “%@”. %@",
+        .audioFileMissing: "The audio file is missing. Reconnect the drive or rescan the folder.",
+        .audioFileUnreadable: "Could not read the audio file. Check the folder’s permissions.",
+        .audioDecodeFailed: "Could not decode the file or start playback.",
+        .undoClearQueue: "Undo Clear Upcoming Songs",
         .playbackMenu: "Playback",
         .playPause: "Play/Pause",
-        .focusSearch: "Search Library",
+        .focusSearch: "Focus Search",
         .playbackPosition: "Playback Position",
         .positionValue: "%@ of %@",
         .addMusicFolder: "Add Music Folder…",
         .chooseLyricsFile: "Choose Lyrics File…",
         .lyricsOptions: "Lyrics Options",
         .useMatchingLyrics: "Use Matching Lyrics File",
-        .lyricsTiming: "Song Timing Adjustment",
+        .lyricsTiming: "Lyrics Timing",
         .lyricsEarlier: "0.5 Seconds Earlier",
         .lyricsLater: "0.5 Seconds Later",
-        .resetLyricsTiming: "Reset",
-        .lyricsTimingValue: "Current: %+.1f s",
-        .lyricsEncodingFailed: "The lyrics file encoding could not be read.",
-        .lyricsParsingFailed: "The lyrics timeline could not be parsed.",
-        .selectedLyricsMissing: "The selected lyrics file “%@” is missing. Choose it again or use the matching file.",
-        .noAlbumsYet: "No albums yet",
+        .resetLyricsTiming: "Reset Timing",
+        .lyricsTimingValue: "Timing Offset %+.1f s",
+        .lyricsEncodingFailed: "Could not decode the lyrics file. Choose a different encoding.",
+        .lyricsParsingFailed: "Could not read the lyric timestamps.",
+        .selectedLyricsMissing: "Could not find “%@”. Choose another file or use the matching lyrics file.",
+        .noAlbumsYet: "No albums",
         .lyricsLoading: "Loading lyrics…",
         .lyricsReload: "Reload Lyrics",
-        .lyricsFileReadFailed: "Could not read the lyrics file: %@",
-        .noFavoriteSongs: "No favorite songs yet",
-        .favoriteSongsHint: "Use the heart button on a song to add it here.",
-        .emptyPlaylist: "This playlist is empty",
-        .emptyPlaylistHint: "Drag songs from your library to this playlist in the sidebar.",
+        .lyricsFileReadFailed: "Could not read the lyrics file.\n%@",
+        .noFavoriteSongs: "No favorite songs",
+        .favoriteSongsHint: "Mark a song as a favorite to add it to this list.",
+        .emptyPlaylist: "No songs in this playlist",
+        .emptyPlaylistHint: "Drag songs onto this playlist in the sidebar.",
         .showDetails: "Show Details",
         .mcpSection: "MCP",
         .mcpEnable: "Enable MCP",
-        .mcpDescription: "Let local MCP clients open Mint Player, search your library, control playback, manage playlists, and block songs.",
+        .mcpDescription: "Allow local clients to search the library, control playback, manage playlists, and block songs.",
         .mcpRequireToken: "Require Access Token",
-        .mcpRequireTokenDescription: "When off, processes running under your macOS account can use all MCP tools without a token.",
+        .mcpRequireTokenDescription: "With this off, processes under your macOS account can use all MCP tools without a token.",
         .mcpStatus: "Status",
         .mcpOff: "Off",
         .mcpStarting: "Starting…",
@@ -500,13 +537,13 @@ enum L10n {
         .mcpCopyCommand: "Copy Command Path",
         .mcpCopyToken: "Copy Token",
         .mcpRotateToken: "Rotate Token",
-        .mcpAuthenticationHint: "Use the command path above for a stdio server in your MCP client. Set MINTPLAYER_MCP_TOKEN to the copied token.",
-        .mcpNoAuthenticationHint: "Use the command path above for a stdio server in your MCP client.",
+        .mcpAuthenticationHint: "Use this path as the stdio command in your MCP client. Set MINTPLAYER_MCP_TOKEN to your access token.",
+        .mcpNoAuthenticationHint: "Use this path as the stdio command in your MCP client.",
         .mcpPlayerNotReady: "The player is not ready yet.",
         .mcpTokenInvalid: "The MCP access token could not be read. Rotate it in Settings.",
         .mcpDisabled: "Open Mint Player and enable MCP in Settings.",
         .mcpUnauthorized: "Set MINTPLAYER_MCP_TOKEN in your MCP client to the current access token from Mint Player.",
-        .mcpLocalConnectionFailed: "The local connection to Mint Player failed. Check MCP in Settings.",
+        .mcpLocalConnectionFailed: "Could not connect to Mint Player. Check MCP in Settings.",
         .mcpHelperNotInstalled: "Use the MCP command inside the Mint Player app bundle.",
         .mcpStdioStartError: "The MCP command could not start its standard input and output connection.",
         .mcpAppLaunchError: "Mint Player could not be opened.",
@@ -524,30 +561,30 @@ enum L10n {
         .mcpLibrarySaveFailed: "The library change could not be saved.",
         .general: "General",
         .appearance: "Appearance",
-        .interfaceTheme: "Interface Theme",
+        .interfaceTheme: "Theme",
         .theme: "Theme",
         .language: "Language",
-        .themeDescription: "Choose the appearance used by Mint Player windows.",
-        .languageDescription: "Choose the language used by Mint Player text.",
-        .playbackPage: "Playback Page",
+        .themeDescription: "The lyrics player always uses a dark appearance.",
+        .languageDescription: "System uses your preferred macOS language. Mint Player supports English and Simplified Chinese.",
+        .playbackPage: "Playback",
         .lyrics: "Lyrics",
-        .lyricsPresentation: "Lyrics Presentation",
-        .lyricsPresentationDescription: "Choose whether lyrics open inside the main window or in a separate window.",
-        .embeddedLyrics: "Inside Main Window",
+        .lyricsPresentation: "Lyrics Display",
+        .lyricsPresentationDescription: "Applies when you open lyrics from the player bar.",
+        .embeddedLyrics: "Main Window",
         .separateLyricsWindow: "Separate Window",
         .lyricsBlur: "Blur inactive lyrics",
-        .lyricsBlurEffect: "Lyrics Blur Effect",
-        .lyricsBlurDescription: "Slightly blur lyrics farther from the current line.",
+        .lyricsBlurEffect: "Lyrics Blur",
+        .lyricsBlurDescription: "Blur lines around the current lyric.",
         .library: "Library",
         .musicLibrary: "Music Library",
-        .addMusicLibrary: "Add Library",
-        .rescanAll: "Rescan Library",
+        .addMusicLibrary: "Name Music Folder",
+        .rescanAll: "Rescan All Folders",
         .libraryDescription: "Add folders that contain local music files. Rescanning updates metadata and artwork for existing library folders.",
         .folders: "Folders",
-        .noMusicLibraries: "No music libraries",
-        .addFolderDescription: "Add a folder to start building your local library.",
-        .lastScanned: "Last scanned",
-        .rescan: "Rescan",
+        .noMusicLibraries: "No music folders",
+        .addFolderDescription: "Choose a folder that contains audio files.",
+        .lastScanned: "Last scanned %@",
+        .rescan: "Rescan Folder",
         .remove: "Remove",
         .blockedSongs: "Blocked Songs",
         .unblock: "Unblock",
@@ -556,74 +593,68 @@ enum L10n {
         .version: "Version %@",
         .add: "Add",
         .cancel: "Cancel",
-        .enterLibraryName: "Enter a name for this music library",
+        .enterLibraryName: "Enter a name for this folder in the library.",
         .home: "Home",
-        .startListening: "Start listening",
-        .resumePlayback: "Resume",
-        .nextTrack: "Next Track",
-        .resumeFromTime: "Continue from %@",
+        .startListening: "Start Playback",
+        .resumePlayback: "Resume Playback",
+        .resumeFromTime: "Resume from %@",
         .quickPlay: "Quick play",
-        .favoriteWidgetSubtitle: "Revisit favorites",
-        .shuffleWidgetSubtitle: "All library songs",
+        .favoriteWidgetSubtitle: "Play favorite songs",
+        .shuffleWidgetSubtitle: "All songs in the library",
         .lyricsWidgetIdle: "Play a song to see lyrics",
-        .showFullScreenLyrics: "Show Full-Screen Lyrics",
+        .showFullScreenLyrics: "Open Lyrics in Main Window",
         .playFavoriteSongs: "Play your favorite songs",
         .shuffleLibrary: "Shuffle your library",
         .browseAlbums: "Browse your albums",
-        .recentlyPlayed: "Recently played",
-        .noRecentlyPlayed: "No recently played songs",
-        .recentlyPlayedHint: "Play a song to see it here.",
-        .showMore: "Show more",
+        .recentlyPlayed: "Recently Played",
+        .noRecentlyPlayed: "No playback history",
+        .showMore: "Show More",
         .songs: "Songs",
         .albums: "Albums",
         .artists: "Artists",
         .favorites: "Favorites",
         .playlists: "Playlists",
-        .foldersSection: "Library",
+        .foldersSection: "Music Folders",
         .noPlaylists: "No playlists",
         .noFolders: "No folders",
         .newPlaylist: "New Playlist",
         .editPlaylist: "Edit Playlist",
-        .editPlaylistAction: "Edit List",
-        .deletePlaylist: "Delete List",
-        .deleteFolder: "Delete Folder",
+        .deletePlaylist: "Delete Playlist",
+        .deleteFolder: "Remove Folder",
         .deletePlaylistQuestion: "Delete Playlist?",
-        .deleteFolderQuestion: "Delete Folder?",
-        .deletePlaylistMessage: "This will remove \"%@\" from Mint Player. Songs will stay in your library.",
-        .deleteFolderMessage: "This will remove \"%@\" and its songs from Mint Player. Files on disk will not be deleted.",
+        .deleteFolderQuestion: "Remove Folder?",
+        .deletePlaylistMessage: "Delete “%@”. Its songs will stay in your library.",
+        .deleteFolderMessage: "Songs in “%@” will be removed from the library and playlists. The folder’s blocked-song records will be cleared. Audio files will stay on disk.",
         .settings: "Settings",
         .playlistNotFound: "Playlist not found",
         .folderNotFound: "Folder not found",
-        .tracks: "tracks",
-        .noSongsYet: "No songs yet",
-        .noMatchingSongs: "No matching songs",
-        .importPrompt: "Import a folder or drag audio files into this window.",
+        .noSongsYet: "No songs",
+        .noMatchingSongs: "No songs match your search",
+        .importPrompt: "Add a music folder or drag audio files into the window.",
         .searchSongs: "Search Songs",
         .searchAlbums: "Search Albums",
         .searchInAlbum: "Search in Album",
         .searchArtists: "Search Artists",
         .searchInArtist: "Search in Artist",
-        .noMatchingMusic: "No matching music",
-        .artistSearchHint: "Try a different artist search.",
-        .noArtistsYet: "No artists yet",
-        .noMatchingArtists: "No matching artists",
+        .noMatchingAlbums: "No albums match your search",
+        .noArtistsYet: "No artists",
+        .noMatchingArtists: "No artists match your search",
         .play: "Play",
         .pause: "Pause",
         .shuffle: "Shuffle",
-        .notPlaying: "Not Playing",
+        .notPlaying: "Nothing Playing",
         .nowPlaying: "Now Playing",
-        .chooseSong: "Choose a song to start listening",
+        .chooseSong: "Choose a song to play",
         .upNext: "Up Next",
         .volume: "Volume",
         .showLyrics: "Show Lyrics",
         .addToFavorites: "Add to Favorites",
         .removeFromFavorites: "Remove from Favorites",
-        .queueEmpty: "Queue is empty",
+        .queueEmpty: "No songs in the queue",
         .removeFromQueue: "Remove from Queue",
-        .clearQueue: "Clear queue",
-        .closeUpNext: "Close Up Next",
-        .history: "history",
-        .upNextLower: "up next",
+        .clearQueue: "Clear Upcoming Songs",
+        .closeUpNext: "Close Playback Queue",
+        .history: "Playback History",
         .sortSongs: "Sort Songs",
         .ascending: "Ascending",
         .descending: "Descending",
@@ -657,14 +688,14 @@ enum L10n {
         .removeFromPlaylist: "Remove from Playlist",
         .showInFinder: "Show in Finder",
         .blockSong: "Block Song",
-        .previous: "Previous",
-        .next: "Next",
+        .previous: "Previous Song",
+        .next: "Next Song",
         .repeatMode: "Repeat",
         .noLyrics: "No Lyrics",
-        .noLyricsFile: "No .lrc file matching the current song was found in the same folder.",
+        .noLyricsFile: "No matching .lrc file was found next to the audio file.",
         .lyricsUnavailable: "Lyrics Unavailable",
-        .emptyLyrics: "The lyrics file has no displayable text.",
-        .noSongPlaying: "No Song Playing",
+        .emptyLyrics: "The lyrics file contains no lyrics.",
+        .noSongPlaying: "No song selected",
         .close: "Close",
         .showSidebar: "Show Sidebar",
         .hideSidebar: "Hide Sidebar",
@@ -673,12 +704,11 @@ enum L10n {
         .playlistName: "Playlist Name",
         .create: "Create",
         .save: "Save",
-        .playlistDescriptionHint: "Add notes, mood, context, or anything useful for this playlist.",
+        .playlistDescriptionHint: "Add a note",
         .systemTheme: "System",
         .lightTheme: "Light",
         .darkTheme: "Dark",
         .systemLanguage: "System",
-        .items: "items",
         .minutesShort: "min",
         .unknownArtist: "Unknown Artist",
         .unknownAlbum: "Unknown Album",
@@ -686,6 +716,19 @@ enum L10n {
     ]
 
     private static let zh: [Key: String] = [
+        .noMatchingArtistMusic: "未找到匹配的专辑或歌曲",
+        .choose: "选取",
+        .back: "返回",
+        .englishLanguage: "English",
+        .chineseLanguage: "简体中文",
+        .songCount: "%ld 首歌曲",
+        .oneSong: "%ld 首歌曲",
+        .albumCount: "%ld 张专辑",
+        .oneAlbum: "%ld 张专辑",
+        .playbackQueue: "播放队列",
+        .queueSummary: "历史 %ld 首 · 待播 %ld 首",
+        .oneScanFailure: "无法处理 %ld 个文件。",
+        .mcpRotateTokenHint: "生成新令牌后，现有令牌将失效。",
         .lyricsEncoding: "文本编码",
         .automaticEncoding: "自动",
         .utf8Encoding: "UTF-8",
@@ -693,57 +736,56 @@ enum L10n {
         .gb18030Encoding: "GB18030 / GBK",
         .big5Encoding: "Big5",
         .retry: "重试",
-        .scanningFiles: "正在扫描 · 已处理 %d 个文件",
-        .importingFiles: "正在导入 · 已处理 %d 个文件",
-        .folderUnavailable: "文件夹离线或扫描未完成",
-        .folderScanFailed: "无法扫描“%@”：%@。已保留原有歌曲。",
-        .scanFailureCount: "%d 个文件未能导入或更新。",
-        .unsupportedAudio: "不支持的音频文件类型。",
-        .saveStatsFailed: "无法保存播放统计：%@",
-        .loadLibraryFailed: "无法加载资料库：%@",
-        .saveLibraryFailed: "无法保存资料库：%@",
-        .databaseOpenFailed: "无法打开资料库数据库：%@",
-        .databaseOperationFailed: "数据库操作失败：%@",
-        .unsupportedDatabase: "不支持此数据库版本，已保留现有数据库。",
+        .scanningFiles: "正在扫描 · 已处理 %ld 个文件",
+        .importingFiles: "正在导入 · 已处理 %ld 个文件",
+        .folderUnavailable: "扫描未完成",
+        .folderScanFailed: "无法扫描“%@”。已保留原有歌曲。\n%@",
+        .scanFailureCount: "无法处理 %ld 个文件。",
+        .unsupportedAudio: "不支持此音频格式。",
+        .saveStatsFailed: "无法保存播放次数。\n%@",
+        .loadLibraryFailed: "无法加载资料库。\n%@",
+        .saveLibraryFailed: "无法保存资料库。\n%@",
+        .databaseOpenFailed: "无法打开资料库数据库。\n%@",
+        .databaseOperationFailed: "资料库数据库操作失败。\n%@",
+        .unsupportedDatabase: "不支持此资料库版本。已保留现有资料库。",
         .databaseUnavailable: "资料库数据库不可用。",
         .unknownError: "未知错误",
-        .playbackFailed: "无法播放“%@”：%@",
-        .audioFileMissing: "找不到音频文件。请重新连接磁盘或扫描文件夹。",
-        .audioFileUnreadable: "无法读取音频文件，请检查文件夹权限。",
-        .audioDecodeFailed: "无法解码音频文件或启动播放。",
-        .undoClearQueue: "撤销清空队列",
-        .removeSelectedQueue: "移除所选歌曲",
+        .playbackFailed: "无法播放“%@”。%@",
+        .audioFileMissing: "找不到音频文件。请重新连接磁盘或重新扫描文件夹。",
+        .audioFileUnreadable: "无法读取音频文件。请检查文件夹权限。",
+        .audioDecodeFailed: "无法解码文件或启动播放。",
+        .undoClearQueue: "撤销清空待播歌曲",
         .playbackMenu: "播放控制",
         .playPause: "播放／暂停",
-        .focusSearch: "搜索资料库",
+        .focusSearch: "聚焦搜索框",
         .playbackPosition: "播放进度",
         .positionValue: "%@，共 %@",
         .addMusicFolder: "添加音乐文件夹…",
         .chooseLyricsFile: "选择歌词文件…",
         .lyricsOptions: "歌词选项",
         .useMatchingLyrics: "使用同名歌词文件",
-        .lyricsTiming: "歌曲时间校准",
+        .lyricsTiming: "歌词时间",
         .lyricsEarlier: "提前 0.5 秒",
         .lyricsLater: "延后 0.5 秒",
-        .resetLyricsTiming: "重置",
-        .lyricsTimingValue: "当前：%+.1f 秒",
-        .lyricsEncodingFailed: "无法读取歌词文件编码。",
-        .lyricsParsingFailed: "无法解析歌词时间轴。",
-        .selectedLyricsMissing: "找不到选定的歌词文件“%@”。请重新选择或使用同名歌词文件。",
-        .noAlbumsYet: "还没有专辑",
+        .resetLyricsTiming: "重置时间",
+        .lyricsTimingValue: "时间偏移 %+.1f 秒",
+        .lyricsEncodingFailed: "无法解读歌词文件。请选择其他文本编码。",
+        .lyricsParsingFailed: "无法读取歌词时间戳。",
+        .selectedLyricsMissing: "找不到歌词文件“%@”。请选择其他文件，或使用同名歌词文件。",
+        .noAlbumsYet: "暂无专辑",
         .lyricsLoading: "正在加载歌词…",
         .lyricsReload: "重新加载歌词",
-        .lyricsFileReadFailed: "无法读取歌词文件：%@",
-        .noFavoriteSongs: "还没有喜欢的歌曲",
-        .favoriteSongsHint: "点击歌曲的心形按钮，将它加入喜欢的音乐。",
-        .emptyPlaylist: "此播放列表为空",
-        .emptyPlaylistHint: "将资料库中的歌曲拖到侧栏中的此播放列表。",
+        .lyricsFileReadFailed: "无法读取歌词文件。\n%@",
+        .noFavoriteSongs: "暂无喜欢的歌曲",
+        .favoriteSongsHint: "将歌曲标记为喜欢，即可加入此列表。",
+        .emptyPlaylist: "播放列表为空",
+        .emptyPlaylistHint: "将歌曲拖到侧栏中的此播放列表。",
         .showDetails: "查看详情",
         .mcpSection: "MCP",
         .mcpEnable: "启用 MCP",
-        .mcpDescription: "允许本机 MCP 客户端启动 Mint Player、搜索资料库、控制播放、管理播放列表和屏蔽歌曲。",
+        .mcpDescription: "允许本机客户端搜索资料库、控制播放、管理播放列表和屏蔽歌曲。",
         .mcpRequireToken: "要求访问令牌",
-        .mcpRequireTokenDescription: "关闭后，在当前 macOS 账户下运行的进程无需令牌即可使用全部 MCP 工具。",
+        .mcpRequireTokenDescription: "关闭后，当前 macOS 账户下的进程无需令牌即可调用所有 MCP 工具。",
         .mcpStatus: "状态",
         .mcpOff: "已关闭",
         .mcpStarting: "正在启动…",
@@ -752,13 +794,13 @@ enum L10n {
         .mcpCopyCommand: "复制命令路径",
         .mcpCopyToken: "复制令牌",
         .mcpRotateToken: "重新生成令牌",
-        .mcpAuthenticationHint: "在 MCP 客户端中使用上述路径配置 stdio 服务，并将 MINTPLAYER_MCP_TOKEN 设置为复制的令牌。",
-        .mcpNoAuthenticationHint: "在 MCP 客户端中使用上述路径配置 stdio 服务。",
+        .mcpAuthenticationHint: "在 MCP 客户端中将此路径设为 stdio 命令。将访问令牌填入 MINTPLAYER_MCP_TOKEN 环境变量。",
+        .mcpNoAuthenticationHint: "在 MCP 客户端中将此路径设为 stdio 命令。",
         .mcpPlayerNotReady: "播放器尚未就绪。",
         .mcpTokenInvalid: "无法读取 MCP 访问令牌。请在设置中重新生成令牌。",
         .mcpDisabled: "请打开 Mint Player 并在设置中启用 MCP。",
         .mcpUnauthorized: "请将 MCP 客户端的 MINTPLAYER_MCP_TOKEN 更新为 Mint Player 当前的访问令牌。",
-        .mcpLocalConnectionFailed: "无法连接本机的 Mint Player，请检查设置中的 MCP 状态。",
+        .mcpLocalConnectionFailed: "无法连接 Mint Player。请检查设置中的 MCP 状态。",
         .mcpHelperNotInstalled: "请使用 Mint Player 应用包内的 MCP 命令。",
         .mcpStdioStartError: "MCP 命令无法启动标准输入输出连接。",
         .mcpAppLaunchError: "无法打开 Mint Player。",
@@ -776,30 +818,30 @@ enum L10n {
         .mcpLibrarySaveFailed: "无法保存资料库更改。",
         .general: "通用",
         .appearance: "外观",
-        .interfaceTheme: "界面主题",
+        .interfaceTheme: "主题",
         .theme: "主题",
         .language: "语言",
-        .themeDescription: "选择 Mint Player 窗口使用的外观。",
-        .languageDescription: "选择 Mint Player 界面文本使用的语言。",
-        .playbackPage: "播放页面",
+        .themeDescription: "歌词播放界面始终采用深色外观。",
+        .languageDescription: "跟随系统时使用 macOS 首选语言。应用支持简体中文和英语。",
+        .playbackPage: "播放",
         .lyrics: "歌词",
-        .lyricsPresentation: "歌词打开方式",
-        .lyricsPresentationDescription: "选择在主窗口内显示歌词，或使用独立歌词窗口。",
-        .embeddedLyrics: "主窗口内嵌",
+        .lyricsPresentation: "歌词显示方式",
+        .lyricsPresentationDescription: "此设置适用于从播放器栏打开歌词。",
+        .embeddedLyrics: "主窗口内",
         .separateLyricsWindow: "独立窗口",
         .lyricsBlur: "模糊非当前歌词",
-        .lyricsBlurEffect: "歌词模糊效果",
-        .lyricsBlurDescription: "对远离当前行的歌词添加轻微模糊。",
+        .lyricsBlurEffect: "歌词模糊",
+        .lyricsBlurDescription: "模糊当前歌词行周围的其他行。",
         .library: "资料库",
         .musicLibrary: "音乐资料库",
-        .addMusicLibrary: "添加资料库",
-        .rescanAll: "重新扫描资料库",
+        .addMusicLibrary: "命名音乐文件夹",
+        .rescanAll: "重新扫描所有文件夹",
         .libraryDescription: "添加包含本地音乐文件的文件夹。重新扫描会更新已有资料库文件夹的元数据和封面。",
         .folders: "文件夹",
-        .noMusicLibraries: "没有音乐资料库",
-        .addFolderDescription: "添加一个文件夹以开始构建本地资料库。",
-        .lastScanned: "上次扫描",
-        .rescan: "重新扫描",
+        .noMusicLibraries: "未添加音乐文件夹",
+        .addFolderDescription: "请选择包含音频文件的文件夹。",
+        .lastScanned: "上次扫描 %@",
+        .rescan: "重新扫描文件夹",
         .remove: "移除",
         .blockedSongs: "已屏蔽歌曲",
         .unblock: "取消屏蔽",
@@ -808,74 +850,68 @@ enum L10n {
         .version: "版本 %@",
         .add: "添加",
         .cancel: "取消",
-        .enterLibraryName: "输入此音乐资料库的名称",
+        .enterLibraryName: "输入此文件夹在资料库中的显示名称。",
         .home: "首页",
-        .startListening: "开始聆听",
+        .startListening: "开始播放",
         .resumePlayback: "继续播放",
-        .nextTrack: "下一曲",
-        .resumeFromTime: "从 %@ 继续",
+        .resumeFromTime: "从 %@ 继续播放",
         .quickPlay: "快速播放",
-        .favoriteWidgetSubtitle: "重温最爱",
-        .shuffleWidgetSubtitle: "资料库全部歌曲",
-        .lyricsWidgetIdle: "播放歌曲以显示歌词",
-        .showFullScreenLyrics: "显示全屏歌词",
+        .favoriteWidgetSubtitle: "播放喜欢的歌曲",
+        .shuffleWidgetSubtitle: "资料库中的所有歌曲",
+        .lyricsWidgetIdle: "播放歌曲后显示歌词",
+        .showFullScreenLyrics: "在主窗口中打开歌词",
         .playFavoriteSongs: "播放收藏的歌曲",
         .shuffleLibrary: "从整个资料库开始",
         .browseAlbums: "浏览资料库中的专辑",
         .recentlyPlayed: "最近播放",
-        .noRecentlyPlayed: "还没有最近播放的歌曲",
-        .recentlyPlayedHint: "播放音乐后，最近聆听的歌曲会显示在这里。",
+        .noRecentlyPlayed: "暂无播放记录",
         .showMore: "显示更多",
         .songs: "歌曲",
         .albums: "专辑",
         .artists: "艺人",
         .favorites: "喜欢的音乐",
         .playlists: "播放列表",
-        .foldersSection: "资料库",
-        .noPlaylists: "没有播放列表",
-        .noFolders: "没有文件夹",
-        .newPlaylist: "新播放列表",
+        .foldersSection: "音乐文件夹",
+        .noPlaylists: "暂无播放列表",
+        .noFolders: "暂无文件夹",
+        .newPlaylist: "新建播放列表",
         .editPlaylist: "编辑播放列表",
-        .editPlaylistAction: "编辑列表",
-        .deletePlaylist: "删除列表",
-        .deleteFolder: "删除文件夹",
+        .deletePlaylist: "删除播放列表",
+        .deleteFolder: "移除文件夹",
         .deletePlaylistQuestion: "删除播放列表？",
-        .deleteFolderQuestion: "删除文件夹？",
-        .deletePlaylistMessage: "这会从 Mint Player 中移除“%@”。歌曲会保留在资料库中。",
-        .deleteFolderMessage: "这会从 Mint Player 中移除“%@”及其中的歌曲。磁盘上的文件不会被删除。",
+        .deleteFolderQuestion: "移除文件夹？",
+        .deletePlaylistMessage: "删除“%@”。其中的歌曲仍保留在资料库中。",
+        .deleteFolderMessage: "“%@”中的歌曲将从资料库和播放列表中移除。该文件夹的屏蔽记录将被清除。磁盘上的音频文件会保留。",
         .settings: "设置",
         .playlistNotFound: "找不到播放列表",
         .folderNotFound: "找不到文件夹",
-        .tracks: "首歌曲",
-        .noSongsYet: "还没有歌曲",
-        .noMatchingSongs: "没有匹配的歌曲",
-        .importPrompt: "导入文件夹，或将音频文件拖入此窗口。",
+        .noSongsYet: "暂无歌曲",
+        .noMatchingSongs: "未找到匹配的歌曲",
+        .importPrompt: "添加音乐文件夹，或将音频文件拖入窗口。",
         .searchSongs: "搜索歌曲",
         .searchAlbums: "搜索专辑",
         .searchInAlbum: "在专辑中搜索",
         .searchArtists: "搜索艺人",
         .searchInArtist: "在艺人中搜索",
-        .noMatchingMusic: "没有匹配的音乐",
-        .artistSearchHint: "试试搜索其他艺人。",
-        .noArtistsYet: "还没有艺人",
-        .noMatchingArtists: "没有匹配的艺人",
+        .noMatchingAlbums: "未找到匹配的专辑",
+        .noArtistsYet: "暂无艺人",
+        .noMatchingArtists: "未找到匹配的艺人",
         .play: "播放",
         .pause: "暂停",
         .shuffle: "随机播放",
         .notPlaying: "未播放",
         .nowPlaying: "正在播放",
-        .chooseSong: "选择一首歌开始聆听",
-        .upNext: "播放队列",
+        .chooseSong: "请选择要播放的歌曲",
+        .upNext: "待播",
         .volume: "音量",
         .showLyrics: "显示歌词",
         .addToFavorites: "添加到喜欢的音乐",
         .removeFromFavorites: "从喜欢的音乐中移除",
-        .queueEmpty: "队列为空",
-        .removeFromQueue: "从队列中移除",
-        .clearQueue: "清空队列",
+        .queueEmpty: "播放队列为空",
+        .removeFromQueue: "移出播放队列",
+        .clearQueue: "清空待播歌曲",
         .closeUpNext: "关闭播放队列",
-        .history: "历史",
-        .upNextLower: "即将播放",
+        .history: "播放历史",
         .sortSongs: "歌曲排序",
         .ascending: "升序",
         .descending: "降序",
@@ -904,7 +940,7 @@ enum L10n {
         .columnGenre: "流派",
         .columnType: "类型",
         .playNext: "下一首播放",
-        .addToQueue: "加入队列",
+        .addToQueue: "加入播放队列",
         .addToPlaylist: "添加到播放列表",
         .removeFromPlaylist: "移出播放列表",
         .showInFinder: "在 Finder 中显示",
@@ -912,11 +948,11 @@ enum L10n {
         .previous: "上一首",
         .next: "下一首",
         .repeatMode: "循环",
-        .noLyrics: "无歌词",
-        .noLyricsFile: "未找到与当前歌曲同目录同名的 .lrc 文件。",
+        .noLyrics: "暂无歌词",
+        .noLyricsFile: "音频文件所在的文件夹中没有同名的 .lrc 文件。",
         .lyricsUnavailable: "歌词不可用",
-        .emptyLyrics: "歌词文件里没有可显示的文本。",
-        .noSongPlaying: "没有正在播放的歌曲",
+        .emptyLyrics: "歌词文件中没有可显示的内容。",
+        .noSongPlaying: "未选择歌曲",
         .close: "关闭",
         .showSidebar: "显示侧栏",
         .hideSidebar: "隐藏侧栏",
@@ -925,12 +961,11 @@ enum L10n {
         .playlistName: "播放列表名称",
         .create: "创建",
         .save: "保存",
-        .playlistDescriptionHint: "添加备注、氛围、场景，或任何对这个播放列表有用的信息。",
+        .playlistDescriptionHint: "添加备注",
         .systemTheme: "跟随系统",
         .lightTheme: "浅色",
         .darkTheme: "深色",
         .systemLanguage: "跟随系统",
-        .items: "项",
         .minutesShort: "分钟",
         .unknownArtist: "未知艺人",
         .unknownAlbum: "未知专辑",

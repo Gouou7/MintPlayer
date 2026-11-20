@@ -144,7 +144,7 @@ private struct ArtistTile: View {
                 .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 7)
 
             VStack(alignment: .center, spacing: 4) {
-                Text(artist.name)
+                Text(settings.artistName(artist.name))
                     .font(.headline)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -158,7 +158,7 @@ private struct ArtistTile: View {
     }
 
     private var countSummary: String {
-        "\(artist.albumCount) \(settings.text(.albums).lowercased()) · \(artist.songCount) \(settings.text(.songs).lowercased())"
+        "\(settings.albumCount(artist.albumCount)) · \(settings.songCount(artist.songCount))"
     }
 }
 
@@ -214,9 +214,8 @@ private struct ArtistDetailView: View {
 
                 if visibleArtistAlbums.isEmpty && visibleArtistSongs.isEmpty {
                     EmptyStateView(
-                        title: settings.text(.noMatchingMusic),
-                        systemImage: "magnifyingglass",
-                        detail: settings.text(.artistSearchHint)
+                        title: settings.text(.noMatchingArtistMusic),
+                        systemImage: "magnifyingglass"
                     )
                     .frame(maxWidth: .infinity, minHeight: 260)
                 } else {
@@ -236,14 +235,10 @@ private struct ArtistDetailView: View {
             key: LibraryToolbarPreferenceKey.self,
             value: LibraryToolbarConfiguration(
                 id: "artist.\(artist.id)",
-                backTitle: backButtonTitle,
+                backTitle: settings.text(.back),
                 onBack: onBack
             )
         )
-    }
-
-    private var backButtonTitle: String {
-        settings.effectiveLanguage == .chinese ? "返回" : "Back"
     }
 
     @ViewBuilder
@@ -313,11 +308,11 @@ private struct ArtistDetailView: View {
 
     private var artistHeaderInfo: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text(artist.name)
+            Text(settings.artistName(artist.name))
                 .font(.system(size: 31, weight: .bold))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("\(artist.albumCount) \(settings.text(.albums).lowercased()) · \(artist.songCount) \(settings.text(.songs).lowercased())")
+            Text("\(settings.albumCount(artist.albumCount)) · \(settings.songCount(artist.songCount))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
@@ -360,11 +355,11 @@ private struct ArtistAlbumTile: View {
                 .matchedGeometryEffectIfPresent(id: artworkTransitionID, in: artworkTransitionNamespace, properties: .frame)
                 .frame(width: 140, height: 140)
                 .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
-            Text(album.title)
+            Text(settings.albumName(album.title))
                 .font(.headline)
                 .foregroundStyle(.primary)
                 .lineLimit(1)
-            Text(album.year > 0 ? "\(album.year)" : "\(album.songCount) \(settings.text(.songs).lowercased())")
+            Text(album.year > 0 ? "\(album.year)" : settings.songCount(album.songCount))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

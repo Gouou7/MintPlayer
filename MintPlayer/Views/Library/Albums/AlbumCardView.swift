@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AlbumCardView: View {
+    @EnvironmentObject private var settings: SettingsManager
     let album: Album
     
     var body: some View {
@@ -14,10 +15,10 @@ struct AlbumCardView: View {
             
             // 专辑信息
             VStack(alignment: .leading, spacing: 4) {
-                Text(album.title)
+                Text(settings.albumName(album.title))
                     .font(.headline)
                     .lineLimit(1)
-                Text(album.artist)
+                Text(settings.artistName(album.artist))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(1)

@@ -46,6 +46,7 @@ struct CollapsibleSidebarHeader: View {
                     }
                     .buttonStyle(MintPlainIconButtonStyle(inactiveForeground: .secondary, hoverSize: CGSize(width: 26, height: 22)))
                     .help(addHelp ?? "")
+                    .accessibilityLabel(addHelp ?? "")
                     .opacity(isHovering ? 1 : 0)
 
                     Image(systemName: "chevron.right")

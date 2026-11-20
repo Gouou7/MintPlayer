@@ -3,16 +3,12 @@ import SwiftUI
 struct PlaylistEditorDraft: Identifiable {
     let id = UUID()
     let playlistId: UUID?
-    let title: String
-    let confirmTitle: String
     var name: String
     var description: String
 
-    static func create(defaultName: String = "New Playlist") -> PlaylistEditorDraft {
+    static func create(defaultName: String) -> PlaylistEditorDraft {
         PlaylistEditorDraft(
             playlistId: nil,
-            title: "New Playlist",
-            confirmTitle: "Create",
             name: defaultName,
             description: ""
         )
@@ -21,8 +17,6 @@ struct PlaylistEditorDraft: Identifiable {
     static func edit(_ playlist: Playlist) -> PlaylistEditorDraft {
         PlaylistEditorDraft(
             playlistId: playlist.id,
-            title: "Edit Playlist",
-            confirmTitle: "Save",
             name: playlist.name,
             description: playlist.description
         )
@@ -74,6 +68,7 @@ struct PlaylistEditorSheet: View {
                 ZStack(alignment: .topLeading) {
                     TextEditor(text: $description)
                         .font(.body)
+                        .accessibilityLabel(settings.text(.description))
                         .scrollContentBackground(.hidden)
                         .padding(10)
 

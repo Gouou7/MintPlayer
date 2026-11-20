@@ -174,7 +174,7 @@ struct MainView: View {
             )
             .dropToImport()
         case .songs:
-            SongsView(title: settings.text(.songs), subtitle: "\(musicLibrary.songs.count) \(settings.text(.tracks))")
+            SongsView(title: settings.text(.songs), subtitle: settings.songCount(musicLibrary.songs.count))
                 .dropToImport()
         case .albums:
             AlbumsView()
@@ -185,7 +185,7 @@ struct MainView: View {
         case .favorites:
             SongsView(
                 title: settings.text(.favorites),
-                subtitle: "\(musicLibrary.favoriteSongs.count) \(settings.text(.tracks))",
+                subtitle: settings.songCount(musicLibrary.favoriteSongs.count),
                 scopedSongs: musicLibrary.favoriteSongs,
                 columnPreferenceScope: .favorites
             )
@@ -194,7 +194,7 @@ struct MainView: View {
             if let playlist = musicLibrary.playlists.first(where: { $0.id == id }) {
                 SongsView(
                     title: playlist.name,
-                    subtitle: "\(playlist.songs.count) \(settings.text(.tracks))",
+                    subtitle: settings.songCount(playlist.songs.count),
                     description: playlist.description,
                     scopedSongs: playlist.songs,
                     playlistId: id,
@@ -209,7 +209,7 @@ struct MainView: View {
                 let sourceSongs = musicLibrary.songs(in: source)
                 SongsView(
                     title: source.name,
-                    subtitle: "\(sourceSongs.count) \(settings.text(.tracks)) · \(source.path)",
+                    subtitle: "\(settings.songCount(sourceSongs.count)) · \(source.path)",
                     scopedSongs: sourceSongs,
                     presentation: .table,
                     columnPreferenceScope: .folder

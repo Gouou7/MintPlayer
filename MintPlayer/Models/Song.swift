@@ -1,6 +1,9 @@
 import Foundation
 
 struct Song: Identifiable, Codable, Hashable {
+    static let unknownArtistName = "Unknown Artist"
+    static let unknownAlbumName = "Unknown Album"
+
     let id: UUID
     let title: String
     let artist: String

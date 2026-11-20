@@ -287,7 +287,8 @@ class MusicLibrary: ObservableObject {
     private static func failureSummary(_ failures: [URL: String]) -> String {
         let details = failures.sorted { $0.key.path < $1.key.path }.prefix(8)
             .map { "\($0.key.lastPathComponent): \($0.value)" }.joined(separator: "\n")
-        return L10n.current(.scanFailureCount, failures.count) + "\n" + details
+        let summary = L10n.current(failures.count == 1 ? .oneScanFailure : .scanFailureCount, failures.count)
+        return "\(summary)\n\(details)"
     }
 
     private func reconcilePlaylistSongs() {
@@ -306,8 +307,8 @@ class MusicLibrary: ObservableObject {
 
         let fileName = url.lastPathComponent
         var title = fileName.replacingOccurrences(of: ".\(url.pathExtension)", with: "")
-        var artist = "Unknown Artist"
-        var album = "Unknown Album"
+        var artist = Song.unknownArtistName
+        var album = Song.unknownAlbumName
         var duration: TimeInterval = 0
         var coverPath: String?
         var genre: String?
@@ -337,10 +338,10 @@ class MusicLibrary: ObservableObject {
         // 没有元数据时，使用常见的 Artist/Album/Track 文件夹结构来兜底。
         let albumFolder = url.deletingLastPathComponent()
         let artistFolder = albumFolder.deletingLastPathComponent()
-        if album == "Unknown Album", !albumFolder.lastPathComponent.isEmpty {
+        if album == Song.unknownAlbumName, !albumFolder.lastPathComponent.isEmpty {
             album = albumFolder.lastPathComponent
         }
-        if artist == "Unknown Artist", artistFolder.path != albumFolder.path, !artistFolder.lastPathComponent.isEmpty {
+        if artist == Song.unknownArtistName, artistFolder.path != albumFolder.path, !artistFolder.lastPathComponent.isEmpty {
             artist = artistFolder.lastPathComponent
         }
 

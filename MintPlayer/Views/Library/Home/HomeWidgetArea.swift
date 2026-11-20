@@ -184,7 +184,7 @@ private struct HomeListeningWidget: View {
                     Text(song?.title ?? settings.text(.resumePlayback))
                         .font(.system(size: 20, weight: .semibold))
                         .lineLimit(2)
-                    Text(song.map { "\($0.artist) - \($0.album)" } ?? settings.text(.noSongsYet))
+                    Text(song.map { settings.songSubtitle(artist: $0.artist, album: $0.album) } ?? settings.text(.noSongsYet))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -239,7 +239,7 @@ private struct HomeListeningWidget: View {
     }
 
     private var buttonTitle: String {
-        settings.text(audioPlayer.isPlaying ? .nextTrack : .resumePlayback)
+        settings.text(audioPlayer.isPlaying ? .next : .resumePlayback)
     }
 
     private var playbackCaption: String {
@@ -247,6 +247,6 @@ private struct HomeListeningWidget: View {
         if audioPlayer.currentSong == nil || pausedTime >= audioPlayer.duration { return settings.text(.startListening) }
         let seconds = Int(max(pausedTime, 0))
         let time = String(format: "%d:%02d", seconds / 60, seconds % 60)
-        return String(format: settings.text(.resumeFromTime), time)
+        return settings.text(.resumeFromTime, time)
     }
 }

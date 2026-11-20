@@ -107,9 +107,9 @@ struct QueueView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(settings.text(.upNext))
+                Text(settings.text(.playbackQueue))
                     .font(.headline)
-                Text("\(audioPlayer.history.count) \(settings.text(.history)) · \(upNextSongs.count) \(settings.text(.upNextLower))")
+                Text(settings.text(.queueSummary, audioPlayer.history.count, upNextSongs.count))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -118,10 +118,10 @@ struct QueueView: View {
 
             if !selectedSongIDs.isEmpty {
                 Button { audioPlayer.removeUpcomingSongs(withIDs: selectedSongIDs) } label: {
-                    Label(settings.text(.removeSelectedQueue), systemImage: "minus.circle")
+                    Label(settings.text(.removeFromQueue), systemImage: "minus.circle")
                 }
                 .labelStyle(.iconOnly)
-                .help(settings.text(.removeSelectedQueue))
+                .help(settings.text(.removeFromQueue))
             }
 
             if audioPlayer.canUndoClearQueue {
@@ -140,6 +140,7 @@ struct QueueView: View {
             .buttonStyle(.borderless)
             .disabled(upNextSongs.isEmpty)
             .help(settings.text(.clearQueue))
+            .accessibilityLabel(settings.text(.clearQueue))
 
             Button(action: { isVisible = false }) {
                 Image(systemName: "xmark.circle.fill")
@@ -148,6 +149,7 @@ struct QueueView: View {
             }
             .buttonStyle(.borderless)
             .help(settings.text(.closeUpNext))
+            .accessibilityLabel(settings.text(.closeUpNext))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -170,7 +172,7 @@ struct QueueView: View {
                 .frame(width: 26)
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title).lineLimit(1)
-                Text(song.artist)
+                Text(settings.artistName(song.artist))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

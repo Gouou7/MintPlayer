@@ -56,7 +56,7 @@ struct SidebarView: View {
                                 .tag(LibrarySelection.playlist(playlist.id))
                                 .overlay {
                                     SidebarContextMenu(items: [
-                                        .init(title: settings.text(.editPlaylistAction), systemImage: "pencil") {
+                                        .init(title: settings.text(.editPlaylist), systemImage: "pencil") {
                                             editPlaylist(playlist)
                                         },
                                         .init(title: settings.text(.deletePlaylist), systemImage: "trash") {
@@ -86,7 +86,7 @@ struct SidebarView: View {
                         title: settings.text(.playlists),
                         isExpanded: $isPlaylistsExpanded,
                         addSystemImage: "plus",
-                        addHelp: "New playlist",
+                        addHelp: settings.text(.newPlaylist),
                         addAction: createPlaylist
                     )
                 }
@@ -119,7 +119,7 @@ struct SidebarView: View {
                         title: settings.text(.foldersSection),
                         isExpanded: $isFoldersExpanded,
                         addSystemImage: "plus",
-                        addHelp: "Add folder",
+                        addHelp: settings.text(.addMusicFolder),
                         addAction: importFolder
                     )
                 }
@@ -155,7 +155,7 @@ struct SidebarView: View {
                 playlistPendingDeletion = nil
             }
         } message: { playlist in
-            Text(String(format: settings.text(.deletePlaylistMessage), playlist.name))
+            Text(settings.text(.deletePlaylistMessage, playlist.name))
         }
         .confirmationDialog(
             settings.text(.deleteFolderQuestion),
@@ -171,7 +171,7 @@ struct SidebarView: View {
                 folderPendingDeletion = nil
             }
         } message: { source in
-            Text(String(format: settings.text(.deleteFolderMessage), source.name))
+            Text(settings.text(.deleteFolderMessage, source.name))
         }
     }
 
@@ -256,6 +256,7 @@ struct SidebarView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
+        panel.prompt = settings.text(.add)
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         musicLibrary.addLibrarySource(name: url.lastPathComponent, path: url.path)
@@ -263,7 +264,7 @@ struct SidebarView: View {
     }
 
     private func createPlaylist() {
-        playlistEditorDraft = .create()
+        playlistEditorDraft = .create(defaultName: settings.text(.newPlaylist))
     }
 
     private func moveLibraryItems(from source: IndexSet, to destination: Int) {

@@ -41,6 +41,7 @@ struct NativeArtistTableView: NSViewRepresentable {
         context.coordinator.observeClipView(scrollView.contentView)
         context.coordinator.resizeColumnToFit()
         context.coordinator.lastArtistIDs = artists.map(\.id)
+        context.coordinator.lastLanguage = settings.effectiveLanguage
         context.coordinator.syncSelectionToTable()
         return scrollView
     }
@@ -50,8 +51,9 @@ struct NativeArtistTableView: NSViewRepresentable {
         guard let tableView = scrollView.documentView as? NSTableView else { return }
 
         let artistIDs = artists.map(\.id)
-        if context.coordinator.lastArtistIDs != artistIDs {
+        if context.coordinator.lastArtistIDs != artistIDs || context.coordinator.lastLanguage != settings.effectiveLanguage {
             context.coordinator.lastArtistIDs = artistIDs
+            context.coordinator.lastLanguage = settings.effectiveLanguage
             tableView.reloadData()
         }
 
@@ -65,6 +67,7 @@ extension NativeArtistTableView {
         var parent: NativeArtistTableView
         weak var tableView: NSTableView?
         var lastArtistIDs: [ArtistSummary.ID] = []
+        var lastLanguage: AppLanguage?
         private var isSyncingSelection = false
         private var clipViewObservers: [NSObjectProtocol] = []
 
@@ -121,7 +124,11 @@ extension NativeArtistTableView {
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
             guard parent.artists.indices.contains(row) else { return nil }
             let artist = parent.artists[row]
-            let view = NSHostingView(rootView: NativeArtistCell(artist: artist, countSummary: countSummary(for: artist)))
+            let view = NSHostingView(rootView: NativeArtistCell(
+                artist: artist,
+                displayName: parent.settings.artistName(artist.name),
+                countSummary: countSummary(for: artist)
+            ))
             view.sizingOptions = []
             return view
         }
@@ -150,13 +157,14 @@ extension NativeArtistTableView {
         }
 
         private func countSummary(for artist: ArtistSummary) -> String {
-            "\(artist.albumCount) \(parent.settings.text(.albums).lowercased()) · \(artist.songCount) \(parent.settings.text(.songs).lowercased())"
+            "\(parent.settings.albumCount(artist.albumCount)) · \(parent.settings.songCount(artist.songCount))"
         }
     }
 }
 
 private struct NativeArtistCell: View {
     let artist: ArtistSummary
+    let displayName: String
     let countSummary: String
 
     var body: some View {
@@ -170,7 +178,7 @@ private struct NativeArtistCell: View {
             .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(artist.name)
+                Text(displayName)
                     .font(.headline)
                     .lineLimit(1)
 

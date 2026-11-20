@@ -95,7 +95,7 @@ struct PlayerBarView: View {
                         .font(.callout.weight(.bold))
                         .lineLimit(1)
 
-                    Text("\(currentSong.artist) - \(currentSong.album)")
+                    Text(settings.songSubtitle(artist: currentSong.artist, album: currentSong.album))
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -156,6 +156,7 @@ struct PlayerBarView: View {
                 toggleCurrentSongFavorite()
             }
             .help(currentSongIsFavorite ? settings.text(.removeFromFavorites) : settings.text(.addToFavorites))
+            .accessibilityLabel(currentSongIsFavorite ? settings.text(.removeFromFavorites) : settings.text(.addToFavorites))
 
             Button(action: { isQueuePresented.toggle() }) {
                 Image(systemName: "list.bullet")
@@ -164,7 +165,8 @@ struct PlayerBarView: View {
                     .frame(width: 24, height: 24)
             }
             .buttonStyle(MintPlainIconButtonStyle())
-            .help(settings.text(.upNext))
+            .help(settings.text(.playbackQueue))
+            .accessibilityLabel(settings.text(.playbackQueue))
             .popover(isPresented: $isQueuePresented, arrowEdge: .bottom) {
                 QueueView(isVisible: $isQueuePresented)
                     .frame(width: 380, height: 520)
@@ -177,6 +179,7 @@ struct PlayerBarView: View {
             }
             .buttonStyle(MintPlainIconButtonStyle())
             .help(settings.text(.volume))
+            .accessibilityLabel(settings.text(.volume))
             .popover(isPresented: $isVolumePresented, arrowEdge: .bottom) {
                 volumeControl
                     .frame(width: 220, height: 24)
@@ -201,6 +204,7 @@ struct PlayerBarView: View {
                 in: 0...1
             )
             .controlSize(.small)
+            .accessibilityLabel(settings.text(.volume))
             .tint(.gray)
             .accentColor(.gray)
             .frame(maxWidth: .infinity)
@@ -233,6 +237,7 @@ struct PlayerBarView: View {
         }
         .buttonStyle(MintContentButtonStyle(cornerRadius: 8, hoverOutset: 0))
         .help(settings.text(.showLyrics))
+        .accessibilityLabel(settings.text(.showLyrics))
     }
 
     private func presentLyrics() {

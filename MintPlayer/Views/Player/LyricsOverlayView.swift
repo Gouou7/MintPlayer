@@ -106,7 +106,7 @@ struct LyricsOverlayView: View {
                     .minimumScaleFactor(0.75)
                     .allowsTightening(true)
 
-                Text("\(song.artist) - \(song.album)")
+                Text(settings.songSubtitle(artist: song.artist, album: song.album))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -162,7 +162,7 @@ struct LyricsOverlayView: View {
                 NativeLyricsOptionsMenu.EncodingOption(encoding: $0, title: settings.text($0.titleKey))
             },
             selectedEncoding: settings.lyricsEncoding(for: song),
-            timingValue: String(format: settings.text(.lyricsTimingValue), timingOffset),
+            timingValue: settings.text(.lyricsTimingValue, timingOffset),
             earlierTitle: settings.text(.lyricsEarlier),
             laterTitle: settings.text(.lyricsLater),
             resetTitle: settings.text(.resetLyricsTiming),
@@ -186,7 +186,7 @@ struct LyricsOverlayView: View {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = [UTType(filenameExtension: "lrc") ?? .plainText, .plainText]
-        panel.prompt = settings.text(.chooseLyricsFile)
+        panel.prompt = settings.text(.choose)
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             settings.updateLyricsFile(url, for: selectedSong)

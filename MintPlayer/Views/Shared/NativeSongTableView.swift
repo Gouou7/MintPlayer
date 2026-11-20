@@ -88,14 +88,16 @@ struct NativeSongTableView: NSViewRepresentable {
         let configurationChanged = context.coordinator.currentStyle != style ||
             context.coordinator.currentColumnPreferenceScope != columnPreferenceScope
         let coordinator = context.coordinator
+        let reloadAll: Bool
         if configurationChanged {
             coordinator.configureColumns(for: style)
             coordinator.configureScrollBehavior(scrollView, for: style)
+            reloadAll = true
         } else {
-            coordinator.updateColumnTitles()
+            reloadAll = coordinator.updateColumnTitles()
         }
         coordinator.configureContentInsets(scrollView)
-        coordinator.reloadSongs(in: tableView, configurationChanged: configurationChanged)
+        coordinator.reloadSongs(in: tableView, reloadAll: reloadAll)
         coordinator.resizeColumnsToFit()
         coordinator.syncSortDescriptorsToTable()
         coordinator.syncSelectionToTable()
@@ -521,9 +523,9 @@ extension NativeSongTableView {
             columnLanguage = parent.settings.effectiveLanguage
         }
 
-        func updateColumnTitles() {
+        func updateColumnTitles() -> Bool {
             let language = parent.settings.effectiveLanguage
-            guard let tableView, columnLanguage != language else { return }
+            guard let tableView, columnLanguage != language else { return false }
             columnLanguage = language
 
             for column in tableView.tableColumns {
@@ -531,18 +533,19 @@ extension NativeSongTableView {
                 column.title = title(for: id, style: parent.style)
             }
             tableView.headerView?.needsDisplay = true
+            return true
         }
 
-        func reloadSongs(in tableView: NSTableView, configurationChanged: Bool) {
+        func reloadSongs(in tableView: NSTableView, reloadAll: Bool) {
             let songs = parent.songs
-            guard configurationChanged || lastSongs != songs else { return }
+            guard reloadAll || lastSongs != songs else { return }
             let previousSongs = lastSongs
             lastSongs = songs
 
             isSyncingSelection = true
             defer { isSyncingSelection = false }
 
-            guard !configurationChanged, previousSongs.elementsEqual(songs, by: { $0.id == $1.id }) else {
+            guard !reloadAll, previousSongs.elementsEqual(songs, by: { $0.id == $1.id }) else {
                 tableView.reloadData()
                 return
             }
@@ -676,9 +679,9 @@ extension NativeSongTableView {
             let song = parent.songs[row]
             switch (parent.style, column) {
             case (.detailed, .song):
-                return hostingView(DetailedNativeSongCell(song: song, unknownAlbum: parent.settings.text(.unknownAlbum)))
+                return hostingView(DetailedNativeSongCell(song: song, albumName: parent.settings.albumName(song.album)))
             case (.detailed, .artist):
-                return hostingView(TextCell(text: song.artist.isEmpty ? parent.settings.text(.unknownArtist) : song.artist, weight: .semibold))
+                return hostingView(TextCell(text: parent.settings.artistName(song.artist), weight: .semibold))
             case (.detailed, .duration):
                 return hostingView(DurationCell(text: formatDuration(song.duration)))
             case (.detailed, .playCount):
@@ -692,9 +695,9 @@ extension NativeSongTableView {
             case (.compactFolder, .title):
                 return hostingView(TextCell(text: song.title))
             case (.compactFolder, .artist):
-                return hostingView(TextCell(text: song.artist))
+                return hostingView(TextCell(text: parent.settings.artistName(song.artist)))
             case (.compactFolder, .album):
-                return hostingView(TextCell(text: song.album))
+                return hostingView(TextCell(text: parent.settings.albumName(song.album)))
             case (.compactFolder, .genre):
                 let genre = (song.genre ?? "").isEmpty ? parent.settings.text(.unknownGenre) : song.displayGenre
                 return hostingView(TextCell(text: genre, color: .secondary))
@@ -1456,7 +1459,7 @@ extension Set where Element == SongContextMenuController.Action {
 
 private struct DetailedNativeSongCell: View {
     let song: Song
-    let unknownAlbum: String
+    let albumName: String
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1467,7 +1470,7 @@ private struct DetailedNativeSongCell: View {
                 Text(song.title)
                     .font(.headline)
                     .lineLimit(1)
-                Text(song.album.isEmpty ? unknownAlbum : song.album)
+                Text(albumName)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
