@@ -73,11 +73,11 @@
 - 继续播放：134 × 134 pt 封面，封面圆角 9 pt，与文字间距 16 pt；标题 20 pt、半粗体、最多两行，艺人与专辑 16 pt、半粗体、最多一行。底部按钮为 114 × 43 pt 胶囊：未播放时显示“继续播放”和播放图标，点击后恢复当前歌曲或开始播放推荐歌曲；播放中显示“下一曲”和切歌图标，点击后切换至下一曲。状态切换时，按钮内的图标与文字使用 `.transition(.blurReplace)`，动画时长为 0.22 秒；减少动态效果时关闭切换动画。
 - 歌词：当前歌曲的专辑图铺满背景，放大至 1.2 倍后模糊 18 pt。组件跟随应用配色：深色模式叠加 60% 不透明度的黑色遮罩，当前行使用白色；浅色模式叠加 66% 不透明度的白色遮罩，当前行使用黑色。其余歌词使用对应文字颜色的 78% 不透明度，不再额外按行距降低透明度。文字使用系统字体 12 pt、半粗体，单行最小高度 25 pt，左右内边距各 16 pt，上下边缘渐隐。同步歌词随播放滚动，当前行中心位于卡片高度的 30% 处（从顶部计）；纯文本歌词可手动滚动。点击整张卡片打开内嵌全屏歌词，歌词行跳转操作位于全屏界面。尚未播放、加载中、缺少歌词或加载失败时显示相应提示，提示文字同样跟随配色；缺少封面时使用灰色占位背景，未选择歌曲时不允许打开歌词界面。
 
-歌词组件复用现有歌词文件选择、编码和时间偏移设置；减少动态效果时关闭自动滚动动画和封面淡入淡出。四种组件均可通过右键添加或移除，每种最多显示一个，显示状态在重启后恢复。
+歌词组件复用现有歌词文件选择、编码和时间偏移设置。开启「减少动态效果」时关闭自动滚动动画和封面淡入淡出。首页显示的组件由代码中的 `HomeWidgetGrid.widgets` 统一定义。
 
 ## 实现入口
 
-- [HomeWidgetArea.swift](../MintPlayer/Views/Library/Home/HomeWidgetArea.swift)：网格常量、类型跨度、固定坐标、卡片内容与管理菜单。
+- [HomeWidgetArea.swift](../MintPlayer/Views/Library/Home/HomeWidgetArea.swift)：组件清单、网格常量、类型跨度、固定坐标与卡片内容。
 - [HomeLyricsWidget.swift](../MintPlayer/Views/Library/Home/HomeLyricsWidget.swift)：歌词组件的加载、背景与空状态。
 - [LyricsOverlayView.swift](../MintPlayer/Views/Player/LyricsOverlayView.swift)：共用同步歌词高亮与原生滚动逻辑。
 - [HomeView.swift](../MintPlayer/Views/Library/Home/HomeView.swift)：首页内容宽度、页面内边距与区域间距。

@@ -2,106 +2,34 @@ import SwiftUI
 
 struct HomeWidgetArea: View {
     @EnvironmentObject private var settings: SettingsManager
-    @AppStorage(AppConfiguration.userDefaultsKey("home.widgets.hidden")) private var hiddenWidgetStorage = ""
 
     let suggestedSong: Song?
     let onShowLyrics: () -> Void
 
-    private var hiddenWidgets: Set<HomeWidgetKind> {
-        Set(hiddenWidgetStorage.split(separator: ",").compactMap { HomeWidgetKind(rawValue: String($0)) })
-    }
-
-    private var visibleWidgets: [HomeWidgetKind] {
-        HomeWidgetKind.allCases.filter { !hiddenWidgets.contains($0) }
-    }
-
     var body: some View {
-        HomeWidgetGridLayout(kinds: visibleWidgets) {
-            ForEach(visibleWidgets) { kind in
+        HomeWidgetGridLayout {
+            ForEach(HomeWidgetGrid.widgets) { kind in
                 HomeWidgetContent(kind: kind, suggestedSong: suggestedSong, onShowLyrics: onShowLyrics)
                     .frame(width: kind.size.width, height: kind.size.height)
-                    .contextMenu {
-                        addMenu
-                        Button { remove(kind) } label: {
-                            Label(settings.text(.removeThisWidget), systemImage: "trash")
-                        }
-                    }
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(settings.text(kind.titleKey))
-                    .accessibilityAction(named: Text(settings.text(.removeThisWidget))) { remove(kind) }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.clear)
-        .contentShape(Rectangle())
-        .contextMenu {
-            addMenu
-            Menu {
-                ForEach(HomeWidgetKind.allCases) { kind in
-                    if !hiddenWidgets.contains(kind) {
-                        Button { remove(kind) } label: {
-                            Label(settings.text(kind.titleKey), systemImage: kind.systemImage)
-                        }
-                    }
-                }
-            } label: {
-                Label(settings.text(.removeWidget), systemImage: "minus.circle")
-            }
-            .disabled(visibleWidgets.isEmpty)
-        }
-        .overlay {
-            if visibleWidgets.isEmpty {
-                Text(settings.text(.addWidgetsHint))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .allowsHitTesting(false)
-            }
-        }
-    }
-
-    private var addMenu: some View {
-        Menu {
-            ForEach(HomeWidgetKind.allCases) { kind in
-                Button { add(kind) } label: {
-                    Label(settings.text(kind.titleKey), systemImage: kind.systemImage)
-                }
-                .disabled(!hiddenWidgets.contains(kind))
-            }
-        } label: {
-            Label(settings.text(.addWidget), systemImage: "plus.circle")
-        }
-    }
-
-    private func add(_ kind: HomeWidgetKind) {
-        var hidden = hiddenWidgets
-        hidden.remove(kind)
-        saveHiddenWidgets(hidden)
-    }
-
-    private func remove(_ kind: HomeWidgetKind) {
-        var hidden = hiddenWidgets
-        hidden.insert(kind)
-        saveHiddenWidgets(hidden)
-    }
-
-    private func saveHiddenWidgets(_ hidden: Set<HomeWidgetKind>) {
-        hiddenWidgetStorage = HomeWidgetKind.allCases.filter { hidden.contains($0) }.map(\.rawValue).joined(separator: ",")
     }
 }
 
 private struct HomeWidgetGridLayout: Layout {
-    let kinds: [HomeWidgetKind]
-
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let proposedWidth = proposal.width ?? HomeWidgetGrid.length(8)
         let width = proposedWidth.isFinite ? proposedWidth : HomeWidgetGrid.length(8)
-        let placements = HomeWidgetGrid.placements(for: kinds, availableWidth: width)
+        let placements = HomeWidgetGrid.placements(availableWidth: width)
         let rows = max(2, placements.map { $0.row + $0.kind.rowSpan }.max() ?? 0)
         return CGSize(width: width, height: HomeWidgetGrid.length(rows))
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let placements = HomeWidgetGrid.placements(for: kinds, availableWidth: bounds.width)
+        let placements = HomeWidgetGrid.placements(availableWidth: bounds.width)
         for (placement, subview) in zip(placements, subviews) {
             subview.place(
                 at: CGPoint(x: bounds.minX + placement.origin.x, y: bounds.minY + placement.origin.y),
@@ -112,7 +40,7 @@ private struct HomeWidgetGridLayout: Layout {
     }
 }
 
-private enum HomeWidgetKind: String, CaseIterable, Identifiable, Hashable {
+private enum HomeWidgetKind: Identifiable, Hashable {
     case favorites
     case shuffle
     case resume
@@ -132,34 +60,25 @@ private enum HomeWidgetKind: String, CaseIterable, Identifiable, Hashable {
         case .lyrics: return .lyrics
         }
     }
-
-    var systemImage: String {
-        switch self {
-        case .favorites: return "heart.fill"
-        case .shuffle: return "shuffle"
-        case .resume: return "play.fill"
-        case .lyrics: return "text.quote"
-        }
-    }
 }
 
-private struct HomeWidgetPlacement: Identifiable {
+private struct HomeWidgetPlacement {
     let kind: HomeWidgetKind
     let column: Int
     let row: Int
 
-    var id: HomeWidgetKind { kind }
     var origin: CGPoint { CGPoint(x: CGFloat(column) * HomeWidgetGrid.pitch, y: CGFloat(row) * HomeWidgetGrid.pitch) }
 }
 
 private enum HomeWidgetGrid {
+    static let widgets: [HomeWidgetKind] = [.favorites, .shuffle, .resume, .lyrics]
     static let unit: CGFloat = 75
     static let spacing: CGFloat = 16
     static let pitch = unit + spacing
 
-    static func placements(for kinds: [HomeWidgetKind], availableWidth: CGFloat) -> [HomeWidgetPlacement] {
+    static func placements(availableWidth: CGFloat) -> [HomeWidgetPlacement] {
         let fitsLyricsOnFirstRow = availableWidth >= length(8)
-        return kinds.map { kind in
+        return widgets.map { kind in
             switch kind {
             case .favorites: return HomeWidgetPlacement(kind: kind, column: 0, row: 0)
             case .shuffle: return HomeWidgetPlacement(kind: kind, column: 0, row: 1)

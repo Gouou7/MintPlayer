@@ -299,10 +299,6 @@ enum L10n {
         case nextTrack
         case resumeFromTime
         case quickPlay
-        case addWidget
-        case removeWidget
-        case removeThisWidget
-        case addWidgetsHint
         case favoriteWidgetSubtitle
         case shuffleWidgetSubtitle
         case lyricsWidgetIdle
@@ -567,10 +563,6 @@ enum L10n {
         .nextTrack: "Next Track",
         .resumeFromTime: "Continue from %@",
         .quickPlay: "Quick play",
-        .addWidget: "Add Widget",
-        .removeWidget: "Remove Widget",
-        .removeThisWidget: "Remove This Widget",
-        .addWidgetsHint: "Right-click to add a widget",
         .favoriteWidgetSubtitle: "Revisit favorites",
         .shuffleWidgetSubtitle: "All library songs",
         .lyricsWidgetIdle: "Play a song to see lyrics",
@@ -823,10 +815,6 @@ enum L10n {
         .nextTrack: "下一曲",
         .resumeFromTime: "从 %@ 继续",
         .quickPlay: "快速播放",
-        .addWidget: "添加小组件",
-        .removeWidget: "移除小组件",
-        .removeThisWidget: "移除此小组件",
-        .addWidgetsHint: "右键添加小组件",
         .favoriteWidgetSubtitle: "重温最爱",
         .shuffleWidgetSubtitle: "资料库全部歌曲",
         .lyricsWidgetIdle: "播放歌曲以显示歌词",
