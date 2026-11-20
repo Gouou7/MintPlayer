@@ -66,7 +66,7 @@ Mint Player 是一款面向 macOS 的原生本地音乐播放器，采用 macOS 
 
 ## 构建
 
-1. 通过 Git 克隆本仓库并保留版本标签。Debug 构建需要一个可达的 `vMAJOR.MINOR.PATCH` 标签，Release 构建要求该标签指向当前提交。构建脚本从 Git 读取版本信息。
+1. 通过 Git 克隆本仓库并保留完整历史和标签。构建时自动生成应用版本号。当前提交有 `vMAJOR.MINOR.PATCH` 格式的标签时显示该标签，例如 `v1.2.3`，否则使用最近的有效祖先标签及提交短哈希，例如 `v1.2.3+g1a2b3c4d`。没有有效祖先标签时显示 `0.0.0+g1a2b3c4d`。
 2. 在 Xcode 中打开 `MintPlayer.xcodeproj`，选择 `MintPlayer` scheme 与 `My Mac`，然后按 `Command + R` 运行。首次构建需要联网解析 SwiftPM 依赖。
 
 ### 命令行
@@ -79,6 +79,8 @@ xcodebuild -project MintPlayer.xcodeproj -scheme MintPlayer -configuration Debug
 
 > [!NOTE]
 > Debug 构建会使用独立于 Release 构建的应用名称、Bundle ID、Application Support 目录和偏好设置前缀。
+
+CI 应检出完整历史和标签。已有的浅克隆可在构建前执行 `git fetch --unshallow --tags`。
 
 ## 常见问题
 

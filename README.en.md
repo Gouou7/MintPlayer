@@ -66,7 +66,7 @@ See the [MCP Guide](docs/mcp.en.md) for client setup, the tool list, and example
 
 ## Build
 
-1. Clone this repository with Git and keep the version tags. A Debug build needs a reachable `vMAJOR.MINOR.PATCH` tag. A Release build needs that tag on the current commit. The build script reads version information from Git.
+1. Clone this repository with Git and keep the full history and tags. The build generates the app version automatically. A `vMAJOR.MINOR.PATCH` tag on the current commit appears as written, for example `v1.2.3`. Otherwise, the version uses the nearest valid ancestor tag and the short commit hash, for example `v1.2.3+g1a2b3c4d`. With no valid ancestor tag, the version is `0.0.0+g1a2b3c4d`.
 2. Open `MintPlayer.xcodeproj` in Xcode, select the `MintPlayer` scheme and `My Mac`, then press `Command + R`. The first build resolves SwiftPM dependencies and needs network access.
 
 ### Command Line
@@ -79,6 +79,8 @@ xcodebuild -project MintPlayer.xcodeproj -scheme MintPlayer -configuration Debug
 
 > [!NOTE]
 > Debug builds use a separate app name, bundle identifier, Application Support directory, and preferences prefix from Release builds.
+
+In CI, check out the full history and tags. For an existing shallow clone, run `git fetch --unshallow --tags` before building.
 
 ## FAQ
 
