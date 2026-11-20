@@ -49,8 +49,13 @@ jobs:
             exit 1
           fi
           executable=$(plutil -extract CFBundleExecutable raw -o - "$plist")
-          lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/$executable"
-          lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/mintplayer-mcp"
+          for binary in "$app/Contents/MacOS/$executable" "$app/Contents/MacOS/mintplayer-mcp"; do
+            archs=$(lipo "$binary" -archs)
+            if [[ " $archs " != *" arm64 "* || " $archs " != *" x86_64 "* ]]; then
+              printf '::error::%s requires arm64 and x86_64. Found %s.\n' "$binary" "$archs"
+              exit 1
+            fi
+          done
 
           staging_dir=$(mktemp -d "$RUNNER_TEMP/mintplayer-dmg.XXXXXXXX")
           trap 'rm -rf "$staging_dir"' EXIT
