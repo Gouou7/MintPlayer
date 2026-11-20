@@ -80,7 +80,11 @@ xcodebuild -project MintPlayer.xcodeproj -scheme MintPlayer -configuration Debug
 > [!NOTE]
 > Debug builds use a separate app name, bundle identifier, Application Support directory, and preferences prefix from Release builds.
 
-In CI, check out the full history and tags. For an existing shallow clone, run `git fetch --unshallow --tags` before building.
+For an existing shallow clone, run `git fetch --unshallow --tags` before building.
+
+### GitHub Releases
+
+Push a new `vMAJOR.MINOR.PATCH` tag on a commit containing the release workflow. GitHub Actions builds the Release app and publishes `MintPlayer-<tag>-macOS.dmg` to [GitHub Releases](https://github.com/Gouou7/MintPlayer/releases). The app supports Apple silicon and Intel Macs and is distributed without Developer ID signing or notarization.
 
 ## FAQ
 

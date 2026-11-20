@@ -20,10 +20,15 @@ version_tags=$(
         LC_ALL=C /usr/bin/sort -nr -t . -k1.2,1 -k2,2 -k3,3
 )
 
+release_tag=${MINTPLAYER_RELEASE_TAG:-}
 version_tag=
 closest_distance=$build_number
 # Count commits since each candidate as git describe does. Version order breaks ties.
 for tag in $version_tags; do
+    if [ -n "$release_tag" ] && [ "$tag" != "$release_tag" ]; then
+        continue
+    fi
+
     distance=$(git_in_source rev-list --count "refs/tags/$tag..$head" --)
     if [ "$distance" -lt "$closest_distance" ]; then
         version_tag=$tag
@@ -33,6 +38,11 @@ for tag in $version_tags; do
         break
     fi
 done
+
+if [ -n "$release_tag" ] && [ "$closest_distance" -ne 0 ]; then
+    printf 'error: Release tag %s must be a valid version tag on HEAD.\n' "$release_tag" >&2
+    exit 1
+fi
 
 if [ "$closest_distance" -eq 0 ]; then
     display_version=$version_tag

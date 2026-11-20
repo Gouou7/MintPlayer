@@ -89,7 +89,7 @@ Mint Player 是原生 macOS 本地音乐播放器，使用 Swift 与 SwiftUI，�
 
 ## 构建与验证
 
-无需手动安装依赖：Xcode 在构建时解析 `Package.resolved` 中的 SwiftPM 依赖，首次构建需要联网。本仓库没有 Xcode 测试 target、Lint 配置或 CI 配置。Xcode 会在构建阶段运行版本脚本。用户要求验证版本生成时，运行 `/bin/sh Scripts/test-embed-git-version.sh`。
+无需手动安装依赖：Xcode 在构建时解析 `Package.resolved` 中的 SwiftPM 依赖，首次构建需要联网。本仓库没有 Xcode 测试 target 或 Lint 配置。Xcode 会在构建阶段运行版本脚本。用户要求验证版本生成时，运行 `/bin/sh Scripts/test-embed-git-version.sh`。
 
 仅在用户明确要求时，使用以下命令检查或构建：
 
@@ -132,6 +132,7 @@ Debug 使用 `Mint Player Debug.app`、Bundle ID `dev.govo.mintplayer.debug`、A
 
 - Debug 和 Release 使用同一套 Git 版本规则，默认使用八位提交短哈希。有效标签严格匹配 `vMAJOR.MINOR.PATCH`，数字分量不含前导零。按标签到 HEAD 之间的提交数选出最近标签，距离相同时选择数值最高的版本。不要手动维护 Xcode 中 `MARKETING_VERSION` 或 `CURRENT_PROJECT_VERSION` 的占位值。
 - `Scripts/embed-git-version.sh` 在 DerivedData 生成 Info.plist，将完整版本写入 `MintDisplayVersion`，将数字版本写入 `CFBundleShortVersionString`，将可达提交数写入 `CFBundleVersion`。浅克隆有当前提交的有效标签时可构建，构建号使用可见提交数。其余浅克隆须先补全历史和标签。构建脚本需要能解析 HEAD。
+- [GitHub 发布工作流](.github/workflows/release.yml)使用 `MINTPLAYER_RELEASE_TAG` 将应用版本绑定到触发发布的标签。脚本只接受指向 HEAD 的有效版本标签。仓库的自动发布目标为 Universal DMG，Xcode 应用签名已在工作流中禁用。
 
 ## Git 与数据安全
 

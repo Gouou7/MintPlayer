@@ -10,6 +10,7 @@ trap 'exit 1' HUP INT TERM
 
 export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_NOSYSTEM=1
+unset MINTPLAYER_RELEASE_TAG
 repo="$test_dir/source repo"
 derived_dir="$test_dir/derived files"
 
@@ -35,6 +36,17 @@ check_version() {
     assert_plist_value MintDisplayVersion "$3"
     assert_plist_value CFBundleShortVersionString "$4"
     assert_plist_value CFBundleVersion "$5"
+}
+
+check_failure() {
+    if output=$(SRCROOT="$1" DERIVED_FILE_DIR="$derived_dir" /bin/sh "$script" 2>&1); then
+        echo 'FAIL version generation unexpectedly succeeded' >&2
+        exit 1
+    fi
+    case "$output" in
+        *"$2"*) ;;
+        *) printf 'FAIL unexpected version generation error: %s\n' "$output" >&2; exit 1 ;;
+    esac
 }
 
 /usr/bin/git init --quiet -b main "$repo"
@@ -63,6 +75,10 @@ git_fixture tag v1.10.0
 git_fixture config column.tag always
 git_fixture config versionsort.suffix .10.0
 check_version "$repo" Debug v1.10.0 1.10.0 2
+(
+    export MINTPLAYER_RELEASE_TAG=v1.2.3
+    check_version "$repo" Release v1.2.3 1.2.3 2
+)
 
 # A larger older tag, an unmerged tag, and an invalid exact tag must lose.
 git_fixture switch --quiet -c side
@@ -73,6 +89,10 @@ commit_fixture 'Development commit'
 git_fixture tag v99.0.0-rc.1
 development_hash=$(git_fixture rev-parse HEAD | /usr/bin/cut -c 1-8)
 check_version "$repo" Release "v1.10.0+g$development_hash" 1.10.0 3
+(
+    export MINTPLAYER_RELEASE_TAG=v1.2.3
+    check_failure "$repo" 'must be a valid version tag on HEAD'
+)
 
 # Both sides are now reachable at the same distance.
 git_fixture tag v1.9.0
@@ -83,14 +103,7 @@ check_version "$repo" Debug "v1.11.0+g$merge_hash" 1.11.0 5
 # A local file URL creates a real shallow clone and requires no network.
 shallow_repo="$test_dir/shallow repo"
 /usr/bin/git clone --quiet --depth=1 "file://$repo" "$shallow_repo"
-if output=$(SRCROOT="$shallow_repo" DERIVED_FILE_DIR="$derived_dir" /bin/sh "$script" 2>&1); then
-    echo 'FAIL shallow checkout without an exact tag succeeded' >&2
-    exit 1
-fi
-case "$output" in
-    *"git fetch --unshallow --tags"*) ;;
-    *) printf 'FAIL unexpected shallow checkout error: %s\n' "$output" >&2; exit 1 ;;
-esac
+check_failure "$shallow_repo" 'git fetch --unshallow --tags'
 /usr/bin/git -C "$shallow_repo" fetch --quiet --unshallow --tags
 check_version "$shallow_repo" Debug "v1.11.0+g$merge_hash" 1.11.0 5
 

@@ -80,7 +80,11 @@ xcodebuild -project MintPlayer.xcodeproj -scheme MintPlayer -configuration Debug
 > [!NOTE]
 > Debug 构建会使用独立于 Release 构建的应用名称、Bundle ID、Application Support 目录和偏好设置前缀。
 
-CI 应检出完整历史和标签。已有的浅克隆可在构建前执行 `git fetch --unshallow --tags`。
+浅克隆可在构建前执行 `git fetch --unshallow --tags`。
+
+### GitHub 发布
+
+在包含发布工作流的提交上新建并推送 `vMAJOR.MINOR.PATCH` 标签后，GitHub Actions 会构建 Release 应用，并发布 `MintPlayer-<标签>-macOS.dmg` 到 [GitHub Releases](https://github.com/Gouou7/MintPlayer/releases)。DMG 内的应用支持 Apple Silicon 和 Intel Mac，未使用开发者证书签名或公证。
 
 ## 常见问题
 
